@@ -1,0 +1,1399 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<title>Texas Dominoes</title>
+<link rel="stylesheet" href="./assets/css/styles.css">
+
+<!-- V12.4: Web App Manifest & Home Screen Icon -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Texas Dominoes">
+<meta name="application-name" content="Texas Dominoes">
+<meta name="theme-color" content="#1a5c2a">
+<link rel="apple-touch-icon" href="./assets/images/icon-180.png">
+<link rel="apple-touch-icon" sizes="512x512" href="./assets/images/icon-512.png">
+</head>
+<body>
+<!-- V12.4: Inline Web App Manifest -->
+<script>
+(function(){
+  var base = window.location.href.replace(/\/[^/]*$/, '/');
+  var m = {"name": "Texas Dominoes", "short_name": "Texas Dominoes", "description": "Texas Dominoes - TN51 / T42 / Moon", "start_url": ".", "display": "standalone", "orientation": "portrait", "background_color": "#1a5c2a", "theme_color": "#1a5c2a", "icons": [{"src": base + "assets/images/manifest-icon-192.png", "sizes": "192x192", "type": "image/png"}, {"src": base + "assets/images/manifest-icon-512.png", "sizes": "512x512", "type": "image/png"}]};
+  var blob = new Blob([JSON.stringify(m)], {type:'application/json'});
+  var link = document.createElement('link');
+  link.rel = 'manifest';
+  link.href = URL.createObjectURL(blob);
+  document.head.appendChild(link);
+})();
+</script>
+
+
+<div id="viewportWrapper">
+<div id="gameWrapper">
+<div id="topbar">
+  <div id="topRow">
+    <div class="pill scorePill" id="team1Pill">
+      <div class="scoreLabel">Team 1</div>
+      <div class="scoreValue" id="team1Score">0</div>
+      <div class="scoreBar"><div class="scoreFill" id="team1Fill"></div></div>
+    </div>
+
+    <div class="pill marksPill" id="marksPill">
+      <div class="marksLabel">MARKS</div>
+      <div class="marksDisplay">
+        <div class="tallyGroup">
+          <canvas id="tallyCanvas1" class="tallyCanvas" width="80" height="24"></canvas>
+        </div>
+        <div class="tallyGroup">
+          <canvas id="tallyCanvas2" class="tallyCanvas" width="80" height="24"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="pill scorePill" id="team2Pill">
+      <div class="scoreLabel">Team 2</div>
+      <div class="scoreValue" id="team2Score">0</div>
+      <div class="scoreBar"><div class="scoreFill" id="team2Fill"></div></div>
+    </div>
+  </div>
+  <!-- Moon Widow Display -->
+<div id="moonWidowLabel" style="display:none;position:absolute;z-index:51;color:rgba(255,255,255,0.7);font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;text-align:center;pointer-events:none;">Widow</div>
+<div id="playerNameDisplay" style="display:none;position:absolute;top:4px;right:8px;z-index:50;color:rgba(255,255,255,0.7);font-size:11px;font-weight:600;"></div>
+<div id="moonScoreBar" style="display:none;justify-content:space-around;padding:4px 8px;background:rgba(0,0,0,0.3);border-radius:0 0 8px 8px;">
+    <div style="text-align:center;flex:1;">
+      <div style="font-size:10px;color:rgba(255,255,255,0.6);">P1 (You)</div>
+      <div style="font-size:16px;font-weight:700;color:#3b82f6;" id="moonP1Score">0</div>
+      <div style="font-size:9px;color:rgba(255,255,255,0.5);">Bid: <span id="moonP1Bid">-</span> | Tricks: <span id="moonP1Tricks">0</span></div>
+    </div>
+    <div style="text-align:center;flex:1;border-left:1px solid rgba(255,255,255,0.1);border-right:1px solid rgba(255,255,255,0.1);">
+      <div style="font-size:10px;color:rgba(255,255,255,0.6);">P2</div>
+      <div style="font-size:16px;font-weight:700;color:#ef4444;" id="moonP2Score">0</div>
+      <div style="font-size:9px;color:rgba(255,255,255,0.5);">Bid: <span id="moonP2Bid">-</span> | Tricks: <span id="moonP2Tricks">0</span></div>
+    </div>
+    <div style="text-align:center;flex:1;">
+      <div style="font-size:10px;color:rgba(255,255,255,0.6);">P3</div>
+      <div style="font-size:16px;font-weight:700;color:#22c55e;" id="moonP3Score">0</div>
+      <div style="font-size:9px;color:rgba(255,255,255,0.5);">Bid: <span id="moonP3Bid">-</span> | Tricks: <span id="moonP3Tricks">0</span></div>
+    </div>
+  </div>
+</div>
+<div id="tableMain">
+  <!-- Trick History Background - darkened area for indentation effect -->
+  <div id="trickHistoryBg"></div>
+  <!-- Boneyard 2 — inline overlay -->
+  <div id="boneyard2Container">
+    <canvas id="boneyard2Canvas"></canvas>
+  </div>
+  <script>
+  // Apply default boneyard position only if no saved settings exist
+  (function(){
+    try {
+      var orient = window.innerWidth > window.innerHeight ? 'landscape' : 'portrait';
+      var byKey = 'tn51_boneyard_' + orient;
+      if(!localStorage.getItem(byKey) && !localStorage.getItem('tn51_boneyard')){
+        document.documentElement.style.setProperty('--th-left', '4.5%');
+        document.documentElement.style.setProperty('--th-top', '14%');
+      }
+    } catch(e) {
+      // V10_122e: iOS Safari private mode - use defaults
+      document.documentElement.style.setProperty('--th-left', '4.5%');
+      document.documentElement.style.setProperty('--th-top', '14%');
+    }
+  })();
+  </script>
+  <!-- Boneyard 2 toggle — vertical BONES text + arrow on right side -->
+  <div id="boneyard2Toggle"><span class="by2Arrow">&#9664;</span><span class="by2Label">BONES</span></div>
+  <!-- Player team indicators -->
+  <div class="playerIndicator team1" id="playerIndicator1">P1</div>
+  <div class="playerIndicator team2" id="playerIndicator2">P2</div>
+  <div class="playerIndicator team1" id="playerIndicator3">P3</div>
+  <div class="playerIndicator team2" id="playerIndicator4">P4</div>
+  <div class="playerIndicator team1" id="playerIndicator5">P5</div>
+  <div class="playerIndicator team2" id="playerIndicator6">P6</div>
+  <div id="shadowLayer"></div>
+  <div id="spriteLayer"></div>
+</div>
+
+<div id="statusBar">Click a domino to play</div>
+
+<!-- Trump Display Square - position adjustable via CSS variables -->
+<div class="trumpDisplaySquare" id="trumpDisplay">
+  <canvas id="trumpDisplayCanvas" width="32" height="32"></canvas>
+  <div class="trumpValue" id="trumpDisplayValue" style="display:none;"></div>
+</div>
+
+<!-- Settings Button -->
+<button class="settingsBtn" id="settingsBtn">⚙</button>
+<div class="settingsMenu" id="settingsMenu">
+  <div class="settingsItem" id="menuResumeGame" style="display:none;">Resume Saved Game</div>
+  <div class="settingsItem" id="menuNewHand">New Hand (Random)</div>
+  <div class="settingsItem" id="menuPassPlay">Pass & Play: OFF</div>
+  <div class="settingsItem" id="menuHint">Hint: OFF</div>
+  <div class="settingsItem" id="menuBones">Bones</div>
+  <div class="settingsDivider"></div>
+  <div class="settingsItem" id="menuNotes">Notes</div>
+  <div class="settingsItem" id="menuReplay">Replay Hand</div>
+  <div class="settingsItem" id="menuGameLog">Game Log</div>
+  <div class="settingsItem" id="menuAdvancedLog">Advanced AI Log</div>
+  <div class="settingsItem" id="menuMonteCarlo">Monte Carlo</div>
+  <div class="settingsItem" id="menuMPLog" style="display:none;">Export MP Log</div>
+  <div class="settingsDivider"></div>
+  <div class="settingsItem" id="menuSoundSettings" style="padding:8px 16px;font-weight:bold;">⚙️ Game Settings</div>
+  <div id="soundSettingsPanel" style="display:none;padding:4px 16px 8px;">
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+      <span style="font-size:11px;color:#aaa;width:52px;">Speed</span>
+      <span style="font-size:14px;">⚡</span>
+      <input type="range" id="animSpeedSlider" min="25" max="300" step="25" value="200" style="flex:1;accent-color:#f59e0b;height:4px;">
+      <span id="animSpeedVal" style="font-size:10px;color:#aaa;width:32px;text-align:right;">200%</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+      <span style="font-size:11px;color:#aaa;width:52px;">SFX</span>
+      <span id="sfxIcon" style="font-size:14px;cursor:pointer;">🔊</span>
+      <input type="range" id="sfxVolume" min="0" max="200" value="70" style="flex:1;accent-color:#22c55e;height:4px;">
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+      <span style="font-size:11px;color:#aaa;width:52px;">BGM</span>
+      <span id="bgmIcon" style="font-size:14px;cursor:pointer;">🔊</span>
+      <input type="range" id="bgmVolume" min="0" max="100" value="50" style="flex:1;accent-color:#3b82f6;height:4px;">
+    </div>
+    <div id="bgmTrackList" style="max-height:120px;overflow-y:auto;border-top:1px solid #333;padding-top:4px;margin-top:2px;">
+      <div style="color:#888;font-size:11px;">Scanning for music...</div>
+    </div>
+    <div style="border-top:1px solid #333;padding-top:6px;margin-top:6px;">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+        <span style="font-size:11px;color:#aaa;width:80px;">Letterbox</span>
+        <div id="letterboxToggle" style="position:relative;width:40px;height:22px;background:rgba(34,197,94,0.8);border-radius:11px;cursor:pointer;transition:background 0.2s;">
+          <div id="letterboxKnob" style="position:absolute;top:2px;left:20px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></div>
+        </div>
+        <span id="letterboxLabel" style="font-size:10px;color:#aaa;">ON</span>
+      </div>
+      <!-- V12.10.27c: Custom Aspect Ratio -->
+      <div id="arSection" style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.06);">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;flex:1;">
+            <input type="checkbox" id="arCustomCheck" style="width:14px;height:14px;accent-color:#3b82f6;cursor:pointer;">
+            <span style="font-size:11px;color:#aaa;">Custom Aspect Ratio</span>
+          </label>
+          <span id="arRatioLabel" style="font-size:10px;color:#666;font-family:monospace;">1:2.2</span>
+        </div>
+        <div style="padding:0 2px;">
+          <input type="range" id="arSlider" min="0" max="200" value="50" step="1" disabled
+            style="width:100%;accent-color:#3b82f6;height:6px;opacity:0.3;cursor:not-allowed;">
+          <div style="display:flex;justify-content:space-between;margin-top:2px;">
+            <span style="font-size:8px;color:#555;">1:3</span>
+            <span style="font-size:8px;color:#555;">1:1</span>
+            <span style="font-size:8px;color:#555;">3:1</span>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+        <span style="font-size:11px;color:#aaa;width:80px;">Game Logs</span>
+        <div id="mpLogToggle" style="position:relative;width:40px;height:22px;background:rgba(255,255,255,0.2);border-radius:11px;cursor:pointer;transition:background 0.2s;">
+          <div id="mpLogKnob" style="position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></div>
+        </div>
+        <span id="mpLogLabel" style="font-size:10px;color:#aaa;">OFF</span>
+      </div>
+      <div style="font-size:9px;color:#666;margin-top:2px;">Game Logs controls visibility of Game Log, AI Log, and Export MP Log in multiplayer.</div>
+    </div>
+    <!-- V12.10.27c: Popup Settings toggle -->
+    <div style="border-top:1px solid rgba(255,255,255,0.06);margin-top:6px;padding-top:6px;">
+      <div id="popupSettingsToggle" style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:4px 0;">
+        <span style="font-size:11px;color:#aaa;font-weight:600;">Popup Settings</span>
+        <span id="popupSettingsArrow" style="font-size:10px;color:#666;transition:transform 0.2s;">&#9654;</span>
+      </div>
+      <div id="popupSettingsPanel" style="display:none;margin-top:6px;max-height:300px;overflow-y:auto;-webkit-overflow-scrolling:touch;">
+        <div style="font-size:9px;color:#666;margin-bottom:6px;">Adjust popup sizes per device. Changes save automatically.</div>
+        <select id="popupSelect" style="width:100%;padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#fff;font-size:11px;margin-bottom:8px;">
+        </select>
+        <div id="popupSliders" style="display:flex;flex-direction:column;gap:6px;">
+          <div style="display:flex;align-items:center;gap:4px;">
+            <span style="font-size:10px;color:#aaa;width:42px;">Width</span>
+            <input type="range" id="popupMaxW" min="20" max="100" step="1" style="flex:1;accent-color:#3b82f6;height:4px;">
+            <span id="popupMaxWVal" style="font-size:10px;color:#aaa;width:30px;text-align:right;">95%</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:4px;">
+            <span style="font-size:10px;color:#aaa;width:42px;">Height</span>
+            <input type="range" id="popupMaxH" min="10" max="100" step="1" style="flex:1;accent-color:#22c55e;height:4px;">
+            <span id="popupMaxHVal" style="font-size:10px;color:#aaa;width:30px;text-align:right;">40%</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:4px;">
+            <span style="font-size:10px;color:#aaa;width:42px;">Top</span>
+            <label style="display:flex;align-items:center;gap:3px;cursor:pointer;">
+              <input type="checkbox" id="popupTopCheck" style="width:12px;height:12px;accent-color:#f59e0b;">
+              <span style="font-size:9px;color:#777;">Custom</span>
+            </label>
+            <input type="range" id="popupTop" min="0" max="50" step="1" disabled style="flex:1;accent-color:#f59e0b;height:4px;opacity:0.3;">
+            <span id="popupTopVal" style="font-size:10px;color:#aaa;width:36px;text-align:right;">center</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:4px;">
+            <span style="font-size:10px;color:#aaa;width:42px;">AR</span>
+            <label style="display:flex;align-items:center;gap:3px;cursor:pointer;">
+              <input type="checkbox" id="popupARCheck" style="width:12px;height:12px;accent-color:#a855f7;">
+              <span style="font-size:9px;color:#777;">Lock</span>
+            </label>
+            <input type="range" id="popupAR" min="30" max="300" step="1" disabled style="flex:1;accent-color:#a855f7;height:4px;opacity:0.3;">
+            <span id="popupARVal" style="font-size:10px;color:#aaa;width:36px;text-align:right;">auto</span>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:4px;">
+            <button id="popupResetOne" style="flex:1;padding:4px;border:none;border-radius:4px;font-size:9px;font-weight:600;cursor:pointer;background:rgba(239,68,68,0.5);color:#fff;">Reset This</button>
+            <button id="popupResetAll" style="flex:1;padding:4px;border:none;border-radius:4px;font-size:9px;font-weight:600;cursor:pointer;background:rgba(239,68,68,0.3);color:#fff;">Reset All</button>
+            <button id="popupPreview" style="flex:1;padding:4px;border:none;border-radius:4px;font-size:9px;font-weight:600;cursor:pointer;background:rgba(59,130,246,0.5);color:#fff;">Preview</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="settingsDivider"></div>
+  <div class="settingsItem" id="menuRestart">Restart Game</div>
+  <div class="settingsItem" id="menuHome">Home</div>
+  <div class="settingsItem" id="menuChangeName">Change Name</div>
+  <div class="settingsDivider"></div>
+  <div class="settingsItem" id="menuAbout">About</div>
+</div>
+
+
+<!-- About Modal -->
+<div id="aboutBackdrop" class="modalBackdrop" style="display:none;background:rgba(0,0,0,0.7);z-index:1500;font-family:system-ui,-apple-system,sans-serif;">
+  <div style="background:linear-gradient(135deg,#1a2332 0%,#0f1923 100%);border-radius:16px;padding:24px;max-width:90%;width:90%;color:#fff;box-shadow:0 20px 60px rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.1);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h3 style="margin:0;font-size:18px;color:#60a5fa;">About</h3>
+      <button id="aboutCloseBtn" style="background:none;border:none;color:#aaa;font-size:22px;cursor:pointer;padding:0 4px;">&times;</button>
+    </div>
+    <div style="text-align:center;">
+      <div style="font-size:24px;font-weight:800;color:#fff;margin-bottom:4px;">TN51 / TX42 Dominoes</div>
+      <div style="font-size:16px;font-weight:700;color:#60a5fa;margin-bottom:12px;" id="aboutVersion">v13.3.0</div>
+      <div style="font-size:12px;color:#9ca3af;line-height:1.6;">
+        <div>Built: February 2026</div>
+        <div>Game modes: Tennessee 51, Texas 42</div>
+        <div>Features: AI, Pass & Play, Multiplayer</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Boneyard Modal -->
+<div id="bonesBackdrop" style="display:none;position:fixed;inset:0;background:rgba(0,30,0,0.92);z-index:9999;overflow-y:auto;">
+  <div style="padding:12px;max-width:500px;margin:0 auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <span style="color:#fff;font-size:18px;font-weight:bold;">Boneyard</span>
+      <button onclick="document.getElementById('bonesBackdrop').style.display='none';" style="background:#ef4444;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:14px;cursor:pointer;">Close</button>
+    </div>
+    <canvas id="bonesCanvas" style="width:100%;border-radius:8px;"></canvas>
+    <!-- Boneyard Style Controls -->
+    <div style="position:relative;">
+      <button id="bonesSettingsBtn" onclick="document.getElementById('bonesControls').style.display=document.getElementById('bonesControls').style.display==='none'?'block':'none';" style="position:absolute;bottom:8px;left:8px;background:none;border:none;color:rgba(255,255,255,0.1);font-size:20px;cursor:pointer;padding:4px;">&#9881;</button>
+      <div id="bonesControls" style="display:none;padding:8px 4px;font-size:13px;color:#fff;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <label style="min-width:80px;">Spacing</label>
+          <input type="range" id="bonesGap" min="1" max="12" value="7" style="flex:1;" oninput="updateBonesStyle()">
+          <span id="bonesGapVal" style="min-width:20px;text-align:right;">7</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <label style="min-width:80px;">Inner Size</label>
+          <input type="range" id="bonesInnerSize" min="0" max="8" value="1" style="flex:1;" oninput="updateBonesStyle()">
+          <span id="bonesInnerSizeVal" style="min-width:20px;text-align:right;">1</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <label style="min-width:80px;">Inner Radius</label>
+          <input type="range" id="bonesInnerRadius" min="0" max="16" value="8" style="flex:1;" oninput="updateBonesStyle()">
+          <span id="bonesInnerRadiusVal" style="min-width:20px;text-align:right;">8</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <label style="min-width:80px;">Outer Size</label>
+          <input type="range" id="bonesOuterSize" min="0" max="8" value="3" style="flex:1;" oninput="updateBonesStyle()">
+          <span id="bonesOuterSizeVal" style="min-width:20px;text-align:right;">3</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <label style="min-width:80px;">Outer Radius</label>
+          <input type="range" id="bonesOuterRadius" min="0" max="16" value="11" style="flex:1;" oninput="updateBonesStyle()">
+          <span id="bonesOuterRadiusVal" style="min-width:20px;text-align:right;">11</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <label style="min-width:80px;">Inner Color</label>
+          <input type="color" id="bonesColor" value="#beb6ab" style="width:40px;height:28px;border:none;background:none;cursor:pointer;" oninput="updateBonesStyle()">
+          <span id="bonesColorVal" style="font-size:11px;">#beb6ab</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <label style="min-width:80px;">Outer Color</label>
+          <input type="color" id="bonesOuterColor" value="#00deff" style="width:40px;height:28px;border:none;background:none;cursor:pointer;" oninput="updateBonesStyle()">
+          <span id="bonesOuterColorVal" style="font-size:11px;">#00deff</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Notes Modal -->
+<div class="modalBackdrop" id="notesBackdrop" style="display:none;">
+  <div class="modalPanel" style="max-width:95%;">
+    <div class="modalHeader">
+      <span>Notes</span>
+      <button class="modalCloseBtn" id="notesCloseBtn">&times;</button>
+    </div>
+    <div class="modalBody">
+      <textarea id="notesTextarea" style="width:100%;height:200px;background:#ffffff;border:1px solid #ccc;border-radius:8px;color:#000;padding:10px;font-family:inherit;font-size:14px;resize:vertical;box-sizing:border-box;"></textarea>
+      <div style="margin-top:10px;display:flex;gap:10px;">
+        <button id="notesCopyBtn" style="flex:1;padding:10px;background:rgba(59,130,246,0.8);border:none;border-radius:8px;color:#fff;font-weight:600;cursor:pointer;">Copy to Clipboard</button>
+        <button id="notesClearBtn" style="flex:1;padding:10px;background:rgba(239,68,68,0.6);border:none;border-radius:8px;color:#fff;font-weight:600;cursor:pointer;">Clear</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Game Log Modal -->
+<div class="modalBackdrop" id="gameLogBackdrop" style="display:none;">
+  <div class="modalPanel" style="max-width:95%;max-height:80%;">
+    <div class="modalHeader">
+      <span>Game Log</span>
+      <button class="modalCloseBtn" id="gameLogCloseBtn">&times;</button>
+    </div>
+    <div style="display:flex;gap:0;border-bottom:1px solid rgba(255,255,255,0.15);">
+      <button id="gameLogTabFull" style="flex:1;padding:8px;background:rgba(255,255,255,0.15);border:none;color:#fff;font-weight:600;font-size:12px;cursor:pointer;">Full Log</button>
+      <button id="gameLogTabHand" style="flex:1;padding:8px;background:transparent;border:none;color:rgba(255,255,255,0.5);font-weight:600;font-size:12px;cursor:pointer;">Current Hand</button>
+    </div>
+    <div class="modalBody" style="max-height:60%;overflow-y:auto;">
+      <pre id="gameLogContent" style="font-size:11px;white-space:pre-wrap;word-break:break-word;color:rgba(255,255,255,0.9);"></pre>
+    </div>
+    <div style="padding:10px;border-top:1px solid rgba(255,255,255,0.1);">
+      <div style="display:flex;gap:8px;">
+        <button id="gameLogCopyBtn" style="flex:1;padding:10px;background:rgba(59,130,246,0.8);border:none;border-radius:8px;color:#fff;font-weight:600;cursor:pointer;">Copy Log to Clipboard</button>
+        <button id="gameLogClearBtn" style="flex:0 0 auto;padding:10px 16px;background:rgba(239,68,68,0.8);border:none;border-radius:8px;color:#fff;font-weight:600;cursor:pointer;">Clear Log</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modalBackdrop" id="advLogBackdrop" style="display:none;">
+  <div class="modalPanel" style="max-width:95%;width:95%;max-height:85%;">
+    <div class="modalHeader">
+      <span>Advanced AI Log</span>
+      <button class="modalCloseBtn" id="advLogCloseBtn">&times;</button>
+    </div>
+    <div style="display:flex;gap:0;border-bottom:1px solid rgba(255,255,255,0.15);">
+      <button id="advLogTabFull" style="flex:1;padding:8px;background:rgba(255,255,255,0.15);border:none;color:#fff;font-weight:600;font-size:12px;cursor:pointer;">Full Log</button>
+      <button id="advLogTabHand" style="flex:1;padding:8px;background:transparent;border:none;color:rgba(255,255,255,0.5);font-weight:600;font-size:12px;cursor:pointer;">Current Hand</button>
+    </div>
+    <div class="modalBody" style="max-height:60%;overflow-y:auto;">
+      <pre id="advLogContent" style="font-size:10px;white-space:pre-wrap;word-break:break-word;color:rgba(255,255,255,0.9);"></pre>
+    </div>
+    <div style="padding:10px;border-top:1px solid rgba(255,255,255,0.1);">
+      <div style="display:flex;gap:8px;">
+        <button id="advLogCopyBtn" style="flex:1;padding:10px;background:rgba(59,130,246,0.8);border:none;border-radius:8px;color:#fff;font-weight:600;cursor:pointer;">Copy to Clipboard</button>
+        <button id="advLogDownloadBtn" style="flex:1;padding:10px;background:rgba(34,197,94,0.8);border:none;border-radius:8px;color:#fff;font-weight:600;cursor:pointer;">Download .txt</button>
+        <button id="advLogClearBtn" style="flex:0 0 auto;padding:10px 16px;background:rgba(239,68,68,0.8);border:none;border-radius:8px;color:#fff;font-weight:600;cursor:pointer;">Clear</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Monte Carlo Simulation Modal -->
+<div class="modalBackdrop" id="mcBackdrop" style="display:none;">
+  <div class="modalPanel" style="max-width:95%;width:95%;max-height:90%;">
+    <div class="modalHeader">
+      <span>Monte Carlo Simulation</span>
+      <button class="modalCloseBtn" id="mcCloseBtn">&times;</button>
+    </div>
+    <div class="modalBody" style="max-height:75%;overflow-y:auto;padding:12px;">
+      <div id="mcNotReady" style="display:none;text-align:center;padding:20px;color:rgba(255,255,255,0.7);font-size:13px;">
+        Monte Carlo is available during play phase when you are the bid winner and leading trick 1.
+      </div>
+      <div id="mcMain">
+        <div style="margin-bottom:10px;font-size:12px;color:rgba(255,255,255,0.8);">
+          Tap your tiles in the order you want to lead them. Select ALL tiles for full simulation, or select SOME tiles for control analysis (stops when control is lost).
+        </div>
+        <div id="mcTileSelect" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:12px;"></div>
+        <div style="display:flex;gap:8px;justify-content:center;margin-bottom:12px;">
+          <button id="mcResetBtn" style="padding:6px 14px;background:rgba(239,68,68,0.8);border:none;border-radius:8px;color:#fff;font-weight:600;font-size:12px;cursor:pointer;">Reset Order</button>
+        </div>
+        <div id="mcControls" style="display:flex;align-items:center;gap:12px;justify-content:center;margin-bottom:12px;">
+          <label style="font-size:12px;color:rgba(255,255,255,0.8);">Simulations:</label>
+          <select id="mcSimCount" style="padding:4px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.15);color:#fff;font-size:12px;">
+            <option value="100">100</option>
+            <option value="500" selected>500</option>
+            <option value="1000">1000</option>
+          </select>
+          <button id="mcRunBtn" disabled style="padding:8px 20px;background:rgba(34,197,94,0.8);border:none;border-radius:8px;color:#fff;font-weight:700;font-size:13px;cursor:pointer;opacity:0.5;">Run Simulation</button>
+        </div>
+        <div id="mcCopyRow" style="display:none;text-align:center;margin-bottom:12px;">
+          <button id="mcCopyBtn" style="padding:6px 14px;background:rgba(59,130,246,0.8);border:none;border-radius:8px;color:#fff;font-weight:600;font-size:12px;cursor:pointer;">Copy Results</button>
+        </div>
+        <div id="mcProgress" style="display:none;text-align:center;padding:10px;">
+          <div style="font-size:12px;color:rgba(255,255,255,0.8);margin-bottom:6px;" id="mcProgressText">Running...</div>
+          <div style="width:100%;height:6px;background:rgba(255,255,255,0.15);border-radius:3px;overflow:hidden;">
+            <div id="mcProgressBar" style="width:0%;height:100%;background:rgba(34,197,94,0.9);transition:width 0.1s;border-radius:3px;"></div>
+          </div>
+        </div>
+        <div id="mcResults" style="display:none;margin-top:8px;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- Pass & Play Setup Modal -->
+<div id="ppBackdrop" class="modalBackdrop" style="display:none;background:rgba(0,0,0,0.7);z-index:1500;font-family:system-ui,-apple-system,sans-serif;">
+  <div style="background:linear-gradient(135deg,#1a2332 0%,#0f1923 100%);border-radius:16px;padding:24px;max-width:90%;width:90%;color:#fff;box-shadow:0 20px 60px rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.1);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h3 style="margin:0;font-size:18px;color:#60a5fa;">Pass & Play Setup</h3>
+      <button id="ppCloseBtn" style="background:none;border:none;color:#aaa;font-size:22px;cursor:pointer;padding:0 4px;">&times;</button>
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <div style="font-size:13px;color:#9ca3af;margin-bottom:8px;">Select human players:</div>
+      <div id="ppPlayerGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+      </div>
+    </div>
+
+    <div style="margin-bottom:16px;display:flex;align-items:center;gap:10px;padding:10px;background:rgba(255,255,255,0.05);border-radius:8px;">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:#d1d5db;">
+        <input type="checkbox" id="ppPrivacy" checked style="width:18px;height:18px;accent-color:#60a5fa;">
+        <span><strong>Privacy Mode</strong> — hide tiles between turns<br><span style="font-size:11px;color:#9ca3af;">(For passing device to another person)</span></span>
+      </label>
+    </div>
+
+    <div style="display:flex;gap:10px;">
+      <button id="ppNewGame" style="flex:1;padding:12px;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;">New Game</button>
+      <button id="ppContinue" style="flex:1;padding:12px;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;">Continue Game</button>
+    </div>
+  </div>
+</div>
+
+<!-- Pass & Play Handoff Screen -->
+<div id="ppHandoff" class="modalBackdrop" style="display:none;background:rgba(0,0,0,0.85);z-index:1400;flex-direction:column;font-family:system-ui,-apple-system,sans-serif;">
+  <div style="text-align:center;">
+    <div id="ppHandoffLabel" style="font-size:28px;font-weight:800;color:#60a5fa;margin-bottom:8px;">Player 4's Turn</div>
+    <div id="ppHandoffPhase" style="font-size:14px;color:#9ca3af;margin-bottom:24px;">Bidding Phase</div>
+    <button id="ppHandoffBtn" style="padding:16px 40px;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;box-shadow:0 8px 24px rgba(34,197,94,0.3);">Show My Hand</button>
+  </div>
+</div>
+
+
+<!-- V11.3: Multiplayer Connection Indicator — fixed dock left of settings gear, collapsible, expands left -->
+<div id="mpIndicator" style="display:none;position:fixed;top:calc(80px + env(safe-area-inset-top));right:52px;z-index:1199;background:rgba(0,0,0,0.7);border-radius:18px;padding:4px 10px;font-family:system-ui,-apple-system,sans-serif;font-size:11px;color:#fff;align-items:center;gap:5px;backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.1);cursor:default;user-select:none;white-space:nowrap;transition:all 0.2s ease;">
+  <span id="mpIndicatorDetails" style="display:inline;overflow:hidden;">
+    <button id="mpRefreshBtn" onclick="mpRequestRefresh()" style="display:none;background:none;border:1px solid rgba(255,255,255,0.3);color:#60a5fa;border-radius:12px;padding:2px 8px;font-size:10px;cursor:pointer;margin-right:4px;">&#x21bb; Sync</button>
+    <span id="mpStatusText">Offline</span>
+    <span id="mpPlayerCount" style="color:#9ca3af;margin-left:3px;"></span>
+  </span>
+  <span id="mpDot" style="width:10px;height:10px;border-radius:50%;background:#ef4444;display:inline-block;cursor:pointer;flex-shrink:0;" onclick="mpToggleIndicator()"></span>
+</div>
+
+<!-- Multiplayer Setup Modal -->
+<div id="mpBackdrop" class="modalBackdrop" style="display:none;background:rgba(0,0,0,0.7);z-index:1500;font-family:system-ui,-apple-system,sans-serif;">
+  <div style="background:linear-gradient(135deg,#1a2332 0%,#0f1923 100%);border-radius:16px;max-width:90%;width:90%;max-height:90%;display:flex;flex-direction:column;color:#fff;box-shadow:0 20px 60px rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.1);">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:24px 24px 16px 24px;flex-shrink:0;">
+      <h3 style="margin:0;font-size:18px;color:#60a5fa;">Multiplayer</h3>
+      <button id="mpCloseBtn" style="background:none;border:none;color:#aaa;font-size:22px;cursor:pointer;padding:0 4px;">&times;</button>
+    </div>
+
+    <!-- Scrollable content area -->
+    <div style="overflow-y:auto;flex:1;min-height:0;padding:0 24px;-webkit-overflow-scrolling:touch;">
+
+    <!-- Connection Status -->
+    <div id="mpConnStatus" style="margin-bottom:16px;padding:10px;border-radius:8px;background:rgba(255,255,255,0.05);font-size:13px;color:#9ca3af;">
+      Not connected
+    </div>
+
+    <!-- Game Mode Selection -->
+    <div id="mpModeSection" style="margin-bottom:12px;">
+      <div style="font-size:13px;color:#9ca3af;margin-bottom:8px;">Select game:</div>
+      <div id="mpModeGrid" style="display:flex;gap:8px;">
+      </div>
+    </div>
+
+    <!-- Room Selection -->
+    <div id="mpRoomSection" style="margin-bottom:16px;display:none;">
+      <div style="font-size:13px;color:#9ca3af;margin-bottom:8px;">Select a room:</div>
+      <div id="mpRoomGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      </div>
+    </div>
+
+    <!-- V10_104: Observer Toggle -->
+    <div id="mpObserverSection" style="display:none;margin-bottom:10px;">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 10px;border-radius:8px;background:rgba(167,139,250,0.1);border:1px solid rgba(167,139,250,0.25);">
+        <input type="checkbox" id="mpObserverChk" style="accent-color:#a78bfa;width:16px;height:16px;">
+        <span style="font-size:12px;color:#a78bfa;font-weight:600;">Watch mode</span>
+        <span style="font-size:11px;color:#6b7280;"> &mdash; observe without playing</span>
+      </label>
+    </div>
+
+    <!-- V10_119: Per-player option to disable auto-refresh -->
+    <div id="mpRefreshToggleSection" style="display:none;margin-bottom:10px;">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 10px;border-radius:8px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);">
+        <input type="checkbox" id="mpDisableRefreshChk" style="accent-color:#ef4444;width:16px;height:16px;">
+        <span style="font-size:12px;color:#ef4444;font-weight:600;">Disable auto-refresh</span>
+        <span style="font-size:11px;color:#6b7280;"> &mdash; prevents stale-state recovery</span>
+      </label>
+    </div>
+
+    <!-- Player List -->
+    <div id="mpPlayerList" style="display:none;margin-bottom:16px;">
+      <div style="font-size:13px;color:#9ca3af;margin-bottom:8px;">Players in room:</div>
+      <div id="mpPlayers" style="display:flex;flex-direction:column;gap:4px;">
+      </div>
+    </div>
+
+    <!-- Seat Selection -->
+    <div id="mpSeatSection" style="display:none;margin-bottom:16px;">
+      <div style="font-size:13px;color:#9ca3af;margin-bottom:8px;">Preferred seat (before connecting):</div>
+      <div id="mpSeatGrid" style="display:flex;gap:8px;flex-wrap:wrap;">
+      </div>
+    </div>
+
+    <!-- Host Settings — expanded in V10_109 with full game rules -->
+    <div id="mpHostSettings" style="display:none;margin-bottom:16px;padding:12px;border-radius:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(96,165,250,0.3);">
+      <div style="font-size:13px;color:#60a5fa;margin-bottom:8px;font-weight:600;">Game Settings <span id="mpSettingsRole" style="font-size:11px;color:#9ca3af;">(Host)</span></div>
+      <div id="mpMarksSection">
+      <div style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Marks to win:</div>
+      <div style="display:flex;gap:8px;margin-bottom:12px;">
+        <button class="mpMarksBtn" data-marks="3" style="flex:1;padding:8px;border:2px solid rgba(255,255,255,0.15);border-radius:8px;background:rgba(255,255,255,0.05);color:#fff;font-size:13px;cursor:pointer;">3<br><span style="font-size:10px;color:#9ca3af;">Short</span></button>
+        <button class="mpMarksBtn mpMarksSelected" data-marks="7" style="flex:1;padding:8px;border:2px solid #60a5fa;border-radius:8px;background:rgba(96,165,250,0.2);color:#fff;font-size:13px;cursor:pointer;">7<br><span style="font-size:10px;color:#9ca3af;">Standard</span></button>
+        <button class="mpMarksBtn" data-marks="15" style="flex:1;padding:8px;border:2px solid rgba(255,255,255,0.15);border-radius:8px;background:rgba(255,255,255,0.05);color:#fff;font-size:13px;cursor:pointer;">15<br><span style="font-size:10px;color:#9ca3af;">Long</span></button>
+      </div>
+      </div>
+      <!-- V10_109: House Rules in MP -->
+      <div id="mpHouseRules" style="border-top:1px solid rgba(255,255,255,0.1);padding-top:8px;">
+        <div style="font-size:12px;color:#9ca3af;margin-bottom:6px;">House Rules:</div>
+        <label class="mpRuleLabel" style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:12px;color:#fff;cursor:pointer;">
+          <input type="checkbox" id="mpChkCallForDouble" checked style="accent-color:#60a5fa;"> Call for the Double
+        </label>
+        <label class="mpRuleLabel" style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:12px;color:#fff;cursor:pointer;">
+          <input type="checkbox" id="mpChkNelloDeclare" style="accent-color:#60a5fa;"> Must declare Nello
+        </label>
+        <label class="mpRuleLabel" style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:12px;color:#fff;cursor:pointer;">
+          <input type="checkbox" id="mpChkNelloRestrict" checked style="accent-color:#60a5fa;"> Nello restricted to 1x first
+        </label>
+        <div style="font-size:12px;color:#9ca3af;margin-bottom:4px;margin-top:8px;">Nello Doubles:</div>
+        <div style="display:flex;gap:4px;">
+          <button class="mpNelloBtn mpNelloBtnSelected" data-nello="regular" style="flex:1;padding:5px 3px;font-size:10px;font-weight:600;border-radius:6px;background:rgba(96,165,250,0.2);border:1px solid #60a5fa;color:#fff;cursor:pointer;">Regular</button>
+          <button class="mpNelloBtn" data-nello="doubles_only" style="flex:1;padding:5px 3px;font-size:10px;font-weight:600;border-radius:6px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);color:#fff;cursor:pointer;">Doubles Only</button>
+          <button class="mpNelloBtn" data-nello="player_chooses" style="flex:1;padding:5px 3px;font-size:10px;font-weight:600;border-radius:6px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);color:#fff;cursor:pointer;">Player Picks</button>
+        </div>
+        <div style="font-size:12px;color:#9ca3af;margin-bottom:4px;margin-top:8px;">Doubles Follow Me:</div>
+        <div style="display:flex;gap:4px;">
+          <button class="mpDfmBtn mpDfmBtnSelected" data-dfm="on" style="flex:1;padding:5px 3px;font-size:10px;font-weight:600;border-radius:6px;background:rgba(96,165,250,0.2);border:1px solid #60a5fa;color:#fff;cursor:pointer;">Always On</button>
+          <button class="mpDfmBtn" data-dfm="off" style="flex:1;padding:5px 3px;font-size:10px;font-weight:600;border-radius:6px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);color:#fff;cursor:pointer;">Always Off</button>
+          <button class="mpDfmBtn" data-dfm="player_chooses" style="flex:1;padding:5px 3px;font-size:10px;font-weight:600;border-radius:6px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);color:#fff;cursor:pointer;">Player Picks</button>
+        </div>
+        <!-- V11.4: Chat toggle -->
+        <label class="mpRuleLabel" style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:12px;color:#fff;cursor:pointer;margin-top:8px;border-top:1px solid rgba(255,255,255,0.1);padding-top:8px;">
+          <input type="checkbox" id="mpChkChat" checked style="accent-color:#60a5fa;" onchange="mpChatEnabled=this.checked;mpShowChatIcon(mpChatEnabled);"> Enable In-Game Chat
+        </label>
+      </div>
+    </div>
+
+    <!-- Host Control Buttons -->
+    <div id="mpRefreshSection" style="display:none;margin-top:12px;">
+      <button id="mpRefreshAllBtn" onclick="mpRefreshAll();document.getElementById('mpBackdrop').style.display='none';" style="width:100%;padding:10px;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;margin-bottom:8px;">&#x21bb; Resync All Players</button>
+      <button id="mpNewHandBtn" onclick="mpHostNewHand();document.getElementById('mpBackdrop').style.display='none';" style="width:100%;padding:10px;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;">&#x21bb; New Hand (Keep Score)</button>
+    </div>
+
+    <!-- Info -->
+    <div style="margin-top:12px;font-size:11px;color:#6b7280;text-align:center;">
+      First player to join becomes the host (dealer).<br>
+      Free tier server may take 30-50s to wake up.
+    </div>
+
+    </div><!-- end scrollable content area -->
+
+    <!-- Actions — always visible at bottom -->
+    <div style="display:flex;gap:10px;padding:16px 24px;flex-shrink:0;border-top:1px solid rgba(255,255,255,0.1);">
+      <button id="mpConnect" style="flex:1;padding:12px;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;">Connect</button>
+      <button id="mpDisconnect" style="flex:1;padding:12px;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;display:none;">Disconnect</button>
+      <button id="mpStartGame" style="flex:1;padding:12px;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;display:none;">Start Game</button>
+    </div>
+  </div>
+</div>
+
+<!-- Call for the Double Button Bar (bid winner sees this) -->
+<div id="callDoubleBtnGroup">
+  <button id="btnCallDouble">Call for the Double</button>
+  <button id="btnPlayRegular">Play Regular</button>
+</div>
+<!-- CALLED FOR DOUBLE Banner (other players see this) -->
+<div id="callDoubleBanner">
+  <button id="callDoubleBannerBtn">CALLED FOR DOUBLE</button>
+</div>
+
+<!-- V11.4: Your Turn Banner -->
+<div id="yourTurnBanner" style="display:none;position:fixed;bottom:22%;left:50%;transform:translateX(-50%);z-index:810;pointer-events:none;">
+  <div style="background:linear-gradient(135deg,#60a5fa,#3b82f6);color:#fff;border:none;border-radius:10px;padding:10px 24px;font-size:1em;font-weight:bold;white-space:nowrap;box-shadow:0 2px 12px rgba(96,165,250,0.5);animation:yourTurnPulse 1.5s ease-in-out 2;">YOUR TURN</div>
+</div>
+
+<!-- Nello Doubles Choice Popup -->
+<div id="nelloDoublesBackdrop" class="modalBackdrop" style="display:none;">
+  <div class="modalPanel" style="max-width:72%;background:linear-gradient(135deg,#1e3a5f 0%,#0f1f33 100%);border-radius:16px;border:1px solid rgba(96,165,250,0.3);box-shadow:0 8px 32px rgba(0,0,0,0.5);">
+    <div class="modalHeader" style="border-bottom:1px solid rgba(96,165,250,0.2);padding:14px 16px;text-align:center;">
+      <span style="font-size:16px;font-weight:700;color:#60a5fa;">Nello Doubles Mode</span>
+    </div>
+    <div class="modalBody" style="padding:16px;text-align:center;">
+      <div style="font-size:12px;color:rgba(255,255,255,0.7);margin-bottom:14px;">
+        How should doubles be treated this hand?
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <button id="btnNelloRegular" class="glossBtn" style="padding:12px;font-size:13px;font-weight:700;border-radius:10px;background:linear-gradient(135deg,#22c55e,#16a34a);border:none;color:#fff;cursor:pointer;">Regular<br><span style="font-size:10px;font-weight:400;opacity:0.8;">Doubles are highest in their suit</span></button>
+        <button id="btnNelloDoublesOnly" class="glossBtn" style="padding:12px;font-size:13px;font-weight:700;border-radius:10px;background:linear-gradient(135deg,#6366f1,#4f46e5);border:none;color:#fff;cursor:pointer;">Doubles Only<br><span style="font-size:10px;font-weight:400;opacity:0.8;">Doubles form their own suit</span></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Doubles Follow Me Choice Popup -->
+<div id="dfmChoiceBackdrop" class="modalBackdrop" style="display:none;">
+  <div class="modalPanel" style="max-width:72%;background:linear-gradient(135deg,#1e3a5f 0%,#0f1f33 100%);border-radius:16px;border:1px solid rgba(96,165,250,0.3);box-shadow:0 8px 32px rgba(0,0,0,0.5);">
+    <div class="modalHeader" style="border-bottom:1px solid rgba(96,165,250,0.2);padding:14px 16px;text-align:center;">
+      <span style="font-size:16px;font-weight:700;color:#60a5fa;">Doubles Follow Me</span>
+    </div>
+    <div class="modalBody" style="padding:16px;text-align:center;">
+      <div style="font-size:12px;color:rgba(255,255,255,0.7);margin-bottom:14px;">
+        When a double leads, must others follow?
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <button id="btnDfmYes" class="glossBtn" style="padding:12px;font-size:13px;font-weight:700;border-radius:10px;background:linear-gradient(135deg,#22c55e,#16a34a);border:none;color:#fff;cursor:pointer;">Yes — Follow Me<br><span style="font-size:10px;font-weight:400;opacity:0.8;">Must play a double, then the led pip</span></button>
+        <button id="btnDfmNo" class="glossBtn" style="padding:12px;font-size:13px;font-weight:700;border-radius:10px;background:linear-gradient(135deg,#ef4444,#dc2626);border:none;color:#fff;cursor:pointer;">No — Any Trump<br><span style="font-size:10px;font-weight:400;opacity:0.8;">Standard doubles trump rules</span></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Multiplayer Waiting Overlay -->
+<div id="mpWaiting" class="modalBackdrop" style="display:none;background:rgba(0,0,0,0.6);z-index:1350;font-family:system-ui,-apple-system,sans-serif;">
+  <div style="text-align:center;color:#fff;">
+    <div id="mpWaitText" style="font-size:20px;font-weight:700;color:#60a5fa;margin-bottom:8px;">Waiting for players...</div>
+    <div id="mpWaitSub" style="font-size:13px;color:#9ca3af;">Other players need to join the room</div>
+  </div>
+</div>
+
+<!-- Bidding Overlay -->
+<div class="modalBackdrop" id="bidBackdrop" style="display:none;">
+  <div class="modalPanel">
+    <div class="modalHeader">
+      <span id="bidHeaderText">Your Bid</span>
+    </div>
+    <div class="modalBody">
+      <div class="bidCurrentValue" id="bidValueDisplay">34</div>
+      <div id="bidHintDisplay" style="font-size:12px;color:#aaa;text-align:center;margin-top:4px;min-height:16px;"></div>
+      <div class="bidSliderWrap">
+        <div class="bidSliderContainer">
+          <div class="bidEndNotch" id="bidPassNotch">Pass</div>
+          <div class="bidRangeWrap">
+            <input type="range" class="bidRangeSlider" id="bidRangeSlider" min="34" max="51" value="34">
+            <div class="bidRangeLabels"><span>34</span><span>51</span></div>
+          </div>
+          <div class="bidEndNotch" id="bid2xNotch">2x</div>
+        </div>
+      </div>
+    </div>
+    <div class="modalFooter" style="display:flex;gap:8px;justify-content:center;">
+      <button class="glossBtn glossGreen" id="btnBidConfirm" style="min-width:120px;">Bid 34</button>
+      <button class="glossBtn" id="btnNello" style="background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;display:none;min-width:110px;">Nello 1x</button>
+    </div>
+  </div>
+</div>
+
+<!-- Trump Selection Overlay -->
+<div class="modalBackdrop" id="trumpBackdrop" style="display:none;">
+  <div class="modalPanel">
+    <div class="modalHeader">
+      <span>Pick Trump</span>
+    </div>
+    <div id="trumpHintBar" style="display:none;text-align:center;padding:6px 12px;background:rgba(255,255,255,0.1);border-bottom:1px solid rgba(255,255,255,0.1);font-size:12px;color:#a5f3fc;">
+      <span style="opacity:0.7;">AI suggests: </span><span id="trumpHintText" style="font-weight:700;color:#4ade80;"></span>
+    </div>
+    <div class="modalBody">
+      <!-- Central pip display -->
+      <div class="trumpCentralDisplay" id="trumpCentralDisplay">
+        <canvas id="trumpCentralCanvas" width="60" height="60" style="width:60px;height:60px;border-radius:8px;"></canvas>
+        <div class="trumpCentralLabel" id="trumpCentralLabel">0s Trump</div>
+      </div>
+      <!-- Pip slider -->
+      <div class="trumpSliderWrap">
+        <input type="range" class="trumpSlider" id="trumpSlider" min="0" max="7" value="0" data-tn51-max="7" data-t42-max="6">
+        <div class="trumpSliderLabels"><span>0</span><span>7</span></div>
+      </div>
+      <!-- Special options (Doubles, NT, Nel-O) -->
+      <div class="trumpSpecialOptions" id="trumpSpecialOptions">
+        <div class="trumpSpecialBtn" id="trumpDoublesBtn">Doubles</div>
+        <div class="trumpSpecialBtn" id="trumpNTBtn">No Trump</div>
+        <div class="trumpSpecialBtn" id="trumpNelloBtn" style="display:none;">Nel-O</div>
+      </div>
+      <!-- Legacy grid for fallback -->
+      <div class="trumpGrid" id="trumpGrid" style="display:none;">
+        <!-- Trump options generated by JS -->
+      </div>
+    </div>
+    <div class="modalFooter">
+      <button class="glossBtn glossGreen" id="btnTrumpConfirm" disabled>Confirm Trump</button>
+    </div>
+  </div>
+</div>
+
+<!-- Nel-O Opponent Selection Overlay -->
+<div class="modalBackdrop" id="nelloBackdrop" style="display:none;">
+  <div class="modalPanel" style="background: linear-gradient(135deg, #9333ea 0%, #6b21a8 100%);">
+    <div class="modalHeader">
+      <span>Nel-O: Pick Opponent to Sit Out</span>
+    </div>
+    <div class="modalBody">
+      <p style="text-align:center;margin-bottom:16px;font-size:13px;opacity:0.9;">
+        You play alone vs 2 opponents.<br>
+        Your teammates (<span id="nelloTeammatesDisplay">P3 & P5</span>) sit out.<br>
+        Choose one opponent to also sit out:
+      </p>
+      <div class="nelloOpponentGrid" id="nelloOpponentGrid">
+        <!-- Opponent options generated by JS -->
+      </div>
+    </div>
+    <div class="modalFooter">
+      <button class="glossBtn glossGray" id="btnNelloCancel">Cancel</button>
+      <button class="glossBtn glossGreen" id="btnNelloConfirm" disabled>Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- End of Hand Popup -->
+<!-- Simple Next Round Button (positioned above lead pip area) -->
+<button class="nextRoundBtn" id="btnNextHand" style="display:none;">Next Round</button>
+
+<!-- Start Screen Overlay -->
+<!-- Game Settings Popup -->
+<div class="modalBackdrop" id="gameSettingsBackdrop" style="display:none;z-index:1300;">
+  <div class="modalPanel" style="max-width:77%;max-height:90%;display:flex;flex-direction:column;background:linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);border-radius:16px;border:1px solid rgba(255,255,255,0.2);box-shadow:0 8px 32px rgba(0,0,0,0.4);">
+    <div class="modalHeader" style="border-bottom:1px solid rgba(255,255,255,0.15);padding:14px 16px;flex-shrink:0;">
+      <span style="font-size:18px;font-weight:700;color:#fff;">Game Settings</span>
+    </div>
+    <div class="modalBody" style="padding:16px;overflow-y:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch;">
+      <!-- V12.10.27c: Game type tabs hidden — already selected from carousel -->
+      <div id="gsGameTypeSection" style="display:none;text-align:center;margin-bottom:16px;">
+        <div style="font-size:13px;color:rgba(255,255,255,0.8);margin-bottom:10px;font-weight:600;">Game Type</div>
+        <div style="display:flex;gap:10px;justify-content:center;">
+          <button class="glossBtn gsGameTypeBtn gsGameTypeSelected" data-game-type="TN51" style="padding:8px 16px;font-size:13px;font-weight:700;background:linear-gradient(135deg,#3b82f6,#1d4ed8);border:2px solid #fff;">Tennessee 51</button>
+          <button class="glossBtn gsGameTypeBtn" data-game-type="T42" style="padding:8px 16px;font-size:13px;font-weight:700;background:linear-gradient(135deg,#6366f1,#4f46e5);border:2px solid transparent;">Texas 42</button>
+          <button class="glossBtn gsGameTypeBtn" data-game-type="MOON" style="padding:8px 16px;font-size:13px;font-weight:700;background:linear-gradient(135deg,#eab308,#ca8a04);border:2px solid transparent;">Moon</button>
+        </div>
+      </div>
+      <div id="gsMarksSection" style="text-align:center;margin-bottom:16px;">
+        <div style="font-size:13px;color:rgba(255,255,255,0.8);margin-bottom:10px;font-weight:600;">Marks to Win</div>
+        <div style="display:flex;gap:10px;justify-content:center;">
+          <button class="glossBtn gsMarksBtn" data-marks="3" style="padding:8px 18px;font-size:14px;background:linear-gradient(135deg,#6366f1,#4f46e5);border:none;border-radius:10px;color:#fff;cursor:pointer;min-width:60px;">3<br><span style="font-size:10px;opacity:0.7;">Short</span></button>
+          <button class="glossBtn gsMarksBtn gsMarksSelected" data-marks="7" style="padding:8px 18px;font-size:14px;background:linear-gradient(135deg,#22c55e,#16a34a);border:2px solid #fff;border-radius:10px;color:#fff;cursor:pointer;min-width:60px;">7<br><span style="font-size:10px;opacity:0.7;">Standard</span></button>
+          <button class="glossBtn gsMarksBtn" data-marks="15" style="padding:8px 18px;font-size:14px;background:linear-gradient(135deg,#f59e0b,#d97706);border:none;border-radius:10px;color:#fff;cursor:pointer;min-width:60px;">15<br><span style="font-size:10px;opacity:0.7;">Long</span></button>
+        </div>
+      </div>
+    <!-- House Rules Section -->
+    <div style="border-top:1px solid rgba(255,255,255,0.15);padding:12px 16px;">
+      <div style="font-size:13px;color:rgba(255,255,255,0.8);font-weight:600;margin-bottom:10px;">House Rules</div>
+
+      <!-- Call for the Double -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div>
+          <span style="font-size:12px;color:#fff;font-weight:600;">Call for the Double</span><br>
+          <span style="font-size:10px;color:rgba(255,255,255,0.5);">Force double trump on trick 1</span>
+        </div>
+        <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;">
+          <input type="checkbox" id="chkCallForDouble" checked style="opacity:0;width:0;height:0;">
+          <span style="position:absolute;inset:0;background:#22c55e;border-radius:12px;transition:0.3s;"></span>
+          <span id="callForDoubleKnob" style="position:absolute;top:2px;left:22px;width:20px;height:20px;background:#fff;border-radius:50%;transition:0.3s;"></span>
+        </label>
+      </div>
+
+      <!-- Nello 2x Start Setting removed in V10_111 -->
+      <!-- V10_109: Must Declare Nello -->
+      <div id="gsNelloDeclareSection" style="margin-bottom:8px;">
+        <label style="font-size:12px;color:#fff;cursor:pointer;display:flex;align-items:center;gap:6px;">
+          <input type="checkbox" id="chkNelloDeclare" style="accent-color:#7c3aed;"> Must declare Nello
+        </label>
+        <span style="font-size:10px;color:rgba(255,255,255,0.4);margin-left:22px;">Others see "Nello" in bid display</span>
+      </div>
+      <!-- V10_109: Nello restricted to 1x first -->
+      <div id="gsNelloRestrictSection" style="margin-bottom:8px;">
+        <label style="font-size:12px;color:#fff;cursor:pointer;display:flex;align-items:center;gap:6px;">
+          <input type="checkbox" id="chkNelloRestrict" checked style="accent-color:#7c3aed;"> Nello restricted to 1x first
+        </label>
+        <span style="font-size:10px;color:rgba(255,255,255,0.4);margin-left:22px;">First Nello bid must be 1x (at 42/51 points)</span>
+      </div>
+      <!-- Nello Doubles Mode -->
+      <div id="gsNelloSection" style="margin-bottom:6px;">
+        <span style="font-size:12px;color:#fff;font-weight:600;">Nello Doubles</span><br>
+        <span style="font-size:10px;color:rgba(255,255,255,0.5);">How doubles work in Nello</span>
+      </div>
+      <div id="gsNelloBtns" style="display:flex;gap:6px;margin-bottom:4px;">
+        <button class="glossBtn gsNelloBtn gsNelloSelected" data-nello="regular" style="flex:1;padding:6px 4px;font-size:11px;font-weight:600;border-radius:8px;background:linear-gradient(135deg,#22c55e,#16a34a);border:2px solid #fff;color:#fff;cursor:pointer;">Regular</button>
+        <button class="glossBtn gsNelloBtn" data-nello="doubles_only" style="flex:1;padding:6px 4px;font-size:11px;font-weight:600;border-radius:8px;background:linear-gradient(135deg,#6366f1,#4f46e5);border:none;color:#fff;cursor:pointer;">Doubles Only</button>
+        <button class="glossBtn gsNelloBtn" data-nello="player_chooses" style="flex:1;padding:6px 4px;font-size:11px;font-weight:600;border-radius:8px;background:linear-gradient(135deg,#f59e0b,#d97706);border:none;color:#fff;cursor:pointer;">Player Picks</button>
+      </div>
+
+      <!-- Doubles Follow Me -->
+      <div id="gsDfmSection" style="margin-top:10px;">
+        <span style="font-size:12px;color:#fff;font-weight:600;">Doubles Follow Me</span><br>
+        <span style="font-size:10px;color:rgba(255,255,255,0.5);">When doubles are trump &amp; a double leads</span>
+      </div>
+      <div id="gsDfmBtns" style="display:flex;gap:6px;margin-top:6px;margin-bottom:4px;">
+        <button class="glossBtn gsDfmBtn gsDfmSelected" data-dfm="on" style="flex:1;padding:6px 4px;font-size:11px;font-weight:600;border-radius:8px;background:linear-gradient(135deg,#22c55e,#16a34a);border:2px solid #fff;color:#fff;cursor:pointer;">Always On</button>
+        <button class="glossBtn gsDfmBtn" data-dfm="off" style="flex:1;padding:6px 4px;font-size:11px;font-weight:600;border-radius:8px;background:linear-gradient(135deg,#ef4444,#dc2626);border:none;color:#fff;cursor:pointer;">Always Off</button>
+        <button class="glossBtn gsDfmBtn" data-dfm="player_chooses" style="flex:1;padding:6px 4px;font-size:11px;font-weight:600;border-radius:8px;background:linear-gradient(135deg,#f59e0b,#d97706);border:none;color:#fff;cursor:pointer;">Player Picks</button>
+      </div>
+    </div>
+
+    <!-- Domino Visual Effects -->
+    <div style="border-top:1px solid rgba(255,255,255,0.15);padding:12px 16px;">
+      <div style="font-size:13px;color:rgba(255,255,255,0.8);font-weight:600;margin-bottom:10px;">Domino Effects</div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div>
+          <span style="font-size:12px;color:#fff;font-weight:600;">Fancy Center Line</span><br>
+          <span style="font-size:10px;color:rgba(255,255,255,0.5);">Groove effect with highlight/shadow</span>
+        </div>
+        <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;">
+          <input type="checkbox" id="chkFancyLine" style="opacity:0;width:0;height:0;">
+          <span style="position:absolute;inset:0;background:rgba(255,255,255,0.2);border-radius:12px;transition:0.3s;"></span>
+          <span id="fancyLineKnob" style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:0.3s;"></span>
+        </label>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <span style="font-size:12px;color:#fff;font-weight:600;">Pip Effects</span><br>
+          <span style="font-size:10px;color:rgba(255,255,255,0.5);">Ring, highlights & gradient on pips</span>
+        </div>
+        <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;">
+          <input type="checkbox" id="chkPipFx" style="opacity:0;width:0;height:0;">
+          <span style="position:absolute;inset:0;background:rgba(255,255,255,0.2);border-radius:12px;transition:0.3s;"></span>
+          <span id="pipFxKnob" style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:0.3s;"></span>
+        </label>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;">
+        <div>
+          <span style="font-size:12px;color:#fff;font-weight:600;">Flip Trump on Top</span><br>
+          <span style="font-size:10px;color:rgba(255,255,255,0.5);">Rotate tiles so trump pip is up</span>
+        </div>
+        <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;">
+          <input type="checkbox" id="chkFlipTrump" style="opacity:0;width:0;height:0;">
+          <span style="position:absolute;inset:0;background:rgba(255,255,255,0.2);border-radius:12px;transition:0.3s;"></span>
+          <span id="flipTrumpKnob" style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:0.3s;"></span>
+        </label>
+      </div>
+
+    </div>
+
+    <div style="border-top:1px solid rgba(255,255,255,0.15);padding:12px 16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:13px;color:rgba(255,255,255,0.8);font-weight:600;">Developer Mode</span>
+        <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;">
+          <input type="checkbox" id="chkDevMode" style="opacity:0;width:0;height:0;">
+          <span style="position:absolute;inset:0;background:rgba(255,255,255,0.2);border-radius:12px;transition:0.3s;"></span>
+          <span id="devModeKnob" style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:0.3s;"></span>
+        </label>
+      </div>
+    </div>
+    </div><!-- end scrollable modalBody -->
+    <div class="modalFooter" style="border-top:1px solid rgba(255,255,255,0.15);padding:12px 16px;text-align:center;display:flex;gap:12px;justify-content:center;flex-shrink:0;">
+      <button class="glossBtn" id="btnGameSettingsBack" style="padding:10px 24px;font-size:14px;font-weight:600;border-radius:10px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff;">Back</button>
+      <button class="glossBtn glossGreen" id="btnGameSettingsStart" style="padding:10px 32px;font-size:15px;font-weight:700;border-radius:10px;">Start Game</button>
+    </div>
+  </div>
+</div>
+
+<!-- V12.10.8: Splash Screen -->
+<div id="splashScreen">
+  <img src="./assets/images/splash-bg.png" alt="Texas Dominoes">
+  <div id="splashLoadingWrap">
+    <div id="splashLoadingText">LOADING...</div>
+    <div id="splashLoadingBar"><div id="splashLoadingFill"></div></div>
+    <div id="splashVersion" style="margin-top:10px;font-size:11px;color:rgba(255,255,255,0.35);letter-spacing:0.08em;text-align:center;font-family:system-ui,-apple-system,sans-serif;"></div>
+  </div>
+</div>
+
+<!-- V12.10.11: Color Picker -->
+<button id="colorPickerToggle" title="Customize background colors" style="display:none;">&#128396;</button>
+<div id="colorPickerPanel">
+  <div style="font-weight:700;font-size:14px;margin-bottom:10px;text-align:center;">Customize</div>
+  <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-bottom:10px;text-align:center;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:8px;">Background</div>
+  <div class="cpRow">
+    <label>Center</label>
+    <input type="color" id="cpCenter" value="#0178ff">
+  </div>
+  <div class="cpRow">
+    <label>Edge</label>
+    <input type="color" id="cpEdge" value="#01001e">
+  </div>
+  <div class="cpRow">
+    <label>Spread</label>
+    <input type="range" id="cpSpread" min="20" max="80" value="68">
+    <span id="cpSpreadVal">68%</span>
+  </div>
+  <div style="font-size:11px;color:rgba(255,255,255,0.4);margin:8px 0 10px 0;text-align:center;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:8px;">Effects</div>
+  <div class="cpRow">
+    <label>Light Burst</label>
+    <label style="position:relative;display:inline-block;width:40px;height:22px;cursor:pointer;">
+      <input type="checkbox" id="cpBurst" checked style="opacity:0;width:0;height:0;">
+      <span style="position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.15);border-radius:11px;transition:0.3s;" id="cpBurstTrack"></span>
+      <span style="position:absolute;top:2px;left:2px;width:18px;height:18px;background:#fff;border-radius:50%;transition:0.3s;" id="cpBurstKnob"></span>
+    </label>
+  </div>
+  <div class="cpRow">
+    <label>Speed</label>
+    <input type="range" id="cpSpeed" min="2" max="40" value="10">
+    <span id="cpSpeedVal">10s</span>
+  </div>
+  <div class="cpRow">
+    <label>Mode</label>
+    <label style="position:relative;display:inline-block;width:40px;height:22px;cursor:pointer;">
+      <input type="checkbox" id="cpRotate" style="opacity:0;width:0;height:0;">
+      <span style="position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.15);border-radius:11px;transition:0.3s;" id="cpRotateTrack"></span>
+      <span style="position:absolute;top:2px;left:2px;width:18px;height:18px;background:#fff;border-radius:50%;transition:0.3s;" id="cpRotateKnob"></span>
+    </label>
+    <span id="cpModeLabel" style="font-size:10px;color:rgba(255,255,255,0.5);margin-left:4px;">Sway</span>
+  </div>
+  
+  <div style="display:flex;gap:8px;margin-top:8px;">
+    <button id="cpReset" style="flex:1;padding:8px;font-size:12px;font-weight:600;color:rgba(255,255,255,0.6);background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:8px;cursor:pointer;">Reset</button>
+    <button id="cpDone" style="flex:1;padding:8px;font-size:12px;font-weight:700;color:#fff;background:linear-gradient(135deg,#3b82f6,#2563eb);border:none;border-radius:8px;cursor:pointer;">Done</button>
+  </div>
+  <button id="cpCopySettings" style="width:100%;margin-top:8px;padding:8px;font-size:11px;font-weight:600;color:rgba(255,255,255,0.7);background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:8px;cursor:pointer;">&#128203; Copy Settings</button>
+</div>
+
+<div class="modalBackdrop" id="startScreenBackdrop" style="display:flex;">
+    <div id="lightBurst" class="active"></div>
+  <div class="startScreenPanel">
+    <!-- V12.10.9: Hero image with feathered edge -->
+    <div id="homeHeroWrap">
+            <img id="homeScreenLogo" src="./assets/images/home-logo.png" alt="Texas Dominoes">
+    </div>
+
+    <div id="homeButtonsWrap">
+      <!-- V12: Inline Screen Name / Handle -->
+      <div id="screenNameSection" style="margin-bottom:8px;width:100%;max-width:280px;">
+        <!-- Edit mode (shown when no name set, or when editing) -->
+        <div id="screenNameEdit" style="display:none;">
+          <div style="font-size:12px;color:rgba(255,255,255,0.5);margin-bottom:6px;text-align:center;">Screen Name</div>
+          <div style="display:flex;gap:8px;align-items:center;justify-content:center;">
+            <input id="screenNameInput" type="text" placeholder="Enter your handle..." maxlength="20" style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#fff;font-size:14px;text-align:center;outline:none;font-weight:600;">
+            <button id="screenNameSave" style="padding:8px 14px;font-size:13px;font-weight:700;color:#fff;background:linear-gradient(135deg,#22c55e,#16a34a);border:none;border-radius:8px;cursor:pointer;white-space:nowrap;">Save</button>
+          </div>
+        </div>
+        <!-- Display mode (shown when name is set) -->
+        <div id="screenNameDisplay" style="display:none;text-align:center;">
+          <div style="display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border-radius:20px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);cursor:pointer;" id="screenNameDisplayBtn">
+            <span id="screenNameText" style="font-size:15px;font-weight:700;color:#fff;"></span>
+            <span style="font-size:12px;opacity:0.5;">&#9998;</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main buttons -->
+      <div id="startMainBtns" style="display:flex;flex-direction:column;gap:28px;width:100%;">
+        <button class="glossBtn glossGreen startScreenBtn" id="btnStartNewGame" style="width:100%;padding:14px 32px;font-size:18px;">New Game</button>
+        <button class="glossBtn glossBlue startScreenBtn" id="btnStartResumeGame" style="display:none;width:100%;padding:14px 32px;font-size:18px;">Resume Game</button>
+        <button class="glossBtn startScreenBtn" id="btnStartMultiplayer" style="background:linear-gradient(to bottom, #a78bfa, #7c3aed);width:100%;padding:14px 32px;font-size:18px;">Multiplayer</button>
+        <button class="glossBtn startScreenBtn" id="btnResumeMP" style="display:none; background:linear-gradient(to bottom, #f59e0b, #d97706); color:#fff;width:100%;padding:14px 32px;font-size:18px;">Resume MP Game</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- V12.10.27cb: Game Select — logo swipe with fixed burst -->
+<div id="gameSelectScreen">
+  <div id="gsBurst"></div>
+  <div id="gsLogoArea">
+    <div id="gsLogoTrack">
+      <div class="gsLogoSlide" data-mode="TN51">
+        <img class="gsSlideImg" data-game="TN51" src="./assets/images/logo-tn51.png" alt="Tennessee 51">
+        <div class="gsSlideTitle">Tennessee 51</div>
+        <div class="gsSlideDesc">6 Players &middot; First to win 7 marks</div>
+      </div>
+      <div class="gsLogoSlide" data-mode="T42">
+        <img class="gsSlideImg" data-game="T42" src="./assets/images/logo-t42.png" alt="Texas 42">
+        <div class="gsSlideTitle">Texas 42</div>
+        <div class="gsSlideDesc">4 Players &middot; First to win 7 marks</div>
+      </div>
+      <div class="gsLogoSlide" data-mode="MOON">
+        <img class="gsSlideImg" data-game="MOON" src="./assets/images/logo-moon.png" alt="Texas Moon">
+        <div class="gsSlideTitle">Texas Moon</div>
+        <div class="gsSlideDesc">3 Players &middot; First to 21 points</div>
+      </div>
+    </div>
+    <button class="gsArrow" id="gsArrowLeft">&#8249;</button>
+    <button class="gsArrow" id="gsArrowRight">&#8250;</button>
+  </div>
+  <div id="gsDots">
+    <button class="gsDot active" data-idx="0"></button>
+    <button class="gsDot" data-idx="1"></button>
+    <button class="gsDot" data-idx="2"></button>
+  </div>
+  <div id="gsBottomBar">
+    <button id="gsPlayBtn" style="background:linear-gradient(135deg,#22c55e,#16a34a);">Play</button>
+    <button id="gsBackBtn">&larr; Back</button>
+  </div>
+</div>
+<button id="gsColorPickerToggle">&#128396;</button>
+<div id="gsColorPickerPanel">
+  <div style="font-weight:700;font-size:14px;margin-bottom:10px;text-align:center;">Game Colors</div>
+  <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-bottom:8px;text-align:center;" id="gsColorGameLabel">Tennessee 51</div>
+  <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-bottom:10px;text-align:center;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:8px;">Image</div>
+  <div class="cpRow">
+    <label>Size</label>
+    <input type="range" id="gsCpImgSize" min="30" max="90" value="60">
+    <span id="gsCpImgSizeVal">60%</span>
+  </div>
+  <div style="font-size:11px;color:rgba(255,255,255,0.4);margin:8px 0 10px 0;text-align:center;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:8px;">Background</div>
+  <div class="cpRow">
+    <label>Center</label>
+    <input type="color" id="gsCpCenter" value="#0178ff">
+  </div>
+  <div class="cpRow">
+    <label>Edge</label>
+    <input type="color" id="gsCpEdge" value="#01001e">
+  </div>
+  <div class="cpRow">
+    <label>Spread</label>
+    <input type="range" id="gsCpSpread" min="20" max="80" value="68">
+    <span id="gsCpSpreadVal">68%</span>
+  </div>
+  <div style="font-size:11px;color:rgba(255,255,255,0.4);margin:8px 0 10px 0;text-align:center;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:8px;">Light Burst</div>
+  <div class="cpRow">
+    <label>Burst</label>
+    <label style="position:relative;display:inline-block;width:40px;height:22px;cursor:pointer;">
+      <input type="checkbox" id="gsCpBurst" checked style="opacity:0;width:0;height:0;">
+      <span style="position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.15);border-radius:11px;transition:0.3s;" id="gsCpBurstTrack"></span>
+      <span style="position:absolute;top:2px;left:2px;width:18px;height:18px;background:#fff;border-radius:50%;transition:0.3s;" id="gsCpBurstKnob"></span>
+    </label>
+  </div>
+  <div class="cpRow">
+    <label>Speed</label>
+    <input type="range" id="gsCpSpeed" min="2" max="40" value="10">
+    <span id="gsCpSpeedVal">10s</span>
+  </div>
+  <div class="cpRow">
+    <label>Mode</label>
+    <label style="position:relative;display:inline-block;width:40px;height:22px;cursor:pointer;">
+      <input type="checkbox" id="gsCpRotate" style="opacity:0;width:0;height:0;">
+      <span style="position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.15);border-radius:11px;transition:0.3s;" id="gsCpRotateTrack"></span>
+      <span style="position:absolute;top:2px;left:2px;width:18px;height:18px;background:#fff;border-radius:50%;transition:0.3s;" id="gsCpRotateKnob"></span>
+    </label>
+    <span id="gsCpModeLabel" style="font-size:10px;color:rgba(255,255,255,0.5);margin-left:4px;">Sway</span>
+  </div>
+  <div class="cpRow">
+    <label>X Offset</label>
+    <input type="range" id="gsCpBurstX" min="-30" max="30" value="0">
+    <span id="gsCpBurstXVal">0%</span>
+  </div>
+  <div class="cpRow">
+    <label>Y Offset</label>
+    <input type="range" id="gsCpBurstY" min="-30" max="30" value="0">
+    <span id="gsCpBurstYVal">0%</span>
+  </div>
+  <div style="font-size:11px;color:rgba(255,255,255,0.4);margin:8px 0 10px 0;text-align:center;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:8px;">Play Button</div>
+  <div class="cpRow">
+    <label>Color 1</label>
+    <input type="color" id="gsCpBtn1" value="#22c55e">
+  </div>
+  <div class="cpRow">
+    <label>Color 2</label>
+    <input type="color" id="gsCpBtn2" value="#16a34a">
+  </div>
+  <div style="display:flex;gap:8px;margin-top:10px;">
+    <button id="gsCpReset" style="flex:1;padding:8px;font-size:12px;font-weight:600;color:rgba(255,255,255,0.6);background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:8px;cursor:pointer;">Reset</button>
+    <button id="gsCpDone" style="flex:1;padding:8px;font-size:12px;font-weight:700;color:#fff;background:linear-gradient(135deg,#3b82f6,#2563eb);border:none;border-radius:8px;cursor:pointer;">Done</button>
+  </div>
+</div>
+
+<script src="./assets/js/game.js" defer></script>
+
+<!-- TN51 Layout Settings Popup -->
+<div id="tn51SettingsBackdrop" class="modalBackdrop" style="display:none;z-index:2000;">
+  <div class="modal" style="width:87%;max-width:87%;max-height:85%;overflow-y:auto;">
+    <div class="modalHeader" style="padding:12px 16px;">
+      <span style="font-weight:700;font-size:15px;">TN51 Layout Settings</span>
+      <button class="closeBtn" id="btnCloseTn51Settings">&times;</button>
+    </div>
+    <div class="modalBody" style="padding:12px 16px;">
+      <div class="t42s-section">Player 1 (You - Bottom)</div>
+      <div class="t42s-group"><label>Scale</label><input type="range" min="0.5" max="1.5" step="0.01" id="tn51s_p1Scale"><span id="tn51sv_p1Scale"></span></div>
+      <div class="t42s-group"><label>X (Start)</label><input type="range" min="0.5" max="1.0" step="0.005" id="tn51s_p1x"><span id="tn51sv_p1x"></span></div>
+      <div class="t42s-group"><label>Y</label><input type="range" min="0.75" max="0.99" step="0.005" id="tn51s_p1y"><span id="tn51sv_p1y"></span></div>
+      <div class="t42s-group"><label>Spacing</label><input type="range" min="0.08" max="0.25" step="0.001" id="tn51s_p1Spacing"><span id="tn51sv_p1Spacing"></span></div>
+
+      <div class="t42s-section">Player 2 (Bottom-Left)</div>
+      <div class="t42s-group"><label>Scale</label><input type="range" min="0.2" max="0.8" step="0.01" id="tn51s_p2Scale"><span id="tn51sv_p2Scale"></span></div>
+      <div class="t42s-group"><label>X</label><input type="range" min="0.05" max="0.35" step="0.005" id="tn51s_p2x"><span id="tn51sv_p2x"></span></div>
+      <div class="t42s-group"><label>Y</label><input type="range" min="0.50" max="0.80" step="0.005" id="tn51s_p2y"><span id="tn51sv_p2y"></span></div>
+      <div class="t42s-group"><label>Spacing</label><input type="range" min="0.01" max="0.06" step="0.001" id="tn51s_p2Spacing"><span id="tn51sv_p2Spacing"></span></div>
+
+      <div class="t42s-section">Player 3 (Top-Left)</div>
+      <div class="t42s-group"><label>Scale</label><input type="range" min="0.2" max="0.8" step="0.01" id="tn51s_p3Scale"><span id="tn51sv_p3Scale"></span></div>
+      <div class="t42s-group"><label>X</label><input type="range" min="0.05" max="0.35" step="0.005" id="tn51s_p3x"><span id="tn51sv_p3x"></span></div>
+      <div class="t42s-group"><label>Y</label><input type="range" min="0.35" max="0.65" step="0.005" id="tn51s_p3y"><span id="tn51sv_p3y"></span></div>
+      <div class="t42s-group"><label>Spacing</label><input type="range" min="0.01" max="0.06" step="0.001" id="tn51s_p3Spacing"><span id="tn51sv_p3Spacing"></span></div>
+
+      <div class="t42s-section">Player 4 (Top - Partner)</div>
+      <div class="t42s-group"><label>Scale</label><input type="range" min="0.2" max="0.8" step="0.01" id="tn51s_p4Scale"><span id="tn51sv_p4Scale"></span></div>
+      <div class="t42s-group"><label>X (Start)</label><input type="range" min="0.15" max="0.55" step="0.005" id="tn51s_p4x"><span id="tn51sv_p4x"></span></div>
+      <div class="t42s-group"><label>Y</label><input type="range" min="0.30" max="0.55" step="0.005" id="tn51s_p4y"><span id="tn51sv_p4y"></span></div>
+      <div class="t42s-group"><label>Spacing</label><input type="range" min="0.02" max="0.10" step="0.001" id="tn51s_p4Spacing"><span id="tn51sv_p4Spacing"></span></div>
+
+      <div class="t42s-section">Player 5 (Top-Right)</div>
+      <div class="t42s-group"><label>Scale</label><input type="range" min="0.2" max="0.8" step="0.01" id="tn51s_p5Scale"><span id="tn51sv_p5Scale"></span></div>
+      <div class="t42s-group"><label>X</label><input type="range" min="0.65" max="0.95" step="0.005" id="tn51s_p5x"><span id="tn51sv_p5x"></span></div>
+      <div class="t42s-group"><label>Y</label><input type="range" min="0.35" max="0.65" step="0.005" id="tn51s_p5y"><span id="tn51sv_p5y"></span></div>
+      <div class="t42s-group"><label>Spacing</label><input type="range" min="0.01" max="0.06" step="0.001" id="tn51s_p5Spacing"><span id="tn51sv_p5Spacing"></span></div>
+
+      <div class="t42s-section">Player 6 (Bottom-Right)</div>
+      <div class="t42s-group"><label>Scale</label><input type="range" min="0.2" max="0.8" step="0.01" id="tn51s_p6Scale"><span id="tn51sv_p6Scale"></span></div>
+      <div class="t42s-group"><label>X</label><input type="range" min="0.65" max="0.95" step="0.005" id="tn51s_p6x"><span id="tn51sv_p6x"></span></div>
+      <div class="t42s-group"><label>Y</label><input type="range" min="0.50" max="0.80" step="0.005" id="tn51s_p6y"><span id="tn51sv_p6y"></span></div>
+      <div class="t42s-group"><label>Spacing</label><input type="range" min="0.01" max="0.06" step="0.001" id="tn51s_p6Spacing"><span id="tn51sv_p6Spacing"></span></div>
+
+      <div class="t42s-section">Trick Area</div>
+      <div class="t42s-group"><label>Trick Scale</label><input type="range" min="0.2" max="0.8" step="0.01" id="tn51s_trickScale"><span id="tn51sv_trickScale"></span></div>
+
+      <div class="t42s-section">Trick Positions</div>
+      <div class="t42s-group"><label>P1 Trick X</label><input type="range" min="0.2" max="0.8" step="0.005" id="tn51s_p1TrickX"><span id="tn51sv_p1TrickX"></span></div>
+      <div class="t42s-group"><label>P1 Trick Y</label><input type="range" min="0.4" max="0.9" step="0.005" id="tn51s_p1TrickY"><span id="tn51sv_p1TrickY"></span></div>
+      <div class="t42s-group"><label>P2 Trick X</label><input type="range" min="0.1" max="0.6" step="0.005" id="tn51s_p2TrickX"><span id="tn51sv_p2TrickX"></span></div>
+      <div class="t42s-group"><label>P2 Trick Y</label><input type="range" min="0.4" max="0.8" step="0.005" id="tn51s_p2TrickY"><span id="tn51sv_p2TrickY"></span></div>
+      <div class="t42s-group"><label>P3 Trick X</label><input type="range" min="0.1" max="0.6" step="0.005" id="tn51s_p3TrickX"><span id="tn51sv_p3TrickX"></span></div>
+      <div class="t42s-group"><label>P3 Trick Y</label><input type="range" min="0.3" max="0.7" step="0.005" id="tn51s_p3TrickY"><span id="tn51sv_p3TrickY"></span></div>
+      <div class="t42s-group"><label>P4 Trick X</label><input type="range" min="0.2" max="0.8" step="0.005" id="tn51s_p4TrickX"><span id="tn51sv_p4TrickX"></span></div>
+      <div class="t42s-group"><label>P4 Trick Y</label><input type="range" min="0.3" max="0.7" step="0.005" id="tn51s_p4TrickY"><span id="tn51sv_p4TrickY"></span></div>
+      <div class="t42s-group"><label>P5 Trick X</label><input type="range" min="0.4" max="0.9" step="0.005" id="tn51s_p5TrickX"><span id="tn51sv_p5TrickX"></span></div>
+      <div class="t42s-group"><label>P5 Trick Y</label><input type="range" min="0.3" max="0.7" step="0.005" id="tn51s_p5TrickY"><span id="tn51sv_p5TrickY"></span></div>
+      <div class="t42s-group"><label>P6 Trick X</label><input type="range" min="0.4" max="0.9" step="0.005" id="tn51s_p6TrickX"><span id="tn51sv_p6TrickX"></span></div>
+      <div class="t42s-group"><label>P6 Trick Y</label><input type="range" min="0.4" max="0.8" step="0.005" id="tn51s_p6TrickY"><span id="tn51sv_p6TrickY"></span></div>
+
+      <div class="t42s-section">Lead Domino</div>
+      <div class="t42s-group"><label>Lead Scale</label><input type="range" min="0.2" max="0.8" step="0.01" id="tn51s_leadScale"><span id="tn51sv_leadScale"></span></div>
+      <div class="t42s-group"><label>Lead X</label><input type="range" min="0.2" max="0.8" step="0.005" id="tn51s_leadX"><span id="tn51sv_leadX"></span></div>
+      <div class="t42s-group"><label>Lead Y</label><input type="range" min="0.3" max="0.8" step="0.005" id="tn51s_leadY"><span id="tn51sv_leadY"></span></div>
+
+      <div class="t42s-section">Trick History</div>
+      <div class="t42s-group"><label>TH Scale</label><input type="range" min="0.15" max="0.6" step="0.005" id="tn51s_thScale"><span id="tn51sv_thScale"></span></div>
+      <div class="t42s-group"><label>TH Base X</label><input type="range" min="0.02" max="0.30" step="0.005" id="tn51s_thBaseX"><span id="tn51sv_thBaseX"></span></div>
+      <div class="t42s-group"><label>TH Base Y</label><input type="range" min="0.05" max="0.40" step="0.005" id="tn51s_thBaseY"><span id="tn51sv_thBaseY"></span></div>
+      <div class="t42s-group"><label>TH Row Spacing</label><input type="range" min="0.05" max="0.20" step="0.001" id="tn51s_thRowSpacing"><span id="tn51sv_thRowSpacing"></span></div>
+      <div class="t42s-group"><label>TH Col Spacing</label><input type="range" min="0.01" max="0.06" step="0.001" id="tn51s_thColSpacing"><span id="tn51sv_thColSpacing"></span></div>
+
+      <div class="t42s-section">Player Indicators</div>
+      <div class="t42s-group"><label>P1 Ind X</label><input type="range" min="0.2" max="0.8" step="0.005" id="tn51s_ind1x"><span id="tn51sv_ind1x"></span></div>
+      <div class="t42s-group"><label>P1 Ind Y</label><input type="range" min="0.5" max="0.9" step="0.005" id="tn51s_ind1y"><span id="tn51sv_ind1y"></span></div>
+      <div class="t42s-group"><label>P2 Ind X</label><input type="range" min="0.1" max="0.6" step="0.005" id="tn51s_ind2x"><span id="tn51sv_ind2x"></span></div>
+      <div class="t42s-group"><label>P2 Ind Y</label><input type="range" min="0.4" max="0.9" step="0.005" id="tn51s_ind2y"><span id="tn51sv_ind2y"></span></div>
+      <div class="t42s-group"><label>P3 Ind X</label><input type="range" min="0.1" max="0.6" step="0.005" id="tn51s_ind3x"><span id="tn51sv_ind3x"></span></div>
+      <div class="t42s-group"><label>P3 Ind Y</label><input type="range" min="0.3" max="0.7" step="0.005" id="tn51s_ind3y"><span id="tn51sv_ind3y"></span></div>
+      <div class="t42s-group"><label>P4 Ind X</label><input type="range" min="0.2" max="0.8" step="0.005" id="tn51s_ind4x"><span id="tn51sv_ind4x"></span></div>
+      <div class="t42s-group"><label>P4 Ind Y</label><input type="range" min="0.2" max="0.6" step="0.005" id="tn51s_ind4y"><span id="tn51sv_ind4y"></span></div>
+      <div class="t42s-group"><label>P5 Ind X</label><input type="range" min="0.4" max="0.9" step="0.005" id="tn51s_ind5x"><span id="tn51sv_ind5x"></span></div>
+      <div class="t42s-group"><label>P5 Ind Y</label><input type="range" min="0.3" max="0.7" step="0.005" id="tn51s_ind5y"><span id="tn51sv_ind5y"></span></div>
+      <div class="t42s-group"><label>P6 Ind X</label><input type="range" min="0.4" max="0.9" step="0.005" id="tn51s_ind6x"><span id="tn51sv_ind6x"></span></div>
+      <div class="t42s-group"><label>P6 Ind Y</label><input type="range" min="0.4" max="0.9" step="0.005" id="tn51s_ind6y"><span id="tn51sv_ind6y"></span></div>
+
+      <div style="text-align:center;margin-top:12px;">
+        <button class="glossBtn" id="btnTn51Reset" style="padding:6px 14px;font-size:12px;">Reset Defaults</button>
+        <button class="glossBtn" id="btnTn51Export" style="padding:6px 14px;font-size:12px;margin-left:8px;">Export Values</button>
+      </div>
+      <div style="text-align:center;margin-top:8px;">
+        <button class="glossBtn" id="btnDeviceSavePreset" style="padding:6px 14px;font-size:12px;">Save Device Preset</button>
+        <button class="glossBtn" id="btnDeviceLoadPreset" style="padding:6px 14px;font-size:12px;margin-left:8px;">Load Device Preset</button>
+      </div>
+      <div id="orientLabel" style="text-align:center;margin-top:6px;font-size:11px;color:rgba(255,255,255,0.5);"></div>
+    </div>
+  </div>
+</div>
+
+<!-- T42 Layout Settings Popup -->
+<div id="t42SettingsBackdrop" class="modalBackdrop" style="display:none;z-index:2000;">
+  <div class="modal" style="width:87%;max-width:87%;max-height:85%;overflow-y:auto;">
+    <div class="modalHeader" style="padding:12px 16px;">
+      <span style="font-weight:700;font-size:15px;">T42 Layout Settings</span>
+      <button class="closeBtn" id="btnCloseT42Settings">&times;</button>
+    </div>
+    <div class="modalBody" style="padding:12px 16px;">
+      <div class="t42s-section">Player 1 (You - Bottom)</div>
+      <div class="t42s-group"><label>Scale</label><input type="range" min="0.5" max="1.5" step="0.01" id="t42s_p1Scale"><span id="t42sv_p1Scale"></span></div>
+      <div class="t42s-group"><label>X (Start)</label><input type="range" min="0.70" max="0.98" step="0.005" id="t42s_p1x"><span id="t42sv_p1x"></span></div>
+      <div class="t42s-group"><label>Y</label><input type="range" min="0.75" max="0.98" step="0.005" id="t42s_p1y"><span id="t42sv_p1y"></span></div>
+      <div class="t42s-group"><label>Spacing</label><input type="range" min="0.05" max="0.20" step="0.001" id="t42s_p1Spacing"><span id="t42sv_p1Spacing"></span></div>
+
+      <div class="t42s-section">Player 2 (Left Opponent)</div>
+      <div class="t42s-group"><label>Scale</label><input type="range" min="0.2" max="0.8" step="0.01" id="t42s_p2Scale"><span id="t42sv_p2Scale"></span></div>
+      <div class="t42s-group"><label>X</label><input type="range" min="0.03" max="0.35" step="0.005" id="t42s_p2x"><span id="t42sv_p2x"></span></div>
+      <div class="t42s-group"><label>Y (Center)</label><input type="range" min="0.40" max="0.80" step="0.005" id="t42s_p2y"><span id="t42sv_p2y"></span></div>
+      <div class="t42s-group"><label>Spacing</label><input type="range" min="0.02" max="0.08" step="0.001" id="t42s_p2Spacing"><span id="t42sv_p2Spacing"></span></div>
+
+      <div class="t42s-section">Player 3 (Top Partner)</div>
+      <div class="t42s-group"><label>Scale</label><input type="range" min="0.2" max="0.8" step="0.01" id="t42s_p3Scale"><span id="t42sv_p3Scale"></span></div>
+      <div class="t42s-group"><label>X (Start)</label><input type="range" min="0.15" max="0.50" step="0.005" id="t42s_p3x"><span id="t42sv_p3x"></span></div>
+      <div class="t42s-group"><label>Y</label><input type="range" min="0.30" max="0.55" step="0.005" id="t42s_p3y"><span id="t42sv_p3y"></span></div>
+      <div class="t42s-group"><label>Spacing</label><input type="range" min="0.03" max="0.10" step="0.001" id="t42s_p3Spacing"><span id="t42sv_p3Spacing"></span></div>
+
+      <div class="t42s-section">Player 4 (Right Opponent)</div>
+      <div class="t42s-group"><label>Scale</label><input type="range" min="0.2" max="0.8" step="0.01" id="t42s_p4Scale"><span id="t42sv_p4Scale"></span></div>
+      <div class="t42s-group"><label>X</label><input type="range" min="0.65" max="0.97" step="0.005" id="t42s_p4x"><span id="t42sv_p4x"></span></div>
+      <div class="t42s-group"><label>Y (Center)</label><input type="range" min="0.40" max="0.80" step="0.005" id="t42s_p4y"><span id="t42sv_p4y"></span></div>
+      <div class="t42s-group"><label>Spacing</label><input type="range" min="0.02" max="0.08" step="0.001" id="t42s_p4Spacing"><span id="t42sv_p4Spacing"></span></div>
+
+      <div class="t42s-section">Trick Area (Center)</div>
+      <div class="t42s-group"><label>Trick Scale</label><input type="range" min="0.2" max="0.8" step="0.01" id="t42s_trickScale"><span id="t42sv_trickScale"></span></div>
+      <div class="t42s-group"><label>P1 Trick X</label><input type="range" min="0.35" max="0.65" step="0.005" id="t42s_p1TrickX"><span id="t42sv_p1TrickX"></span></div>
+      <div class="t42s-group"><label>P1 Trick Y</label><input type="range" min="0.55" max="0.80" step="0.005" id="t42s_p1TrickY"><span id="t42sv_p1TrickY"></span></div>
+      <div class="t42s-group"><label>P2 Trick X</label><input type="range" min="0.25" max="0.50" step="0.005" id="t42s_p2TrickX"><span id="t42sv_p2TrickX"></span></div>
+      <div class="t42s-group"><label>P2 Trick Y</label><input type="range" min="0.45" max="0.75" step="0.005" id="t42s_p2TrickY"><span id="t42sv_p2TrickY"></span></div>
+      <div class="t42s-group"><label>P3 Trick X</label><input type="range" min="0.35" max="0.65" step="0.005" id="t42s_p3TrickX"><span id="t42sv_p3TrickX"></span></div>
+      <div class="t42s-group"><label>P3 Trick Y</label><input type="range" min="0.40" max="0.65" step="0.005" id="t42s_p3TrickY"><span id="t42sv_p3TrickY"></span></div>
+      <div class="t42s-group"><label>P4 Trick X</label><input type="range" min="0.50" max="0.75" step="0.005" id="t42s_p4TrickX"><span id="t42sv_p4TrickX"></span></div>
+      <div class="t42s-group"><label>P4 Trick Y</label><input type="range" min="0.45" max="0.75" step="0.005" id="t42s_p4TrickY"><span id="t42sv_p4TrickY"></span></div>
+      <div class="t42s-group"><label>Lead Scale</label><input type="range" min="0.2" max="0.8" step="0.01" id="t42s_leadScale"><span id="t42sv_leadScale"></span></div>
+      <div class="t42s-group"><label>Lead X</label><input type="range" min="0.35" max="0.65" step="0.005" id="t42s_leadX"><span id="t42sv_leadX"></span></div>
+      <div class="t42s-group"><label>Lead Y</label><input type="range" min="0.45" max="0.70" step="0.005" id="t42s_leadY"><span id="t42sv_leadY"></span></div>
+
+      <div class="t42s-section">Player Indicators</div>
+      <div class="t42s-group"><label>P1 Indicator X</label><input type="range" min="0.30" max="0.70" step="0.005" id="t42s_ind1x"><span id="t42sv_ind1x"></span></div>
+      <div class="t42s-group"><label>P1 Indicator Y</label><input type="range" min="0.65" max="0.95" step="0.005" id="t42s_ind1y"><span id="t42sv_ind1y"></span></div>
+      <div class="t42s-group"><label>P2 Indicator X</label><input type="range" min="0.05" max="0.40" step="0.005" id="t42s_ind2x"><span id="t42sv_ind2x"></span></div>
+      <div class="t42s-group"><label>P2 Indicator Y</label><input type="range" min="0.40" max="0.80" step="0.005" id="t42s_ind2y"><span id="t42sv_ind2y"></span></div>
+      <div class="t42s-group"><label>P3 Indicator X</label><input type="range" min="0.30" max="0.70" step="0.005" id="t42s_ind3x"><span id="t42sv_ind3x"></span></div>
+      <div class="t42s-group"><label>P3 Indicator Y</label><input type="range" min="0.35" max="0.60" step="0.005" id="t42s_ind3y"><span id="t42sv_ind3y"></span></div>
+      <div class="t42s-group"><label>P4 Indicator X</label><input type="range" min="0.60" max="0.95" step="0.005" id="t42s_ind4x"><span id="t42sv_ind4x"></span></div>
+      <div class="t42s-group"><label>P4 Indicator Y</label><input type="range" min="0.40" max="0.80" step="0.005" id="t42s_ind4y"><span id="t42sv_ind4y"></span></div>
+
+      <div class="t42s-section">Trick History</div>
+      <div class="t42s-group"><label>TH Scale</label><input type="range" min="0.15" max="0.6" step="0.005" id="t42s_thScale"><span id="t42sv_thScale"></span></div>
+      <div class="t42s-group"><label>TH Base X</label><input type="range" min="0.02" max="0.30" step="0.005" id="t42s_thBaseX"><span id="t42sv_thBaseX"></span></div>
+      <div class="t42s-group"><label>TH Base Y</label><input type="range" min="0.05" max="0.40" step="0.005" id="t42s_thBaseY"><span id="t42sv_thBaseY"></span></div>
+      <div class="t42s-group"><label>TH Row Spacing</label><input type="range" min="0.05" max="0.20" step="0.001" id="t42s_thRowSpacing"><span id="t42sv_thRowSpacing"></span></div>
+      <div class="t42s-group"><label>TH Col Spacing</label><input type="range" min="0.01" max="0.06" step="0.001" id="t42s_thColSpacing"><span id="t42sv_thColSpacing"></span></div>
+
+      <div style="text-align:center;margin-top:12px;">
+        <button class="glossBtn" id="btnT42Reset" style="padding:6px 14px;font-size:12px;">Reset Defaults</button>
+        <button class="glossBtn" id="btnT42Export" style="padding:6px 14px;font-size:12px;margin-left:8px;">Export Values</button>
+      </div>
+      <div style="text-align:center;margin-top:8px;">
+        <button class="glossBtn" id="btnT42DeviceSave" style="padding:6px 14px;font-size:12px;">Save Device Preset</button>
+        <button class="glossBtn" id="btnT42DeviceLoad" style="padding:6px 14px;font-size:12px;margin-left:8px;">Load Device Preset</button>
+      </div>
+      <div id="orientLabelT42" style="text-align:center;margin-top:6px;font-size:11px;color:rgba(255,255,255,0.5);"></div>
+    </div>
+  </div>
+</div>
+<!-- Boneyard Settings Popup -->
+<div id="by2SettingsBackdrop" class="modalBackdrop" style="display:none;z-index:2100;">
+  <div class="modal" style="width:82%;max-width:82%;max-height:80%;overflow-y:auto;">
+    <div class="modalHeader" style="padding:12px 16px;">
+      <span style="font-weight:700;font-size:15px;">Boneyard Settings</span>
+      <button class="closeBtn" id="btnCloseBy2Settings">&times;</button>
+    </div>
+    <div class="modalBody" style="padding:12px 16px;">
+      <div class="t42s-section">Position</div>
+      <div class="t42s-group"><label>X Offset (%)</label><input type="range" min="0" max="20" step="0.5" id="by2s_xOffset"><span id="by2sv_xOffset"></span></div>
+      <div class="t42s-group"><label>Y Offset (%)</label><input type="range" min="5" max="35" step="0.5" id="by2s_yOffset"><span id="by2sv_yOffset"></span></div>
+      <div class="t42s-group"><label>Width (%)</label><input type="range" min="50" max="100" step="1" id="by2s_width"><span id="by2sv_width"></span></div>
+      <div class="t42s-group"><label>Height (%)</label><input type="range" min="10" max="60" step="0.5" id="by2s_height"><span id="by2sv_height"></span></div>
+      <div class="t42s-section">Tile Appearance</div>
+      <div class="t42s-group"><label>Tile Gap</label><input type="range" min="0" max="8" step="1" id="by2s_gap"><span id="by2sv_gap"></span></div>
+      <div class="t42s-group"><label>Played Tile Opacity</label><input type="range" min="0.1" max="1.0" step="0.01" id="by2s_playedOpacity"><span id="by2sv_playedOpacity"></span></div>
+      <div class="t42s-section">Hand Tile Border</div>
+      <div class="t42s-group"><label>Inner Border Size</label><input type="range" min="0" max="5" step="0.5" id="by2s_innerSize"><span id="by2sv_innerSize"></span></div>
+      <div class="t42s-group"><label>Inner Border Radius</label><input type="range" min="0" max="15" step="1" id="by2s_innerRadius"><span id="by2sv_innerRadius"></span></div>
+      <div class="t42s-group"><label>Inner Border Color</label><input type="color" id="by2s_innerColor" style="width:60px;height:24px;vertical-align:middle;"><span id="by2sv_innerColor" style="margin-left:6px;font-size:11px;color:#fff;"></span></div>
+      <div class="t42s-group"><label>Outer Border Size</label><input type="range" min="0" max="5" step="0.5" id="by2s_outerSize"><span id="by2sv_outerSize"></span></div>
+      <div class="t42s-group"><label>Outer Border Radius</label><input type="range" min="0" max="15" step="1" id="by2s_outerRadius"><span id="by2sv_outerRadius"></span></div>
+      <div class="t42s-group"><label>Outer Border Color</label><input type="color" id="by2s_outerColor" style="width:60px;height:24px;vertical-align:middle;"><span id="by2sv_outerColor" style="margin-left:6px;font-size:11px;color:#fff;"></span></div>
+      <div style="text-align:center;margin-top:12px;">
+        <button class="glossBtn" id="btnBy2Reset" style="padding:6px 14px;font-size:12px;">Reset Defaults</button>
+        <button class="glossBtn" id="btnBy2Export" style="padding:6px 14px;font-size:12px;margin-left:8px;">Export Values</button>
+      </div>
+      <div style="text-align:center;margin-top:8px;">
+        <button class="glossBtn" id="btnBy2DeviceSave" style="padding:6px 14px;font-size:12px;">Save Device Preset</button>
+        <button class="glossBtn" id="btnBy2DeviceLoad" style="padding:6px 14px;font-size:12px;margin-left:8px;">Load Device Preset</button>
+      </div>
+      <div id="orientLabelBy2" style="text-align:center;margin-top:6px;font-size:11px;color:rgba(255,255,255,0.5);"></div>
+    </div>
+  </div>
+</div>
+<div id="devTabsWrap">
+<button id="devTabsArrowL" onclick="document.getElementById('devTabsBar').scrollBy({left:-120,behavior:'smooth'})">&lsaquo;</button>
+<button id="devTabsArrowR" onclick="document.getElementById('devTabsBar').scrollBy({left:120,behavior:'smooth'})">&rsaquo;</button>
+<div id="devTabsBar">
+<button id="tn51SettingsBtn">TN51 Layout</button>
+<button id="t42SettingsBtn">T42 Layout</button>
+<button id="moonSettingsBtn">Moon Layout</button>
+<button id="by2SettingsBtn">Boneyard</button>
+<button id="pipDetailsBtn">Pip Details</button>
+<button id="pipColorsBtn">Pip Colors</button>
+<button id="zIndexBtn">Z-Index</button>
+<button id="shuffleSettingsBtn" style="display:none;">Shuffle</button>
+<button id="exportAllBtn" onclick="if(typeof exportAllSettings==='function')exportAllSettings()">Export All</button>
+<button id="dominoStyleBtn">Domino Style</button>
+</div>
+</div>
+<!-- Lay Down Hand UI -->
+<div id="layDownBtnGroup">
+  <button id="btnLayDown" onclick="showLayDownDialog()">Lay Down Hand</button>
+  <button id="btnDismissLayDown" onclick="dismissLayDown()">No Thanks</button>
+</div>
+<div id="layDownMinDot" onclick="restoreLayDown()" title="Lay Down Hand"></div>
+<div id="layDownTraveler"></div>
+<div id="layDownBackdrop">
+  <div id="layDownPanel">
+    <h3 id="layDownTitle">Lay Down Hand</h3>
+    <p id="layDownDesc"></p>
+    <div id="layDownTiles"></div>
+    <div id="layDownActions">
+      <button id="btnAcceptLayDown" onclick="acceptLayDown()">Accept</button>
+      <button id="btnContestLayDown" onclick="contestLayDown()">Contest</button>
+    </div>
+  </div>
+</div>
+
+<!-- V10_FIX4: Syncing overlay to block input during state_sync -->
+<div id="syncingOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center;pointer-events:auto;">
+  <div style="background:rgba(59,130,246,0.95);padding:20px 40px;border-radius:12px;color:#fff;font-size:18px;font-weight:700;box-shadow:0 8px 32px rgba(0,0,0,0.4);">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div class="syncSpinner"></div>
+      <span>Syncing game state...</span>
+    </div>
+  </div>
+</div>
+
+<!-- V11.4: In-game Chat -->
+<button id="mpChatIcon" onclick="mpToggleChat()">&#128172;<span class="chat-badge" id="chatBadge">0</span></button>
+<div id="mpChatPanel" style="display:none;">
+  <div class="chat-header">
+    <span>Game Chat</span>
+    <div style="display:flex;gap:6px;">
+      <button onclick="mpClearMyChat()" title="Clear my view">&#128465;</button>
+      <button id="chatClearAllBtn" onclick="mpClearAllChat()" title="Clear for everyone" style="display:none;">&#128465;&#8505;</button>
+      <button onclick="mpToggleChat()">&times;</button>
+    </div>
+  </div>
+  <div id="noTableTalkRow" style="display:none;padding:4px 12px;border-bottom:1px solid rgba(255,255,255,0.08);font-size:11px;align-items:center;gap:6px;">
+    <input type="checkbox" id="chkNoTableTalk" checked onchange="_toggleNoTableTalk()" style="margin:0;accent-color:#ef4444;cursor:pointer;">
+    <label for="chkNoTableTalk" style="color:#f87171;cursor:pointer;user-select:none;">No Table Talk</label>
+    <span id="noTableTalkLabel" style="color:rgba(248,113,113,0.6);font-size:10px;margin-left:auto;">(during rounds)</span>
+  </div>
+  <div id="mpChatMessages"></div>
+  <div id="mpChatInput">
+    <input type="text" id="chatInputField" placeholder="Type a message..." maxlength="200" onkeydown="if(event.key==='Enter')mpSendChat()">
+    <button onclick="mpSendChat()">Send</button>
+  </div>
+</div>
+
+</div><!-- /gameWrapper -->
+</div><!-- /viewportWrapper -->
+
+<!-- V12.10.27c: Popup Responsive Config System + Settings UI -->
+
+</body>
+</html>
+
+ *My favorite app::html+css+js  https://itunes.apple.com/app/id908054939?mt=8
+Other's Tutorals:http://iii9i.com
+
+ *My favorite app::html+css+js  https://itunes.apple.com/app/id908054939?mt=8
+Other's Tutorals:http://iii9i.com
+
+ *My favorite app::html+css+js  https://itunes.apple.com/app/id908054939?mt=8
+Other's Tutorals:http://iii9i.com
