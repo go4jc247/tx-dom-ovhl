@@ -29,6 +29,7 @@ const SFX = {
   bgmMuted: false,
   bgmVolume: 0.5,
   resultPlaying: false,  // Whether a result song is currently playing
+  _bgmStopTimeout: null, // Stored timeout for deferred stopBgm (race-condition fix)
 
   // Variation settings (client specified ±10% for all)
   PITCH_VAR: 0.10,
@@ -42,16 +43,20 @@ const SFX = {
       if(this.ctx.state === 'suspended') await this.ctx.resume();
       for(const [key, url] of Object.entries(SOUND_DATA)){
         if(!this.buffers[key]){
-          const resp = await fetch(url);
-          const buf = await resp.arrayBuffer();
-          this.buffers[key] = await this.ctx.decodeAudioData(buf);
+          try {
+            const resp = await fetch(url);
+            const buf = await resp.arrayBuffer();
+            this.buffers[key] = await this.ctx.decodeAudioData(buf);
+          } catch(e) {
+            console.warn('SFX load failed for', key, ':', e.message);
+          }
         }
       }
       this.ready = true;
       // Load saved SFX volume
       const savedSfx = localStorage.getItem('tn51_sfx_volume');
       if(savedSfx !== null){
-        this.sfxVolume = parseFloat(savedSfx);
+        this.sfxVolume = parseFloat(savedSfx) || 0.7;
         const slider = document.getElementById('sfxVolume');
         if(slider) slider.value = Math.round(this.sfxVolume * 100);
       }
@@ -62,7 +67,7 @@ const SFX = {
       // Load saved BGM volume
       const savedBgm = localStorage.getItem('tn51_bgm_volume');
       if(savedBgm !== null){
-        this.bgmVolume = parseFloat(savedBgm);
+        this.bgmVolume = parseFloat(savedBgm) || 0.5;
         const slider2 = document.getElementById('bgmVolume');
         if(slider2) slider2.value = Math.round(this.bgmVolume * 100);
       }
@@ -96,6 +101,7 @@ const SFX = {
     source.connect(gain);
     gain.connect(this.ctx.destination);
     source.start();
+    source.onended = () => { try { source.disconnect(); gain.disconnect(); } catch(e){} };
   },
 
   playDomino(){
@@ -119,6 +125,7 @@ const SFX = {
     source.connect(gain);
     gain.connect(this.ctx.destination);
     source.start();
+    source.onended = () => { try { source.disconnect(); gain.disconnect(); } catch(e){} };
   },
 
 
@@ -134,6 +141,7 @@ const SFX = {
     source.connect(gain);
     gain.connect(this.ctx.destination);
     source.start();
+    source.onended = () => { try { source.disconnect(); gain.disconnect(); } catch(e){} };
   },
 
   // V10_109: Invalid selection sound
@@ -214,7 +222,7 @@ const SFX = {
   bgmPlaying: false,
 
 
-  // Embedded music data (base64)
+  // Background music file paths
   MUSIC_DATA: {
     bgm1: "./assets/audio/bgm1.mp3",
     bgm2: "./assets/audio/bgm2.mp3",
@@ -236,7 +244,7 @@ const SFX = {
     // Build track list from embedded data
     this.bgmTracks = this.BGM_TRACK_LIST.map(t => ({
       name: t.name,
-      dataUri: this.MUSIC_DATA[t.key],
+      audioUrl: this.MUSIC_DATA[t.key],
     }));
 
     // Restore saved selection
@@ -382,7 +390,7 @@ const SFX = {
     const track = this.bgmTracks[trackIdx];
     if(!track) return;
 
-    this.bgmAudio = new Audio(track.dataUri);
+    this.bgmAudio = new Audio(track.audioUrl);
 
     if(this.bgmLoopMode === 'one' || this.bgmPlaylist.length === 1){
       this.bgmAudio.loop = true;
@@ -435,15 +443,15 @@ const SFX = {
   playResultSong(type){
     if(!this.ctx) return;
     const key = type === 'win' ? 'win_song' : 'lose_song';
-    const dataUri = this.MUSIC_DATA[key];
-    if(!dataUri) return;
+    const audioUrl = this.MUSIC_DATA[key];
+    if(!audioUrl) return;
 
     // Fade out BGM over 1 second then stop
     if(this.bgmGain && this.bgmPlaying){
       const now = this.ctx.currentTime;
       this.bgmGain.gain.setValueAtTime(this.bgmGain.gain.value, now);
       this.bgmGain.gain.linearRampToValueAtTime(0, now + 1.0);
-      setTimeout(() => this.stopBgm(), 1100);
+      this._bgmStopTimeout = setTimeout(() => this.stopBgm(), 1100);
     } else {
       this.stopBgm();
     }
@@ -451,7 +459,7 @@ const SFX = {
     // Start result song after brief delay for fade
     setTimeout(() => {
       this.stopResultSong();
-      this.resultAudio = new Audio(dataUri);
+      this.resultAudio = new Audio(audioUrl);
       this.resultAudio.loop = true;
 
       this.resultMediaSource = this.ctx.createMediaElementSource(this.resultAudio);
@@ -488,6 +496,7 @@ const SFX = {
 
   // Called when starting a new game - stop result song, resume BGM
   resumeBgmAfterResult(){
+    if (this._bgmStopTimeout) { clearTimeout(this._bgmStopTimeout); this._bgmStopTimeout = null; }
     if(this.resultPlaying){
       if(this.resultGain && this.ctx){
         const now = this.ctx.currentTime;
@@ -1026,6 +1035,7 @@ class SessionV6_4g{
     this.contract="NORMAL";
     this.current_bid=0;
     this.bid_marks=1;
+    this.moon_shoot = false;
 
     // Rotate dealer clockwise (to next seat)
     // Clockwise order: 0 -> 1 -> 2 -> 3 -> 4 -> 5 -> 0
@@ -1147,10 +1157,15 @@ class SessionV6_4g{
           this.game.set_active_players(activePlayers);
           this.game.hands[partnerSeat] = [];
         } else {
-          // TN51: remove 2 players (seats 2 and 4)
-          this.game.set_active_players([0,1,3,5]);
-          this.game.hands[2]=[];
-          this.game.hands[4]=[];
+          // TN51 (6-player): bidder's 2 partners sit out, bidder vs 3 opponents
+          const bidderTeamIdx = bidderSeat % 2;
+          const partners = [];
+          for (let s = 0; s < 6; s++) {
+            if (s !== bidderSeat && s % 2 === bidderTeamIdx) partners.push(s);
+          }
+          const activePlayers = [0,1,2,3,4,5].filter(s => !partners.includes(s));
+          this.game.set_active_players(activePlayers);
+          for (const p of partners) this.game.hands[p] = [];
         }
         this.phase=PHASE_PLAYING;
         this.status=`Nel-O: Lose all tricks to win.`;
@@ -1344,8 +1359,15 @@ class SessionV6_4g{
         }
       }
 
-      if(Math.max(this.team_marks[0], this.team_marks[1]) >= this.marks_to_win){
-        const winner=(this.team_marks[0] > this.team_marks[1]) ? 0 : 1;
+      if (GAME_MODE === 'MOON') {
+        const maxMark = Math.max(this.team_marks[0], this.team_marks[1], this.team_marks[2] || 0);
+        if (maxMark >= this.marks_to_win) {
+          const marks = [this.team_marks[0], this.team_marks[1], this.team_marks[2] || 0];
+          const winner = marks.indexOf(maxMark);
+          this.status += ` Player ${winner+1} wins the game!`;
+        }
+      } else if(Math.max(this.team_marks[0], this.team_marks[1]) >= this.marks_to_win){
+        const winner=(this.team_marks[0] >= this.team_marks[1]) ? 0 : 1;
         this.status += ` Team ${winner+1} wins the game!`;
       }
     }
@@ -1552,7 +1574,8 @@ function aiChooseTrump(hand, bidAmount) {
 
   let bestSuit = null;
   let bestScore = 0;
-  for (let pip = 7; pip >= 0; pip--) {
+  const maxPip = GAME_MODE === 'MOON' ? 6 : 7;
+  for (let pip = maxPip; pip >= 0; pip--) {
     const trumpTiles = hand.filter(t => t[0] === pip || t[1] === pip);
     const hasDouble = trumpTiles.some(t => t[0] === pip && t[1] === pip);
     const score = trumpTiles.length * 10 + (hasDouble ? 20 : 0);
@@ -1632,6 +1655,7 @@ function showLayDownReveal(result, isAI) {
   const panel = document.getElementById('layDownPanel');
   const title = document.getElementById('layDownTitle');
   const desc = document.getElementById('layDownDesc');
+  if (!title || !desc) return;
   const tilesDiv = document.getElementById('layDownTiles');
   const backdrop = document.getElementById('layDownBackdrop');
   const acceptBtn = document.getElementById('btnAcceptLayDown');
@@ -1677,7 +1701,7 @@ function acceptLayDown() {
   if (!layDownState) return;
 
   // Award all remaining tricks to the bidder's team
-  const bidderTeam = layDownState.seat % 2; // 0 = Team 1 index, 1 = Team 2 index
+  const bidderTeam = GAME_MODE === 'MOON' ? layDownState.seat : (layDownState.seat % 2);
   const hand = layDownState.hand;
 
   // V12.10.20: Fix lay-down scoring
@@ -4630,7 +4654,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v13.3.0';  // v13.0.0: MyClaude — fresh start, Claude Code dev build
+const MP_VERSION = 'v14.0.0';  // v14.0.0: TX-DOM-OVHL — full codebase overhaul
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
@@ -4862,19 +4886,6 @@ const AI_NAMES = [
   'Lyric L.','Milan D.','Nyx F.','Orion K.'
 ];
 
-// Assign AI names (shuffled) per session
-let _aiNamePool = [];
-function getAIName() {
-  if (_aiNamePool.length === 0) {
-    _aiNamePool = AI_NAMES.slice();
-    for (let i = _aiNamePool.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [_aiNamePool[i], _aiNamePool[j]] = [_aiNamePool[j], _aiNamePool[i]];
-    }
-  }
-  return _aiNamePool.pop() || 'AI';
-}
-
 function getPlayerDisplayName(seat) {
   // Returns display name for status bar: "John P." for named player, "P2" for unnamed
   // V10_113: Check MP remote player names
@@ -5050,7 +5061,7 @@ function mpConnect(roomName) {
 
   mpSocket.onmessage = (evt) => {
     let msg;
-    try { msg = JSON.parse(evt.data); } catch(e) { return; }
+    try { msg = JSON.parse(evt.data); } catch(e) { console.warn('[MP] Malformed message:', e.message); return; }
     // V10_113: Any message from server counts as a pong (connection alive)
     _mpLastPongTime = Date.now();
     // V10_113: Don't log pong responses (noise)
@@ -5062,7 +5073,7 @@ function mpConnect(roomName) {
     } else {
       mpLogEntry('RECV', msg.type || 'unknown', msg);
     }
-    mpHandleMessage(msg);
+    try { mpHandleMessage(msg); } catch(e) { console.error('[MP] Message handler error:', e); }
   };
 
   mpSocket.onclose = (evt) => {
@@ -5245,7 +5256,7 @@ function mpHandleMessage(msg) {
         }
       }, 2000);
     }
-    // If no seat assignment received within 3 seconds, we're the host (first in room)
+    // If no seat assignment received within 8 seconds, we're the host (first in room)
     setTimeout(() => {
       if (mpConnected && mpSeat < 0) {
         mpIsHost = true;
@@ -5262,7 +5273,7 @@ function mpHandleMessage(msg) {
         // Show marks selection for host
         mpShowHostSettings();
       }
-    }, 3000);
+    }, 8000);
     return;
   }
 
@@ -5932,11 +5943,25 @@ function mpRenderPlayerList(players) {
     div.style.cssText = 'padding:8px 12px;border-radius:6px;background:rgba(255,255,255,0.05);font-size:13px;display:flex;justify-content:space-between;align-items:center;';
     if (p) {
       const isMe = (s === mpSeat);
-      div.innerHTML = '<span style="color:#fff;">Seat ' + (s+1) + ': ' + (p.name || ('Player ' + (s+1))) + '</span>' +
-        (isMe ? '<span style="color:#22c55e;font-size:11px;">YOU</span>' :
-         (p.isHost ? '<span style="color:#f59e0b;font-size:11px;">HOST</span>' : '<span style="color:#60a5fa;font-size:11px;">READY</span>'));
+      const nameSpan = document.createElement('span');
+      nameSpan.style.color = '#fff';
+      nameSpan.textContent = 'Seat ' + (s+1) + ': ' + (p.name || ('Player ' + (s+1)));
+      const badgeSpan = document.createElement('span');
+      badgeSpan.style.fontSize = '11px';
+      if (isMe) { badgeSpan.style.color = '#22c55e'; badgeSpan.textContent = 'YOU'; }
+      else if (p.isHost) { badgeSpan.style.color = '#f59e0b'; badgeSpan.textContent = 'HOST'; }
+      else { badgeSpan.style.color = '#60a5fa'; badgeSpan.textContent = 'READY'; }
+      div.appendChild(nameSpan);
+      div.appendChild(badgeSpan);
     } else {
-      div.innerHTML = '<span style="color:#6b7280;">Seat ' + (s+1) + ': Empty</span><span style="color:#6b7280;font-size:11px;">waiting...</span>';
+      const emptySpan = document.createElement('span');
+      emptySpan.style.color = '#6b7280';
+      emptySpan.textContent = 'Seat ' + (s+1) + ': Empty';
+      const waitSpan = document.createElement('span');
+      waitSpan.style.cssText = 'color:#6b7280;font-size:11px;';
+      waitSpan.textContent = 'waiting...';
+      div.appendChild(emptySpan);
+      div.appendChild(waitSpan);
     }
     container.appendChild(div);
   }
@@ -7980,15 +8005,14 @@ function _mpHandleStateSyncInternal(move) {
   console.log('[FIX2] Closing all overlays before state_sync');
   const bidBackdrop = document.getElementById('bidBackdrop');
   const trumpBackdrop = document.getElementById('trumpBackdrop');
-  const handEndBackdrop = document.getElementById('handEndBackdrop');
-  const nelloBackdrop = document.getElementById('nelloOpponentBackdrop');
+  // handEndBackdrop removed — element does not exist in DOM
+  const nelloBackdrop = document.getElementById('nelloBackdrop');
   const nelloDoublesBackdrop = document.getElementById('nelloDoublesBackdrop');
   const widowBackdrop = document.getElementById('widowSwapBackdrop');
   const layDownBackdrop = document.getElementById('layDownBackdrop');
   
   if (bidBackdrop) bidBackdrop.style.display = 'none';
   if (trumpBackdrop) trumpBackdrop.style.display = 'none';
-  if (handEndBackdrop) handEndBackdrop.style.display = 'none';
   if (nelloBackdrop) nelloBackdrop.style.display = 'none';
   if (nelloDoublesBackdrop) nelloDoublesBackdrop.style.display = 'none';
   const dfmChoiceBackdrop = document.getElementById('dfmChoiceBackdrop');
@@ -8628,24 +8652,10 @@ function mpShowHandEnd() {
 }
 
 // Show waiting status — uses status bar only (no overlay), keeps game visible
-function mpShowWaiting(text, sub) {
-  // Just update status bar — no overlay in multiplayer (should look like AI mode)
-  if (text) setStatus(text);
-}
-
 function mpHideWaiting() {
   const el = document.getElementById('mpWaiting');
   if (el) el.style.display = 'none';
 }
-
-// Debug: show seat assignment on MP sync button for easy debugging
-function mpUpdateSeatDebug() {
-  const btn = document.getElementById('mpRefreshBtn');
-  if (btn && mpSeat >= 0) {
-    btn.title = 'Your seat: ' + (mpSeat+1) + ' (Visual: P1)';
-  }
-}
-
 
 // Multiplayer: map game seat to visual player position (local player = P1 at bottom)
 function mpVisualPlayer(seat) {
@@ -8658,13 +8668,6 @@ function getLocalSeat() {
   if (MULTIPLAYER_MODE) return mpSeat;
   if (PASS_AND_PLAY_MODE) return ppActiveViewSeat;
   return 0;
-}
-
-// Check if a seat is played by a real human (for multiplayer: check mpPlayers)
-function mpIsRemoteHuman(seat) {
-  if (!MULTIPLAYER_MODE) return false;
-  if (seat === mpSeat) return true;  // Local player
-  return !!mpPlayers[seat];  // Remote player exists
 }
 
 // Check if seat should be AI-controlled in multiplayer
@@ -8703,7 +8706,7 @@ function mpRequestRoomStatus() {
   };
   mpSocket.onmessage = (evt) => {
     let msg;
-    try { msg = JSON.parse(evt.data); } catch(e) { return; }
+    try { msg = JSON.parse(evt.data); } catch(e) { console.warn('[MP] Malformed message:', e.message); return; }
     console.log('[MP] Status received:', msg.type);
     mpHandleMessage(msg);
   };
@@ -8752,7 +8755,7 @@ function mpConnectAsObserver(roomName) {
   };
   mpSocket.onmessage = (evt) => {
     let msg;
-    try { msg = JSON.parse(evt.data); } catch(e) { return; }
+    try { msg = JSON.parse(evt.data); } catch(e) { console.warn('[MP] Malformed message:', e.message); return; }
     console.log('[MP] Observer received:', msg.type);
     mpHandleMessage(msg);
   };
@@ -9552,16 +9555,6 @@ function mpMarkHostStateCompleted() {
   } catch(e) {}
 }
 
-// Host: Clear saved state entirely
-function mpClearHostState() {
-  try {
-    localStorage.removeItem(MP_HOST_STATE_KEY);
-    console.log('[MP] Host state cleared');
-  } catch(e) {
-    console.warn('[MP] Could not clear host state:', e);
-  }
-}
-
 // Guest: Track plays made while host might be disconnected
 function mpGuestTrackPlay(seat, tile) {
   if (mpIsHost) return; // Host doesn't track - it IS the source of truth
@@ -9931,17 +9924,20 @@ function mpResumeConnection(savedState) {
 
   mpSocket.onopen = () => {
     console.log('[MP] Reconnected to relay, joining room:', mpRoom);
+    _mpReconnectAttempts = 0;
     try {
       mpSocket.send(JSON.stringify({ type: 'join', room: mpRoom }));
     } catch(e) {
       console.error('[MP] Reconnect join send error:', e);
       mpSocket.close();
+      return;
     }
+    mpStartHeartbeat();
   };
 
   mpSocket.onmessage = (evt) => {
     let msg;
-    try { msg = JSON.parse(evt.data); } catch(e) { return; }
+    try { msg = JSON.parse(evt.data); } catch(e) { console.warn('[MP] Malformed message:', e.message); return; }
     console.log('[MP] Received:', msg);
 
     if (msg.type === 'joined') {
@@ -9956,7 +9952,7 @@ function mpResumeConnection(savedState) {
 
       // Send hello with our saved playerId (other clients will recognize us)
       mpHelloNonce = mpGenerateId();
-      mpSendRaw({ type: 'move', move: { action: 'hello', name: 'Player 1 (Host)', playerId: mpPlayerId, version: MP_VERSION, preferredSeat: mpSeat, nonce: mpHelloNonce } });
+      mpSendRaw({ type: 'move', move: { action: 'hello', name: playerName || 'Player', playerId: mpPlayerId, version: MP_VERSION, preferredSeat: mpSeat, nonce: mpHelloNonce } });
 
       // Tell all players host has resumed
       setTimeout(() => {
@@ -10001,11 +9997,20 @@ function mpResumeConnection(savedState) {
   mpSocket.onclose = (evt) => {
     console.log('[MP] WebSocket closed:', evt.code, evt.reason);
     mpConnected = false;
+    mpStopHeartbeat();
     mpUpdateStatus('Disconnected', '#ef4444');
     mpUpdateIndicator();
     if (MULTIPLAYER_MODE && mpGameStarted && mpRoom) {
-      mpUpdateStatus('Reconnecting...', '#f59e0b');
-      setTimeout(() => mpConnect(mpRoom), 2000);
+      if (_mpReconnectAttempts < 50) {
+        const delay = mpGetReconnectDelay();
+        _mpReconnectAttempts++;
+        console.log('[MP] Resume auto-reconnect attempt', _mpReconnectAttempts, '/50 in', delay, 'ms');
+        mpUpdateStatus('Reconnecting (' + _mpReconnectAttempts + '/50)...', '#f59e0b');
+        setTimeout(() => mpConnect(mpRoom), delay);
+      } else {
+        console.log('[MP] Max reconnect attempts (50) reached');
+        mpUpdateStatus('Connection lost. Tap Sync to retry.', '#ef4444');
+      }
     }
   };
 
@@ -10069,7 +10074,25 @@ function mpShowVersionWarning(hostVersion, myVersion) {
   const warn = document.createElement('div');
   warn.id = 'mpVersionWarning';
   warn.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:2000;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;padding:10px 20px;border-radius:10px;font-size:13px;font-weight:600;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,0.3);max-width:320px;';
-  warn.innerHTML = 'Version mismatch!<br><span style="font-weight:400;font-size:12px;">Host: ' + hostVersion + ' | You: ' + myVersion + '<br>The game may not play properly.</span>';
+  const warnTitle = document.createTextNode('Version mismatch!');
+  const warnBr1 = document.createElement('br');
+  const warnDetail = document.createElement('span');
+  warnDetail.style.cssText = 'font-weight:400;font-size:12px;';
+  const detailText1 = document.createTextNode('Host: ');
+  const hostVer = document.createTextNode(String(hostVersion));
+  const detailText2 = document.createTextNode(' | You: ');
+  const myVer = document.createTextNode(String(myVersion));
+  const warnBr2 = document.createElement('br');
+  const detailText3 = document.createTextNode('The game may not play properly.');
+  warnDetail.appendChild(detailText1);
+  warnDetail.appendChild(hostVer);
+  warnDetail.appendChild(detailText2);
+  warnDetail.appendChild(myVer);
+  warnDetail.appendChild(warnBr2);
+  warnDetail.appendChild(detailText3);
+  warn.appendChild(warnTitle);
+  warn.appendChild(warnBr1);
+  warn.appendChild(warnDetail);
   // Remove existing warning if any
   const existing = document.getElementById('mpVersionWarning');
   if (existing) existing.remove();
@@ -10132,11 +10155,6 @@ function ppVisualPlayer(seat) {
   // When ppRotationOffset=0, seat 0 -> Player 1 (normal)
   // When ppRotationOffset=3 (P4 viewing), seat 3 -> Player 1 position, seat 0 -> Player 4 position
   return ((seat - ppRotationOffset + session.game.player_count) % session.game.player_count) + 1;
-}
-
-// Convert visual player number back to game seat
-function ppSeatFromVisual(visualPlayer) {
-  return (visualPlayer - 1 + ppRotationOffset) % session.game.player_count;
 }
 
 // Check if a seat is human-controlled
@@ -10457,7 +10475,7 @@ let bidMode = 'range'; // 'pass', 'range', '2x', or multiplier like '3x'
 function initBiddingRound() {
   const dealerSeat = session.dealer || 0;
   const _pc = session.game.player_count;
-  const firstBidder = (dealerSeat - 1 + _pc) % _pc;
+  const firstBidder = (dealerSeat + 1) % _pc;
 
   biddingState = {
     currentBidder: firstBidder,
@@ -12085,6 +12103,25 @@ let waitingForPlayer1 = true;
 let leadDominoSprite = null;  // The sprite shown in center indicating lead suit
 let placeholderElements = {}; // Store placeholder DOM elements
 
+// Shared sprite-redraw helper (module scope) — avoids duplicate implementations
+function _redrawAllDominoSprites(){
+  try{
+    for(const seat of sprites){
+      if(!seat) continue;
+      for(const d of seat){
+        if(d && d.sprite && typeof d.sprite.redrawCanvases === "function") d.sprite.redrawCanvases();
+      }
+    }
+    if(typeof playedThisTrick !== 'undefined'){
+      for(const pt of playedThisTrick){
+        if(pt && pt.sprite && typeof pt.sprite.redrawCanvases === "function") pt.sprite.redrawCanvases();
+      }
+    }
+    var sl = document.getElementById('spriteLayer');
+    if(sl){ for(var i = 0; i < sl.children.length; i++){ var c = sl.children[i]; if(c && typeof c.redrawCanvases === "function") c.redrawCanvases(); } }
+  }catch(e){}
+}
+
 // Scoring state
 let team1Score = 0;
 let team2Score = 0;
@@ -12636,48 +12673,6 @@ function updateWidowDisplay(){
   }
 }
 
-function drawFaceDown(ctx, w, h){
-  // Simple face-down domino rendering
-  var r = 4;
-  ctx.fillStyle = '#1a3a1a';
-  ctx.beginPath();
-  ctx.moveTo(r, 0);
-  ctx.lineTo(w - r, 0);
-  ctx.quadraticCurveTo(w, 0, w, r);
-  ctx.lineTo(w, h - r);
-  ctx.quadraticCurveTo(w, h, w - r, h);
-  ctx.lineTo(r, h);
-  ctx.quadraticCurveTo(0, h, 0, h - r);
-  ctx.lineTo(0, r);
-  ctx.quadraticCurveTo(0, 0, r, 0);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = '#2a5a2a';
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-  // Center diamond pattern
-  ctx.fillStyle = '#2a5a2a';
-  var cx = w/2, cy = h/2, ds = 8;
-  ctx.beginPath();
-  ctx.moveTo(cx, cy - ds);
-  ctx.lineTo(cx + ds, cy);
-  ctx.lineTo(cx, cy + ds);
-  ctx.lineTo(cx - ds, cy);
-  ctx.closePath();
-  ctx.fill();
-}
-
-function animateWidowFlip(callback){
-  // Animate widow sprite flipping from face-down to face-up using ry rotation
-  if(!widowSprite) { if(callback) callback(); return; }
-  var pose = widowSprite.getPose();
-  var targetPose = Object.assign({}, pose, { ry: 180 });
-  updateWidowDisplay(); // Ensure tile data is current
-  animateSprite(widowSprite, targetPose, 400).then(function(){
-    if(callback) callback();
-  });
-}
-
 function showMoonSettingsPanel(){
   var existing = document.getElementById('moonSettingsPanel');
   if(existing){ existing.remove(); return; }
@@ -13000,15 +12995,6 @@ function afterWidowSwap(){
       // V10_121g: Ensure trump selection is active for proper domino clicks
       trumpSelectionActive = true;
       enableTrumpDominoClicks();
-    } else {
-      // AI picks trump after widow swap
-      const hand = session.game.hands[bidderSeat] || [];
-      const trump = aiChooseTrump(hand, session.current_bid);
-      const trumpDisplay = trump === "NT" ? "No Trumps" : trump + "s";
-      session.status = `P${seatToPlayer(bidderSeat)} bid ${session.current_bid}. Trump: ${trumpDisplay}`;
-      setStatus(session.status);
-      session.set_trump(trump);
-      _dfmActiveThisHand = (trump === 'DOUBLES' && doublesFollowMe !== 'off');
       syncSpritesWithGameState();
       sortAllHandsByTrump();
       flipTilesForTrump();
@@ -13019,20 +13005,19 @@ function afterWidowSwap(){
   }
 }
 
-// Demo function to test scoring (can be called from console)
-function setScores(t1Score, t2Score, t1Marks, t2Marks){
-  team1Score = t1Score;
-  team2Score = t2Score;
-  team1Marks = t1Marks;
-  team2Marks = t2Marks;
-  updateScoreDisplay();
-}
-
 // Utilities
 function clamp01(x){ return Math.max(0,Math.min(1,x)); }
 function lerp(a,b,t){ return a+(b-a)*t; }
 function smoothstep(t){ t=clamp01(t); return t*t*(3-2*t); }
-function getRect(){ return document.getElementById('tableMain').getBoundingClientRect(); }
+let _cachedRect = null;
+let _rectDirty = true;
+function getRect(){
+  if(_rectDirty || !_cachedRect){
+    _cachedRect = document.getElementById('tableMain').getBoundingClientRect();
+    _rectDirty = false;
+  }
+  return _cachedRect;
+}
 function normToPx(xN,yN){ const r=getRect(); return { x: r.width*xN, y: r.height*yN }; }
 
 // V12.3: Fixed aspect ratio container with letterboxing
@@ -13104,6 +13089,18 @@ function strokeRoundRect(ctx,x,y,w,h,r,lw,col){
   ctx.save(); ctx.strokeStyle=col; ctx.lineWidth=lw;
   roundRectPath(ctx,x,y,w,h,r); ctx.stroke(); ctx.restore();
 }
+
+// Pip layout patterns (hoisted to module scope to avoid per-call allocation)
+const FACE_SPOTS = {
+  0: [],
+  1: [[0,0]],
+  2: [[-1,-1],[1,1]],
+  3: [[-1,-1],[0,0],[1,1]],
+  4: [[-1,-1],[1,-1],[-1,1],[1,1]],
+  5: [[-1,-1],[1,-1],[0,0],[-1,1],[1,1]],
+  6: [[-1,-1],[1,-1],[-1,0],[1,0],[-1,1],[1,1]],
+  7: [[-1,-1],[1,-1],[-1,0],[0,0],[1,0],[-1,1],[1,1]]
+};
 
 // Use pip colors from DOMINO_STYLE settings
 function pipColorForValue(v){ return DOMINO_STYLE.PIP_COLORS[Number(v)] || DOMINO_STYLE.PIP_COLORS[0]; }
@@ -13177,17 +13174,8 @@ function drawFace(ctx, tile, w, h, highlighted = false, valid = true, rotRad){
   roundRectPath(ctx, 0, 0, w, h, rCss);
   ctx.stroke();
 
-  // Pip patterns
-  const spots = {
-    0: [],
-    1: [[0,0]],
-    2: [[-1,-1],[1,1]],
-    3: [[-1,-1],[0,0],[1,1]],
-    4: [[-1,-1],[1,-1],[-1,1],[1,1]],
-    5: [[-1,-1],[1,-1],[0,0],[-1,1],[1,1]],
-    6: [[-1,-1],[1,-1],[-1,0],[1,0],[-1,1],[1,1]],
-    7: [[-1,-1],[1,-1],[-1,0],[0,0],[1,0],[-1,1],[1,1]]
-  };
+  // Pip patterns (use hoisted FACE_SPOTS constant)
+  const spots = FACE_SPOTS;
 
   // Pip geometry
   const hh = h / 2;
@@ -14388,17 +14376,8 @@ function drawPipSquare(ctx, pipValue, size, highlighted = false){
   roundRectPath(ctx, lw/2, lw/2, size-lw, size-lw, r-lw/2);
   ctx.stroke();
 
-  // Draw pips
-  const spots = {
-    0: [],
-    1: [[0,0]],
-    2: [[-1,-1],[1,1]],
-    3: [[-1,-1],[0,0],[1,1]],
-    4: [[-1,-1],[1,-1],[-1,1],[1,1]],
-    5: [[-1,-1],[1,-1],[0,0],[-1,1],[1,1]],
-    6: [[-1,-1],[1,-1],[-1,0],[1,0],[-1,1],[1,1]],
-    7: [[-1,-1],[1,-1],[-1,0],[0,0],[1,0],[-1,1],[1,1]]
-  };
+  // Draw pips (use hoisted FACE_SPOTS constant)
+  const spots = FACE_SPOTS;
 
   const col = pipColorForValue(pipValue);
   const sx = size * 0.25;
@@ -14607,13 +14586,6 @@ function setPlaceholderText(playerId, text, bidType = ''){
     } else if(bidType === 'winner'){
       el.classList.add('bid-winner');
     }
-  }
-}
-
-function clearAllPlaceholderText(){
-  const _clrCount = GAME_MODE === 'T42' ? 4 : 6;
-  for(let p = 1; p <= _clrCount; p++){
-    setPlaceholderText(p, '', '');
   }
 }
 
@@ -15366,99 +15338,6 @@ async function handlePlayer1Click(spriteSlotIndexOrElement){
   }
 }
 
-function dealDominoes(){
-  hideGameEndSummary();
-  hideRoundEndSummary();
-  // Reset house rule flags for new hand
-  callForDoubleActive = false;
-  callForDoubleTrumpPip = null;
-  nelloDoublesSuitActive = false;
-  _dfmActiveThisHand = false; // V12.10.21: always start false, set true only when doubles trump confirmed
-  _dfmChoiceMade = false;
-  if(session && session.game){
-    session.game.force_double_trump = false;
-    session.game.nello_doubles_suit = false;
-  }
-  // Hide Call for Double UI
-  document.getElementById('callDoubleBtnGroup').style.display = 'none';
-  hideCallDoubleBanner();
-  clearForcedDoubleGlow();
-  shadowLayer.innerHTML = '';
-  spriteLayer.innerHTML = '';
-  sprites.length = 0;
-  currentTrick = 0;
-  playedThisTrick = [];
-  team1TricksWon = 0;
-  team2TricksWon = 0;
-  moonPlayerTricksWon = [0, 0, 0];
-  zIndexCounter = 100;
-  // Clean up previous widow sprite
-  if(widowSprite){
-    if(widowSprite.parentNode) widowSprite.parentNode.removeChild(widowSprite);
-    if(widowSprite._shadow && widowSprite._shadow.parentNode) widowSprite._shadow.parentNode.removeChild(widowSprite._shadow);
-    widowSprite = null;
-  }
-  var _widowLbl = document.getElementById('moonWidowLabel');
-  if(_widowLbl) _widowLbl.style.display = 'none';
-  isAnimating = false;
-  waitingForPlayer1 = true;
-
-  // Create placeholder boxes
-  createPlaceholders();
-
-  // Sample tiles for demo — generate dynamically based on game mode
-  const _demoPC = session.game.player_count;
-  const _demoHS = session.game.hand_size;
-  const _demoMP = session.game.max_pip;
-  const sampleTiles = [];
-  for(let p = 0; p < _demoPC; p++){
-    const hand = [];
-    for(let h = 0; h < _demoHS; h++){
-      const a = (_demoMP - p - h + _demoMP + 1) % (_demoMP + 1);
-      const b = (_demoMP - p - h - 1 + _demoMP + 1) % (_demoMP + 1);
-      hand.push([a, b]);
-    }
-    sampleTiles.push(hand);
-  }
-
-  for(let p = 0; p < _demoPC; p++){
-    sprites[p] = [];
-    const playerNum = seatToPlayer(p);  // Convert seat to player number for layout
-    for(let h = 0; h < _demoHS; h++){
-      const tile = sampleTiles[p][h];
-      const sprite = makeSprite(tile);
-
-      const pos = getHandPosition(playerNum, h);
-      if(pos){
-        sprite.setPose(pos);
-        // Add shadow to shadow layer, sprite to sprite layer
-        if(sprite._shadow){
-          shadowLayer.appendChild(sprite._shadow);
-        }
-        spriteLayer.appendChild(sprite);
-
-        // Store data
-        const data = { sprite, tile, originalSlot: h };
-        sprites[p][h] = data;
-
-        // Add click handler for P1 - pass sprite element directly for dynamic lookup after sorting
-        if(p === 0){
-          sprite.addEventListener('click', () => handlePlayer1Click(sprite));
-        }
-      }
-    }
-  }
-
-  enablePlayer1Clicks();
-  setStatus('Trick 1 - Click a domino to play');
-
-  // Initialize score display with demo values
-  team1Score = 45;
-  team2Score = 32;
-  team1Marks = 15;
-  team2Marks = 15;
-  updateScoreDisplay();
-}
 
 /******************************************************************************
  * GAME FLOW - Bidding, Trump Selection, and Playing
@@ -15887,10 +15766,19 @@ function processAIBid(seat) {
   }
 
   // If already in multiplier mode, AI with a strong hand should bid the next multiplier up
+  const MAX_AI_MULTIPLIER = 4;
   if (biddingState.inMultiplierMode && evalMarks >= 2) {
-    // AI bids one level above the current highest multiplier
-    bidMarks = (biddingState.highMultiplier || 1) + 1;
-    bidAmount = maxBid;
+    // AI bids one level above the current highest multiplier, capped at MAX_AI_MULTIPLIER
+    const nextMult = (biddingState.highMultiplier || 1) + 1;
+    if (nextMult <= MAX_AI_MULTIPLIER) {
+      bidMarks = nextMult;
+      bidAmount = maxBid;
+    } else {
+      // Cap reached — AI passes instead of escalating further
+      biddingState.passCount++;
+      biddingState.bids.push({ seat, playerNumber: seatToPlayer(seat), bid: "pass" });
+      return { action: "pass" };
+    }
   }
 
   // Check if this bid actually outbids the current leader
@@ -16540,12 +16428,21 @@ function showHandEndPopup(){
 
   // Check for game win - change button text accordingly
   if(status.includes('wins the game')){
-    // Determine if LOCAL player's team won
-    const localTeam = MULTIPLAYER_MODE ? ((mpSeat % 2 === 0) ? 1 : 2) : 1;
-    const t1m = session.team_marks[0];
-    const t2m = session.team_marks[1];
-    const winningTeam = t1m > t2m ? 1 : 2;
-    const localWon = (localTeam === winningTeam);
+    // Determine if LOCAL player's team/seat won
+    let localWon;
+    if (GAME_MODE === 'MOON') {
+      const marks = [session.team_marks[0], session.team_marks[1], session.team_marks[2] || 0];
+      const maxM = Math.max(...marks);
+      const winnerIdx = marks.indexOf(maxM);
+      const _localSeat = MULTIPLAYER_MODE ? mpSeat : 0;
+      localWon = (_localSeat === winnerIdx);
+    } else {
+      const localTeam = MULTIPLAYER_MODE ? ((mpSeat % 2 === 0) ? 1 : 2) : 1;
+      const t1m = session.team_marks[0];
+      const t2m = session.team_marks[1];
+      const winningTeam = t1m > t2m ? 1 : 2;
+      localWon = (localTeam === winningTeam);
+    }
     SFX.playResultSong(localWon ? 'win' : 'lose');
     // Show final scores summary (has its own New Game button inside)
     showGameEndSummary();
@@ -17020,11 +16917,6 @@ function showYourTurnBanner(){
     }, 3000);
   }
 }
-function hideYourTurnBanner(){
-  if (_yourTurnBannerTimeout) { clearTimeout(_yourTurnBannerTimeout); _yourTurnBannerTimeout = null; }
-  const banner = document.getElementById('yourTurnBanner');
-  if (banner) banner.style.display = 'none';
-}
 
 // V11.4: Haptic feedback
 function triggerHaptic(pattern){
@@ -17461,6 +17353,8 @@ async function startNewHand(){
   _biddingCompleting = false;  // FIX1: Reset bidding completion flag
   _aiActionInProgress = false; // FIX3: Reset AI action lock
   _clearAllAITimers();         // FIX5: Clear all AI timers
+  if (session) session.bid_winner_seat = -1;
+  if (typeof _mpPlayQueue !== 'undefined') _mpPlayQueue = [];
   console.log('[FIX] All sync flags reset for new hand');
   
   _staleRefreshCount = 0; // V10_118: Reset refresh counter for new hand
@@ -17490,7 +17384,16 @@ async function startNewHand(){
   document.getElementById('callDoubleBtnGroup').style.display = 'none';
   hideCallDoubleBanner();
   clearForcedDoubleGlow();
-
+  // Reset house rule flags for new hand
+  callForDoubleActive = false;
+  callForDoubleTrumpPip = null;
+  nelloDoublesSuitActive = false;
+  _dfmActiveThisHand = false;
+  _dfmChoiceMade = false;
+  if(session && session.game){
+    session.game.force_double_trump = false;
+    session.game.nello_doubles_suit = false;
+  }
   shadowLayer.innerHTML = '';
   spriteLayer.innerHTML = '';
   sprites.length = 0;
@@ -17971,11 +17874,26 @@ function showGameEndSummary(){
   const t2m = session.team_marks[1];
   const t1p = session.game.team_points[0];
   const t2p = session.game.team_points[1];
-  const winner = t1m > t2m ? 1 : 2;
-  const _localTeam = MULTIPLAYER_MODE ? ((mpSeat % 2 === 0) ? 1 : 2) : 1;
-  const _youWon = (_localTeam === winner);
-  const _endTitle = _youWon ? 'Your Team Wins! \u{1F389}' : 'Your Team Lost';
-  const _endBg = _youWon ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
+
+  let _endTitle, _endBg, _youWon;
+  if (GAME_MODE === 'MOON') {
+    // Moon: 3 individual players
+    const t3m = session.team_marks[2] || 0;
+    const t3p = session.game.team_points[2] || 0;
+    const marks = [t1m, t2m, t3m];
+    const maxM = Math.max(...marks);
+    const winnerIdx = marks.indexOf(maxM);
+    const _localSeat = MULTIPLAYER_MODE ? mpSeat : 0;
+    _youWon = (_localSeat === winnerIdx);
+    _endTitle = _youWon ? 'You Win!' : 'Player ' + (winnerIdx + 1) + ' Wins!';
+    _endBg = _youWon ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
+  } else {
+    const winner = t1m > t2m ? 1 : 2;
+    const _localTeam = MULTIPLAYER_MODE ? ((mpSeat % 2 === 0) ? 1 : 2) : 1;
+    _youWon = (_localTeam === winner);
+    _endTitle = _youWon ? 'Your Team Wins! \u{1F389}' : 'Your Team Lost';
+    _endBg = _youWon ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
+  }
   // Update tally
   if (MULTIPLAYER_MODE) {
     mpGamesPlayed++;
@@ -17994,15 +17912,32 @@ function showGameEndSummary(){
     _btnSection = '<button id="gameEndNewGameBtn" style="padding:10px 28px;font-size:15px;font-weight:700;color:#1d4ed8;background:linear-gradient(135deg,#fbbf24 0%,#f59e0b 100%);border:none;border-radius:10px;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,0.2);transition:transform 0.15s ease;">New Game</button>';
   }
 
+  // Build score columns — Moon shows 3 players, others show 2 teams
+  let _scoreColumns;
+  if (GAME_MODE === 'MOON') {
+    const t3m = session.team_marks[2] || 0;
+    const t3p = session.game.team_points[2] || 0;
+    _scoreColumns = '<div style="display:flex;gap:16px;justify-content:center;margin-bottom:4px;">'
+      + '<div style="text-align:center;"><div style="font-size:12px;opacity:0.8;">P1</div><div style="font-size:26px;font-weight:bold;color:#fff;">' + t1m + '</div><div style="font-size:10px;opacity:0.6;">marks</div><div style="font-size:13px;margin-top:2px;opacity:0.8;">' + t1p + ' pts</div></div>'
+      + '<div style="width:1px;background:rgba(255,255,255,0.2);"></div>'
+      + '<div style="text-align:center;"><div style="font-size:12px;opacity:0.8;">P2</div><div style="font-size:26px;font-weight:bold;color:#fff;">' + t2m + '</div><div style="font-size:10px;opacity:0.6;">marks</div><div style="font-size:13px;margin-top:2px;opacity:0.8;">' + t2p + ' pts</div></div>'
+      + '<div style="width:1px;background:rgba(255,255,255,0.2);"></div>'
+      + '<div style="text-align:center;"><div style="font-size:12px;opacity:0.8;">P3</div><div style="font-size:26px;font-weight:bold;color:#fff;">' + t3m + '</div><div style="font-size:10px;opacity:0.6;">marks</div><div style="font-size:13px;margin-top:2px;opacity:0.8;">' + t3p + ' pts</div></div>'
+      + '</div>';
+  } else {
+    _scoreColumns = '<div style="display:flex;gap:24px;justify-content:center;margin-bottom:4px;">'
+      + '<div style="text-align:center;"><div style="font-size:12px;opacity:0.8;">Team 1</div><div style="font-size:26px;font-weight:bold;color:#fff;">' + t1m + '</div><div style="font-size:10px;opacity:0.6;">marks</div><div style="font-size:13px;margin-top:2px;opacity:0.8;">' + t1p + ' pts</div></div>'
+      + '<div style="width:1px;background:rgba(255,255,255,0.2);"></div>'
+      + '<div style="text-align:center;"><div style="font-size:12px;opacity:0.8;">Team 2</div><div style="font-size:26px;font-weight:bold;color:#fff;">' + t2m + '</div><div style="font-size:10px;opacity:0.6;">marks</div><div style="font-size:13px;margin-top:2px;opacity:0.8;">' + t2p + ' pts</div></div>'
+      + '</div>';
+  }
+
   overlay.innerHTML = '<div style="background:' + _endBg + ';border-radius:16px;padding:0;text-align:center;color:#fff;font-family:inherit;box-shadow:0 8px 32px rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.2);pointer-events:auto;min-width:200px;max-width:80%;overflow:hidden;">'
     + '<div style="padding:14px 28px 10px;">'
     + '<div style="font-size:20px;font-weight:900;margin-bottom:10px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.3);">' + _endTitle + '</div>'
     + (MULTIPLAYER_MODE ? '<div style="font-size:13px;opacity:0.85;margin-bottom:8px;font-weight:600;">' + _tallyText + '</div>' : '')
-    + '<div style="display:flex;gap:24px;justify-content:center;margin-bottom:4px;">'
-    + '<div style="text-align:center;"><div style="font-size:12px;opacity:0.8;">Team 1</div><div style="font-size:26px;font-weight:bold;color:#fff;">' + t1m + '</div><div style="font-size:10px;opacity:0.6;">marks</div><div style="font-size:13px;margin-top:2px;opacity:0.8;">' + t1p + ' pts</div></div>'
-    + '<div style="width:1px;background:rgba(255,255,255,0.2);"></div>'
-    + '<div style="text-align:center;"><div style="font-size:12px;opacity:0.8;">Team 2</div><div style="font-size:26px;font-weight:bold;color:#fff;">' + t2m + '</div><div style="font-size:10px;opacity:0.6;">marks</div><div style="font-size:13px;margin-top:2px;opacity:0.8;">' + t2p + ' pts</div></div>'
-    + '</div></div>'
+    + _scoreColumns
+    + '</div>'
     + '<div style="border-top:1px solid rgba(255,255,255,0.15);padding:10px 28px;">' + _btnSection + '</div>'
     + '</div>';
   overlay.style.display = 'flex';
@@ -18013,7 +17948,7 @@ function showGameEndSummary(){
     newGameBtn.addEventListener('click', () => {
       hideGameEndSummary();
       SFX.resumeBgmAfterResult();
-      session.team_marks = [0, 0];
+      session.team_marks = GAME_MODE === 'MOON' ? [0, 0, 0] : [0, 0];
       clearSavedGame();
       startNewHand();
     });
@@ -18126,7 +18061,7 @@ function mpStartRematch(acceptedSeats) {
   SFX.resumeBgmAfterResult();
 
   // Reset marks for new game
-  session.team_marks = [0, 0];
+  session.team_marks = GAME_MODE === 'MOON' ? [0, 0, 0] : [0, 0];
   clearSavedGame();
 
   // Mark declined seats as AI
@@ -18227,7 +18162,7 @@ function mpHandleRematchStart() {
   }
   hideGameEndSummary();
   SFX.resumeBgmAfterResult();
-  session.team_marks = [0, 0];
+  session.team_marks = GAME_MODE === 'MOON' ? [0, 0, 0] : [0, 0];
   clearSavedGame();
   setStatus('New game starting...');
   // The deal message will follow from the host
@@ -18515,28 +18450,46 @@ function showRoundEndSummary(){
     resultText = 'Round Over';
   }
 
+  // Build round-end score columns — Moon shows 3 players, others show 2 teams
+  let _roundPointsCols, _roundMarksCols;
+  if (GAME_MODE === 'MOON') {
+    const t3p = session.game.team_points[2] || 0;
+    const t3m = session.team_marks[2] || 0;
+    _roundPointsCols = `
+          <div style="text-align:center;"><div style="font-size:10px;opacity:0.8;">P1</div><div style="font-size:20px;font-weight:bold;color:#fff;">${t1p}</div></div>
+          <div style="width:1px;background:rgba(255,255,255,0.2);"></div>
+          <div style="text-align:center;"><div style="font-size:10px;opacity:0.8;">P2</div><div style="font-size:20px;font-weight:bold;color:#fff;">${t2p}</div></div>
+          <div style="width:1px;background:rgba(255,255,255,0.2);"></div>
+          <div style="text-align:center;"><div style="font-size:10px;opacity:0.8;">P3</div><div style="font-size:20px;font-weight:bold;color:#fff;">${t3p}</div></div>`;
+    _roundMarksCols = `
+            <div style="font-size:16px;font-weight:bold;color:#93c5fd;">${t1m}</div>
+            <div style="font-size:12px;opacity:0.5;align-self:center;">-</div>
+            <div style="font-size:16px;font-weight:bold;color:#fca5a5;">${t2m}</div>
+            <div style="font-size:12px;opacity:0.5;align-self:center;">-</div>
+            <div style="font-size:16px;font-weight:bold;color:#fbbf24;">${t3m}</div>`;
+  } else {
+    _roundPointsCols = `
+          <div style="text-align:center;"><div style="font-size:10px;opacity:0.8;">Team 1</div><div style="font-size:20px;font-weight:bold;color:#fff;">${t1p}</div></div>
+          <div style="width:1px;background:rgba(255,255,255,0.2);"></div>
+          <div style="text-align:center;"><div style="font-size:10px;opacity:0.8;">Team 2</div><div style="font-size:20px;font-weight:bold;color:#fff;">${t2p}</div></div>`;
+    _roundMarksCols = `
+            <div style="font-size:16px;font-weight:bold;color:#93c5fd;">${t1m}</div>
+            <div style="font-size:12px;opacity:0.5;align-self:center;">-</div>
+            <div style="font-size:16px;font-weight:bold;color:#fca5a5;">${t2m}</div>`;
+  }
+
   overlay.innerHTML = `
     <div style="background:linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);border-radius:14px;padding:0;text-align:center;color:#fff;font-family:inherit;box-shadow:0 8px 32px rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.2);pointer-events:auto;max-width:55%;overflow:hidden;">
       <div style="padding:10px 14px 8px;">
         <div style="font-size:16px;font-weight:900;margin-bottom:4px;color:${resultColor};text-shadow:0 1px 3px rgba(0,0,0,0.3);">${resultText}</div>
         <div style="font-size:10px;opacity:0.7;margin-bottom:6px;">Round Points</div>
         <div style="display:flex;gap:16px;justify-content:center;margin-bottom:4px;">
-          <div style="text-align:center;">
-            <div style="font-size:10px;opacity:0.8;">Team 1</div>
-            <div style="font-size:20px;font-weight:bold;color:#fff;">${t1p}</div>
-          </div>
-          <div style="width:1px;background:rgba(255,255,255,0.2);"></div>
-          <div style="text-align:center;">
-            <div style="font-size:10px;opacity:0.8;">Team 2</div>
-            <div style="font-size:20px;font-weight:bold;color:#fff;">${t2p}</div>
-          </div>
+          ${_roundPointsCols}
         </div>
         <div style="border-top:1px solid rgba(255,255,255,0.12);margin-top:4px;padding-top:5px;">
           <div style="font-size:10px;opacity:0.7;margin-bottom:2px;">Marks</div>
           <div style="display:flex;gap:14px;justify-content:center;">
-            <div style="font-size:16px;font-weight:bold;color:#93c5fd;">${t1m}</div>
-            <div style="font-size:12px;opacity:0.5;align-self:center;">-</div>
-            <div style="font-size:16px;font-weight:bold;color:#fca5a5;">${t2m}</div>
+            ${_roundMarksCols}
           </div>
         </div>
       </div>
@@ -19316,7 +19269,7 @@ document.getElementById('menuHome').addEventListener('click', () => {
 document.getElementById('menuRestart').addEventListener('click', () => {
   document.getElementById('settingsMenu').classList.remove('open');
   SFX.resumeBgmAfterResult();
-  session.team_marks = [0, 0];
+  session.team_marks = GAME_MODE === 'MOON' ? [0, 0, 0] : [0, 0];
   localStorage.removeItem('tn51_saved_game');  // Clear saved game on restart
   startNewHand();
 });
@@ -21818,10 +21771,25 @@ document.getElementById('ppHandoffBtn').addEventListener('click', () => {
     const activePlayers = g.active_players.slice();
     const bidWinnerSeat = session.bid_winner_seat !== undefined ? session.bid_winner_seat : 0;
 
-    // Build remaining tile pool (all tiles minus P1's hand)
+    // Build remaining tile pool (all tiles minus P1's hand and already-played tiles)
     const allTiles = allDominoesForSet(g.max_pip);
-    const handSet = new Set(mcPlayerHand.map(t => t[0] + ',' + t[1]));
-    const remainingPool = allTiles.filter(t => !handSet.has(t[0] + ',' + t[1]));
+    const excludeSet = new Set(mcPlayerHand.map(t => t[0] + ',' + t[1]));
+    // Exclude tiles from completed tricks
+    for (let team = 0; team < g.tricks_team.length; team++) {
+      for (const record of (g.tricks_team[team] || [])) {
+        if (Array.isArray(record)) {
+          for (const entry of record) {
+            if (Array.isArray(entry)) { excludeSet.add(entry[0] + ',' + entry[1]); }
+            else if (entry && typeof entry === 'object') { excludeSet.add(entry[0] + ',' + entry[1]); }
+          }
+        }
+      }
+    }
+    // Exclude tiles from the current (in-progress) trick
+    for (const [seat, tile] of (g.current_trick || [])) {
+      if (tile) excludeSet.add(tile[0] + ',' + tile[1]);
+    }
+    const remainingPool = allTiles.filter(t => !excludeSet.has(t[0] + ',' + t[1]));
 
     const isPartial = mcSelectedOrder.length < mcPlayerHand.length;
     const isMoon = GAME_MODE === 'MOON';
@@ -22373,6 +22341,7 @@ document.getElementById('btnTrumpConfirm').ontouchend = function(e) {
 
 // Full layout refresh - repositions all elements
 function refreshLayout(){
+  _rectDirty = true;
   console.log("Refreshing layout...");
 
   // Reposition all hand sprites
@@ -22445,7 +22414,9 @@ document.addEventListener('visibilitychange', () => {
     return;
   }
 
-  // Tab becoming visible again
+  // Tab becoming visible again — resume audio context if suspended
+  if (SFX.ctx && SFX.ctx.state === 'suspended') SFX.ctx.resume();
+
   const hiddenDuration = Date.now() - _lastVisibleTime;
   console.log('[Visibility] Tab visible again after', hiddenDuration, 'ms');
 
@@ -22647,7 +22618,7 @@ let _staleRefreshDisabled = false; // V10_119: Per-player toggle to disable auto
 let _mpLastHeartbeatSent = 0; // V10_122: Last time we sent "still_here" heartbeat
 let _mpLastHeartbeatReceived = {}; // V10_122: Last heartbeat time per seat
 
-setInterval(() => {
+let _staleDetectorInterval = setInterval(() => {
   if(!MULTIPLAYER_MODE || !mpGameStarted || !session) return;
   if(document.hidden) return; // Don't check while tab is hidden
   if(_staleRefreshDisabled) return; // V10_119: Player disabled auto-refresh
@@ -24504,7 +24475,7 @@ showStartScreen();
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js', { scope: './' })
-      .catch(() => {});
+      .catch(e => console.warn('SW registration failed:', e.message));
   });
 }
 
@@ -24518,8 +24489,6 @@ if ('serviceWorker' in navigator) {
   // ==================== ORIENTATION-AWARE PERSISTENCE ====================
   function getOrientation(){ return window.innerWidth > window.innerHeight ? 'landscape' : 'portrait'; }
   let currentOrientation = getOrientation();
-
-  function storageKey(base){ return base + '_' + currentOrientation; }
 
   const STORAGE_KEY_DEVMODE = 'tn51_devmode';
   const STORAGE_KEY_PRESETS = 'tn51_device_presets';
@@ -24645,24 +24614,8 @@ if ('serviceWorker' in navigator) {
     }
   }
 
-  // Helper: redraw all sprites including trick history
-  function _redrawAllVisibleSprites(){
-    try{
-      for(const seat of sprites){
-        if(!seat) continue;
-        for(const d of seat){
-          if(d && d.sprite && typeof d.sprite.redrawCanvases === "function") d.sprite.redrawCanvases();
-        }
-      }
-      if(typeof playedThisTrick !== 'undefined'){
-        for(const pt of playedThisTrick){
-          if(pt && pt.sprite && typeof pt.sprite.redrawCanvases === "function") pt.sprite.redrawCanvases();
-        }
-      }
-      var sl = document.getElementById('spriteLayer');
-      if(sl){ for(var i = 0; i < sl.children.length; i++){ var c = sl.children[i]; if(c && typeof c.redrawCanvases === "function") c.redrawCanvases(); } }
-    }catch(e){}
-  }
+  // Helper: redraw all sprites including trick history (delegates to module-scope function)
+  function _redrawAllVisibleSprites(){ _redrawAllDominoSprites(); }
 
   document.getElementById('chkFancyLine').addEventListener('change', function(){
     DOMINO_STYLE.FANCY_LINE_ENABLED = this.checked;
@@ -25567,28 +25520,7 @@ if ('serviceWorker' in navigator) {
     }
 
     function redrawAllSprites(){
-      try{
-        // Redraw hand sprites
-        for(const seat of sprites){
-          if(!seat) continue;
-          for(const d of seat){
-            if(d && d.sprite && typeof d.sprite.redrawCanvases==="function") d.sprite.redrawCanvases();
-          }
-        }
-        // Redraw current trick sprites
-        if(typeof playedThisTrick !== 'undefined'){
-          for(const pt of playedThisTrick){
-            if(pt && pt.sprite && typeof pt.sprite.redrawCanvases==="function") pt.sprite.redrawCanvases();
-          }
-        }
-        // Redraw ALL sprites in spriteLayer (catches trick history tiles)
-        const sl = document.getElementById('spriteLayer');
-        if(sl){
-          for(const child of sl.children){
-            if(child && typeof child.redrawCanvases==="function") child.redrawCanvases();
-          }
-        }
-      }catch(e){}
+      _redrawAllDominoSprites();
       // Also redraw preview canvases
       renderPreviews();
     }
@@ -26129,44 +26061,25 @@ if ('serviceWorker' in navigator) {
     window.syncPipColorsUI = syncPipColorsUI;
   })();
 
-  // Preset helpers
-  function getAllPresets(){ return loadFromStorage(STORAGE_KEY_PRESETS) || {}; }
-  function savePreset(category, name, data){
-    const presets = getAllPresets();
-    if(!presets[category]) presets[category] = {};
-    presets[category][name] = data;
-    saveToStorage(STORAGE_KEY_PRESETS, presets);
-  }
-  function loadPreset(category){
-    const presets = getAllPresets();
-    const catPresets = presets[category] || {};
-    const names = Object.keys(catPresets);
-    if(names.length === 0){ alert('No saved presets for ' + category); return null; }
-    const name = prompt('Available presets:\n' + names.join('\n') + '\n\nEnter preset name to load:');
-    if(!name || !catPresets[name]){ if(name) alert('Preset not found: ' + name); return null; }
-    return catPresets[name];
-  }
-
   // ==================== T42 LAYOUT SETTINGS ====================
   const T42_DEFAULTS = {
-    p1Scale:0.92, p1Spacing:0.137, p1x:0.905, p1y:0.925,
-    p2Scale:0.59, p2x:0.09, p2y:0.65, p2Spacing:0.049,
-    p3Scale:0.59, p3x:0.235, p3y:0.43, p3Spacing:0.087,
-    p4Scale:0.59, p4x:0.905, p4y:0.65, p4Spacing:0.049,
-    trickScale:0.59,
-    p1TrickX:0.495, p1TrickY:0.725,
-    p2TrickX:0.35, p2TrickY:0.65,
-    p3TrickX:0.495, p3TrickY:0.585,
-    p4TrickX:0.63, p4TrickY:0.65,
-    leadScale:0.51, leadX:0.485, leadY:0.65,
-    ind1x:0.495, ind1y:0.80,
-    ind2x:0.215, ind2y:0.65,
-    ind3x:0.495, ind3y:0.505,
-    ind4x:0.775, ind4y:0.65,
-    thScale:0.393, thBaseX:0.106, thBaseY:0.2281,
-    thRowSpacing:0.1111, thColSpacing:0.0311
+    p1Scale: 0.92, p1Spacing: 0.137, p1x: 0.905, p1y: 0.925,
+    p2Scale: 0.59, p2x: 0.09, p2y: 0.65, p2Spacing: 0.049,
+    p3Scale: 0.59, p3x: 0.235, p3y: 0.43, p3Spacing: 0.087,
+    p4Scale: 0.59, p4x: 0.905, p4y: 0.65, p4Spacing: 0.049,
+    trickScale: 0.59,
+    p1TrickX: 0.495, p1TrickY: 0.725,
+    p2TrickX: 0.35, p2TrickY: 0.65,
+    p3TrickX: 0.495, p3TrickY: 0.585,
+    p4TrickX: 0.63, p4TrickY: 0.65,
+    leadScale: 0.51, leadX: 0.485, leadY: 0.65,
+    ind1x: 0.495, ind1y: 0.80,
+    ind2x: 0.215, ind2y: 0.65,
+    ind3x: 0.495, ind3y: 0.505,
+    ind4x: 0.775, ind4y: 0.65,
+    thScale: 0.393, thBaseX: 0.106, thBaseY: 0.2281,
+    thRowSpacing: 0.1111, thColSpacing: 0.0311
   };
-  const T42_KEYS = Object.keys(T42_DEFAULTS);
 
   function showT42Settings(){
     document.getElementById('t42SettingsBackdrop').style.display = 'flex';
@@ -26914,7 +26827,7 @@ window.addEventListener('error', function(event) {
  * V10_122c: GLOBAL SYNCING OVERLAY FAILSAFE
  * Ensures overlay never stays visible for more than 15 seconds
  ******************************************************************************/
-setInterval(() => {
+let _syncOverlayInterval = setInterval(() => {
   const overlay = document.getElementById('syncingOverlay');
   if(overlay && overlay.style.display !== 'none'){
     // Check how long overlay has been visible
@@ -26939,6 +26852,23 @@ setInterval(() => {
 }, 1000);
 
 
+
+// ============================================================
+// ESCAPE KEY — close topmost visible modal
+// ============================================================
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    // Close modals in z-index priority order
+    const modals = ['bonesBackdrop','syncingOverlay','gameSettingsBackdrop','aboutBackdrop','ppBackdrop','mpBackdrop','nelloBackdrop','trumpBackdrop','bidBackdrop'];
+    for (const id of modals) {
+      const el = document.getElementById(id);
+      if (el && el.style.display !== 'none' && getComputedStyle(el).display !== 'none') {
+        el.style.display = 'none';
+        break;
+      }
+    }
+  }
+});
 
 // ============================================================
 // SECTION 3: Popup Config

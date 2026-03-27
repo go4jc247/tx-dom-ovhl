@@ -1,6 +1,6 @@
-# CLAUDE.md — Project Rules for TX-Dom-Dev
+# CLAUDE.md — Project Rules for tx-dom-ovhl
 # Texas 42 Dominoes — Claude Code Dev Build
-# Owner: go4jc247 | Repo: https://github.com/go4jc247/TX-Dom-Dev
+# Owner: go4jc247 | Repo: https://github.com/go4jc247/tx-dom-ovhl
 
 ---
 
@@ -13,10 +13,10 @@ These are not suggestions. They are hard rules for this project.
 
 ## SCOPE — Where Claude Is Allowed to Work
 
-- ✅ Working directory: `/Users/jp/TX-Dom-Dev/` ONLY
-- ✅ GitHub: `go4jc247/TX-Dom-Dev` repository ONLY
-- ❌ NEVER access, read, modify, or touch any files outside of `/Users/jp/TX-Dom-Dev/`
-- ❌ NEVER touch any other GitHub repository, organization, settings, tokens, or account data outside of TX-Dom-Dev
+- ✅ Working directory: `/Users/jp/tx-dom-ovhl/` ONLY
+- ✅ GitHub: `go4jc247/tx-dom-ovhl` repository ONLY
+- ❌ NEVER access, read, modify, or touch any files outside of `/Users/jp/tx-dom-ovhl/`
+- ❌ NEVER touch any other GitHub repository, organization, settings, tokens, or account data outside of tx-dom-ovhl
 - ❌ NEVER access iCloud files directly — originals in iCloud are reference only, never modify them
 
 ---
@@ -38,7 +38,7 @@ These are not suggestions. They are hard rules for this project.
   3. The `id="aboutVersion"` default text in index.html (backup, since it's dynamic)
 
 ### Rule 3 — Never Overwrite Original iCloud Files
-- Our ONLY working directory is `/Users/jp/TX-Dom-Dev/`
+- Our ONLY working directory is `/Users/jp/tx-dom-ovhl/`
 - The iCloud folder `/Users/jp/Library/Mobile Documents/com~apple~CloudDocs/Texas dominoes /` is READ-ONLY reference
 - NEVER write, move, rename, or delete anything in iCloud
 
@@ -55,13 +55,13 @@ These are not suggestions. They are hard rules for this project.
 - If a change has any risk of breaking gameplay, UI, multiplayer, or audio — STOP and warn the user before proceeding
 - Describe the risk clearly and wait for confirmation
 
-### Rule 7 — Never Touch Anything Outside the TX-Dom-Dev Repository
-- GitHub access is limited to: `go4jc247/TX-Dom-Dev` only
+### Rule 7 — Never Touch Anything Outside the tx-dom-ovhl Repository
+- GitHub access is limited to: `go4jc247/tx-dom-ovhl` only
 - NEVER access other repos, GitHub settings, billing, tokens, SSH keys, or any other account data
 - NEVER create new repositories without explicit instruction
 
 ### Rule 8 — Never Access Files Outside the Project Directory
-- File system access is limited to `/Users/jp/TX-Dom-Dev/` only
+- File system access is limited to `/Users/jp/tx-dom-ovhl/` only
 - Do not read, list, or interact with any other directory on the machine
 - If a file is needed from elsewhere, ask the user to provide it
 
@@ -81,8 +81,8 @@ These are not suggestions. They are hard rules for this project.
 
 - **Game:** Texas 42 / TN51 Dominoes — HTML5 single-file game
 - **Base file:** Started from `Texas Dominoes V12.10.27c 2.html` (clean, no Easter egg)
-- **Current version:** v13.0.0
-- **Live URL:** https://go4jc247.github.io/TX-Dom-Dev/
+- **Current version:** v14.0.0
+- **Live URL:** https://go4jc247.github.io/tx-dom-ovhl/
 - **Dev branch:** main
 - **Live branch:** gh-pages
 - **Relay server:** wss://tn51-tx42-relay.onrender.com
@@ -92,9 +92,9 @@ These are not suggestions. They are hard rules for this project.
 ---
 
 ## VERSIONING LOCATIONS (update all 3 every release)
-1. `const MP_VERSION = 'vX.X.X';` — in index.html (~line 7454)
+1. `const MP_VERSION = 'vX.X.X';` — in assets/js/game.js (~line 4633)
 2. `const CACHE_NAME = 'tx-dom-vX.X.X';` — in sw.js (line 8)
-3. `<div ... id="aboutVersion">vX.X.X</div>` — in index.html (~line 1981)
+3. `<div ... id="aboutVersion">vX.X.X</div>` — in index.html (~line 266)
 
 ---
 

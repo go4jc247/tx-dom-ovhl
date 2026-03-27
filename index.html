@@ -12,6 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="Texas Dominoes">
 <meta name="application-name" content="Texas Dominoes">
 <meta name="theme-color" content="#1a5c2a">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://tn51-tx42-relay.onrender.com; media-src 'self'; img-src 'self' blob: data:;">
 <link rel="apple-touch-icon" href="./assets/images/icon-180.png">
 <link rel="apple-touch-icon" sizes="512x512" href="./assets/images/icon-512.png">
 </head>
@@ -20,7 +21,7 @@
 <script>
 (function(){
   var base = window.location.href.replace(/\/[^/]*$/, '/');
-  var m = {"name": "Texas Dominoes", "short_name": "Texas Dominoes", "description": "Texas Dominoes - TN51 / T42 / Moon", "start_url": ".", "display": "standalone", "orientation": "portrait", "background_color": "#1a5c2a", "theme_color": "#1a5c2a", "icons": [{"src": base + "assets/images/manifest-icon-192.png", "sizes": "192x192", "type": "image/png"}, {"src": base + "assets/images/manifest-icon-512.png", "sizes": "512x512", "type": "image/png"}]};
+  var m = {"name": "Texas Dominoes", "short_name": "TX Dominoes", "description": "Texas Dominoes - TN51 / T42 / Moon", "start_url": ".", "display": "standalone", "orientation": "portrait", "background_color": "#1a5c2a", "theme_color": "#1a5c2a", "icons": [{"src": base + "assets/images/manifest-icon-192.png", "sizes": "192x192", "type": "image/png"}, {"src": base + "assets/images/manifest-icon-512.png", "sizes": "512x512", "type": "image/png"}]};
   var blob = new Blob([JSON.stringify(m)], {type:'application/json'});
   var link = document.createElement('link');
   link.rel = 'manifest';
@@ -203,7 +204,7 @@
         <span style="font-size:11px;color:#aaa;font-weight:600;">Popup Settings</span>
         <span id="popupSettingsArrow" style="font-size:10px;color:#666;transition:transform 0.2s;">&#9654;</span>
       </div>
-      <div id="popupSettingsPanel" style="display:none;margin-top:6px;max-height:300px;overflow-y:auto;-webkit-overflow-scrolling:touch;">
+      <div id="popupSettingsPanel" style="display:none;margin-top:6px;max-height:300px;overflow-y:auto;">
         <div style="font-size:9px;color:#666;margin-bottom:6px;">Adjust popup sizes per device. Changes save automatically.</div>
         <select id="popupSelect" style="width:100%;padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#fff;font-size:11px;margin-bottom:8px;">
         </select>
@@ -263,7 +264,7 @@
     </div>
     <div style="text-align:center;">
       <div style="font-size:24px;font-weight:800;color:#fff;margin-bottom:4px;">TN51 / TX42 Dominoes</div>
-      <div style="font-size:16px;font-weight:700;color:#60a5fa;margin-bottom:12px;" id="aboutVersion">v13.3.0</div>
+      <div style="font-size:16px;font-weight:700;color:#60a5fa;margin-bottom:12px;" id="aboutVersion">v14.0.0</div>
       <div style="font-size:12px;color:#9ca3af;line-height:1.6;">
         <div>Built: February 2026</div>
         <div>Game modes: Tennessee 51, Texas 42</div>
@@ -489,7 +490,7 @@
     </div>
 
     <!-- Scrollable content area -->
-    <div style="overflow-y:auto;flex:1;min-height:0;padding:0 24px;-webkit-overflow-scrolling:touch;">
+    <div style="overflow-y:auto;flex:1;min-height:0;padding:0 24px;">
 
     <!-- Connection Status -->
     <div id="mpConnStatus" style="margin-bottom:16px;padding:10px;border-radius:8px;background:rgba(255,255,255,0.05);font-size:13px;color:#9ca3af;">
@@ -764,7 +765,7 @@
     <div class="modalHeader" style="border-bottom:1px solid rgba(255,255,255,0.15);padding:14px 16px;flex-shrink:0;">
       <span style="font-size:18px;font-weight:700;color:#fff;">Game Settings</span>
     </div>
-    <div class="modalBody" style="padding:16px;overflow-y:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch;">
+    <div class="modalBody" style="padding:16px;overflow-y:auto;flex:1;min-height:0;">
       <!-- V12.10.27c: Game type tabs hidden — already selected from carousel -->
       <div id="gsGameTypeSection" style="display:none;text-align:center;margin-bottom:16px;">
         <div style="font-size:13px;color:rgba(255,255,255,0.8);margin-bottom:10px;font-weight:600;">Game Type</div>
@@ -1388,12 +1389,3 @@
 
 </body>
 </html>
-
- *My favorite app::html+css+js  https://itunes.apple.com/app/id908054939?mt=8
-Other's Tutorals:http://iii9i.com
-
- *My favorite app::html+css+js  https://itunes.apple.com/app/id908054939?mt=8
-Other's Tutorals:http://iii9i.com
-
- *My favorite app::html+css+js  https://itunes.apple.com/app/id908054939?mt=8
-Other's Tutorals:http://iii9i.com

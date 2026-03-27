@@ -1,13 +1,12 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v13.3.0 — MyClaude / Claude Code build
+// Version: v14.0.0 — TX-DOM-OVHL full codebase overhaul
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v13.3.0';
+const CACHE_NAME = 'tx-dom-v14.0.0';
 const urlsToCache = [
   './index.html',
-  './sw.js',
   // CSS
   './assets/css/styles.css',
   // JS
@@ -53,7 +52,13 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   e.respondWith(
     fetch(e.request)
-      .then(r => { const rc = r.clone(); caches.open(CACHE_NAME).then(c => c.put(e.request, rc)); return r; })
-      .catch(() => caches.match(e.request))
+      .then(r => {
+        if (r && r.ok && r.type === 'basic') {
+          const rc = r.clone();
+          caches.open(CACHE_NAME).then(c => c.put(e.request, rc));
+        }
+        return r;
+      })
+      .catch(() => caches.match(e.request).then(r => r || new Response('Offline — please reconnect', { status: 503, headers: { 'Content-Type': 'text/plain' } })))
   );
 });
