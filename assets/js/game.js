@@ -4756,6 +4756,16 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       return makeResult(lowIdx, "Partner trumped, play low");
     }
 
+    // BID-SAFE FINAL TRICK: no need to risk anything — play lowest
+    if(bidIsSafe && tricksLeft <= 1 && isBidderTeam){
+      let safeLowIdx = legal[0], safeLowVal = Infinity;
+      for(const idx of legal){
+        const v = hand[idx][0] + hand[idx][1];
+        if(v < safeLowVal){ safeLowVal = v; safeLowIdx = idx; }
+      }
+      return makeResult(safeLowIdx, "Bid safe in final trick: play lowest");
+    }
+
     if(winTrumpIdx >= 0){
       // SMART TRUMP CONSERVATION: On defense with low-value trick, consider saving trump
       // But always trump in if: we're the bidder's team, endgame, or trick has count
@@ -4818,6 +4828,19 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       return makeResult(anyTrumpIdx, "Endgame: desperate trump in");
     }
     // Can't beat existing trump — fall through to dump
+  }
+
+  // ── LAST TRICK COUNT DUMP: if partner is winning the last trick, throw our best count ──
+  if(tricksLeft <= 1 && partnerWinning && isBidderTeam && !bidIsSafe){
+    let bestCountIdx = -1, bestCountVal = 0;
+    for(const idx of legal){
+      const ps = hand[idx][0] + hand[idx][1];
+      const cnt = (ps === 5) ? 5 : (ps === 10) ? 10 : 0;
+      if(cnt > bestCountVal){ bestCountVal = cnt; bestCountIdx = idx; }
+    }
+    if(bestCountIdx >= 0 && bestCountVal > 0){
+      return makeResult(bestCountIdx, "Last trick: throw count to partner (" + bestCountVal + "pts)");
+    }
   }
 
   // ── Cannot win: smart dump (suit-voiding + avoid count + save trumps) ──
