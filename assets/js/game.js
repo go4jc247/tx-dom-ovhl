@@ -1554,6 +1554,17 @@ function evaluateHandForBid(hand) {
       else ntUncoveredOffs++;
     }
 
+    // SUPER TRUMP: 6+ trumps with double = overwhelming trump count, always max bid
+    if (trumpCount >= 6 && hasDoubleTrump) {
+      const marks = (nonTrumpDoubles.length >= 2 || (hasSecondTrump && ntUncoveredOffs === 0)) ? 2 : 1;
+      return { action: "bid", bid: maxBid, marks };
+    }
+    // 5 trumps with double + 2nd + any side double → max bid (near-guaranteed control)
+    if (trumpCount >= 5 && hasDoubleTrump && hasSecondTrump && nonTrumpDoubles.length >= 1) {
+      const marks = ntUncoveredOffs === 0 ? 2 : 1;
+      return { action: "bid", bid: maxBid, marks };
+    }
+
     // PATTERN: 3+ top trumps (double + 2nd + 3rd) + doubles + at most 1 covered off, no uncovered → max bid 2x
     if (trumpCount >= 3 && hasDoubleTrump && hasSecondTrump && hasThirdTrump
         && nonTrumpDoubles.length >= 1 && ntUncoveredOffs === 0) {
@@ -3436,6 +3447,19 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         }
       }
       if(bestDumpIdx >= 0) return makeResult(bestDumpIdx, "Nel-O bidder: highest losing card (dump danger)");
+      // Off-suit: dump the HIGHEST dangerous card (can't win off-suit, so discard future threats)
+      const hasInSuit = legal.some(i => hand[i][0] === ledPip || hand[i][1] === ledPip);
+      if(!hasInSuit){
+        // Prefer dumping doubles (dangerous when led) and high-pip tiles
+        let dumpIdx = legal[0], dumpScore = -Infinity;
+        for(const idx of legal){
+          const tile = hand[idx];
+          const isDbl = tile[0] === tile[1];
+          let sc = tile[0] + tile[1] + (isDbl ? 20 : 0); // doubles are most dangerous in Nello
+          if(sc > dumpScore){ dumpScore = sc; dumpIdx = idx; }
+        }
+        return makeResult(dumpIdx, "Nel-O bidder: off-suit dump dangerous tile");
+      }
       return makeResult(lowIdx, "Nel-O bidder: play low (no safe dump)");
     }
     if(iAmOpponent){
