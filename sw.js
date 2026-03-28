@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.85.0 — Moon STM risk-aware bidding, 2-trick lookahead partner awareness
+// Version: v17.86.0 — Critical walker check fix, Moon count contamination cleanup
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.85.0';
+const CACHE_NAME = 'tx-dom-v17.86.0';
 const urlsToCache = [
   './index.html',
   // CSS

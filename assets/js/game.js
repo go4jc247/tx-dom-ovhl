@@ -4559,7 +4559,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           const bR = gameState._suit_rank(tileB, ledSuit);
           return (aR[0] * 100 + aR[1]) > (bR[0] * 100 + bR[1]);
         };
-        const _tileCount = (t) => { const s = t[0]+t[1]; return s===5?5:s===10?10:0; };
+        const _tileCount = (t) => { if(isMoon) return 0; const s = t[0]+t[1]; return s===5?5:s===10?10:0; };
         // Helper: determine which tile opponent plays against our lead
         // Opponent plays their BEST tile that beats us — prefers non-count winners
         // If can't win, plays lowest non-count tile (save count for team)
@@ -4850,7 +4850,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     // When the bidder is confirmed void in trump, they can't trump ANY suit.
     // This means ALL doubles are safe leads and count capture is risk-free.
     // Strategy shifts from "force trump waste" to "grab maximum count."
-    if(!isBidderTeam && trumpVoidConfirmed[bidderSeat] && (nonTrumpDoubles.length > 0 || trumpDoubles.length > 0)){
+    if(!isMoon && !isBidderTeam && trumpVoidConfirmed[bidderSeat] && (nonTrumpDoubles.length > 0 || trumpDoubles.length > 0)){
       const freeSuitDoubles = [...nonTrumpDoubles, ...trumpDoubles];
       let bestFreeIdx = -1, bestFreeScore = -Infinity;
       for(const idx of freeSuitDoubles){
@@ -4873,7 +4873,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     // ── DEFENSIVE LEAD: force bidder to waste trump on low-value tricks ──
     // When on defense, instead of leading our own trumps (which bidder beats),
     // lead suits where the bidder is void — forces them to trump low-count tricks
-    if(!isBidderTeam && !weHaveTrumpControl && nonTrumpDoubles.length > 0){
+    if(!isMoon && !isBidderTeam && !weHaveTrumpControl && nonTrumpDoubles.length > 0){
       const bidderVoids = voidIn[bidderSeat] || new Set();
       if(bidderVoids.size > 0){
         // Find a non-trump double in a suit the bidder is void in
@@ -4900,7 +4900,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     // When we have no doubles in the bidder's void suits, lead low non-count singles
     // IMPORTANT: led suit = max(pip0, pip1). Only the led suit matters for forcing trump.
     // If bidder is void in low pip but not high pip, they follow suit — no trump forced.
-    if(!isBidderTeam && !weHaveTrumpControl && nonTrumpSingles.length > 0){
+    if(!isMoon && !isBidderTeam && !weHaveTrumpControl && nonTrumpSingles.length > 0){
       const bidderVoids = voidIn[bidderSeat] || new Set();
       if(bidderVoids.size > 0){
         let bestTapIdx = -1, bestTapScore = -Infinity;
@@ -4938,7 +4938,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     // ── DEFENDER COUNT CAPTURE: lead doubles in count-rich suits to deny bidder points ──
     // When we can set the bid, lead our doubles in suits with lots of remaining count.
     // Winning the double guarantees the trick, then partner can throw count to us.
-    if(!isBidderTeam && canSetBid && nonTrumpDoubles.length > 0){
+    if(!isMoon && !isBidderTeam && canSetBid && nonTrumpDoubles.length > 0){
       let bestCapIdx = -1, bestCapScore = -Infinity;
       for(const idx of nonTrumpDoubles){
         const pip = hand[idx][0];
@@ -5030,17 +5030,19 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           let isHighestRemaining = true;
           if(info.remaining){
             for(const rt of info.remaining){
-              if(rt[0] === tile[0] && rt[1] === tile[1]) continue; // skip self
+              // rt is {tile: [a,b], count: pts} — use rt.tile for array access
+              const rtTile = rt.tile || rt; // handle both shapes for safety
+              if(rtTile[0] === tile[0] && rtTile[1] === tile[1]) continue; // skip self
               // Check if this remaining tile is in our hand (safe) or an opponent's (dangerous)
-              const inOurHand = hand.some(h => h[0] === rt[0] && h[1] === rt[1]);
+              const inOurHand = hand.some(h => h[0] === rtTile[0] && h[1] === rtTile[1]);
               if(inOurHand) continue; // we hold it too, no threat
-              const rtRank = gameState._suit_rank(rt, pip);
+              const rtRank = gameState._suit_rank(rtTile, pip);
               if(rtRank[0] * 100 + rtRank[1] > myRankNum){ isHighestRemaining = false; break; }
             }
           }
           if(!isHighestRemaining) continue; // not a true walker — higher tiles still out
           const pipSum = tile[0] + tile[1];
-          const myCount = (pipSum === 5) ? 5 : (pipSum === 10) ? 10 : 0;
+          const myCount = isMoon ? 0 : ((pipSum === 5) ? 5 : (pipSum === 10) ? 10 : 0);
           // Walk count tiles for points, or non-count tiles to pull partner count
           if(info.tilesLeft <= 2){
             let score = (weHaveTrumpControl ? 8 : 0);
@@ -5105,7 +5107,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           const pip = hand[idx][0];
           const info = suitInfo[pip];
           const dblSum = pip + pip;
-          const dblCount = (dblSum === 5) ? 5 : (dblSum === 10) ? 10 : 0;
+          const dblCount = isMoon ? 0 : ((dblSum === 5) ? 5 : (dblSum === 10) ? 10 : 0);
           // Prefer non-count doubles; then doubles with more remaining tiles (pull more tiles)
           let score = -dblCount * 3 + (info ? info.tilesLeft : 0);
           if(score > bestDblScore){ bestDblScore = score; bestDbl = idx; }
@@ -5118,7 +5120,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         for(const idx of nonTrumpSingles){
           const tile = hand[idx];
           const pipSum = tile[0] + tile[1];
-          const myCount = (pipSum === 5) ? 5 : (pipSum === 10) ? 10 : 0;
+          const myCount = isMoon ? 0 : ((pipSum === 5) ? 5 : (pipSum === 10) ? 10 : 0);
           const score = myCount * 3 + pipSum; // minimize count given away
           if(score < safestScore){ safestScore = score; safestIdx = idx; }
         }
@@ -8069,7 +8071,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.85.0';  // v17.85.0: Moon STM risk-aware bidding, 2-trick lookahead partner awareness, TN51 outbid gap tightened
+const MP_VERSION = 'v17.86.0';  // v17.86.0: Critical walker check fix, Moon count contamination cleanup
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
