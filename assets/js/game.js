@@ -1427,6 +1427,33 @@ function evaluateHandForBid(hand) {
     if (a === 0 || b === 0) blanks.push(tile);
   }
 
+  // MOON-SPECIFIC bidding patterns (9-tile hands, 3 players, max pip 6)
+  if (GAME_MODE === 'MOON') {
+    // Moon has 9 tricks, bid = tricks you'll win. Min bid 4, max 7.
+    // With 9 tiles in hand + widow swap, hands tend to be stronger.
+    // Pattern: 5+ trumps with double → bid 5
+    for (let pip = maxPip; pip >= 0; pip--) {
+      const trumpTiles = hand.filter(t => t[0] === pip || t[1] === pip);
+      const hasDouble = trumpTiles.some(t => t[0] === pip && t[1] === pip);
+      if (trumpTiles.length >= 5 && hasDouble) {
+        const hasSecond = trumpTiles.some(t =>
+          (t[0] === pip && t[1] === pip - 1) || (t[0] === pip - 1 && t[1] === pip));
+        if (hasSecond) return { action: "bid", bid: 6, marks: 1 };
+        return { action: "bid", bid: 5, marks: 1 };
+      }
+      // 4 trumps with double + 2nd + other doubles → bid 5
+      if (trumpTiles.length >= 4 && hasDouble) {
+        const hasSecond = trumpTiles.some(t =>
+          (t[0] === pip && t[1] === pip - 1) || (t[0] === pip - 1 && t[1] === pip));
+        const ntDoubles = doubles.filter(d => d[0] !== pip);
+        if (hasSecond && ntDoubles.length >= 2) return { action: "bid", bid: 5, marks: 1 };
+      }
+    }
+    // Moon: 4+ doubles → strong Nello-style or doubles-trump hand
+    if (doubles.length >= 5) return { action: "bid", bid: 6, marks: 1 };
+    if (doubles.length >= 4) return { action: "bid", bid: 4, marks: 1 };
+  }
+
   if (GAME_MODE !== 'T42' && blanks.length >= 4) {
     const has01 = blanks.some(t => (t[0] === 0 && t[1] === 1) || (t[0] === 1 && t[1] === 0));
     let maxSmallPip = 0;
