@@ -4510,6 +4510,30 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       }
     }
 
+    // ── DEFENSIVE LEAD: BIDDER OUT OF TRUMP — maximize count capture freely ──
+    // When the bidder is confirmed void in trump, they can't trump ANY suit.
+    // This means ALL doubles are safe leads and count capture is risk-free.
+    // Strategy shifts from "force trump waste" to "grab maximum count."
+    if(!isBidderTeam && trumpVoidConfirmed[bidderSeat] && (nonTrumpDoubles.length > 0 || trumpDoubles.length > 0)){
+      const freeSuitDoubles = [...nonTrumpDoubles, ...trumpDoubles];
+      let bestFreeIdx = -1, bestFreeScore = -Infinity;
+      for(const idx of freeSuitDoubles){
+        const tile = hand[idx];
+        const pip = tile[0];
+        const info = suitInfo[pip];
+        const pipSum = tile[0] + tile[1];
+        const myCount = (pipSum === 5) ? 5 : (pipSum === 10) ? 10 : 0;
+        // Score: own count + count remaining in suit (partner can throw count to us)
+        let score = myCount * 2 + (info ? info.countRemaining * 2 : 0);
+        // Prefer suits with many tiles remaining (more likely partner has count to throw)
+        if(info) score += Math.min(info.tilesLeft * 2, 10);
+        if(score > bestFreeScore){ bestFreeScore = score; bestFreeIdx = idx; }
+      }
+      if(bestFreeIdx >= 0){
+        return makeResult(bestFreeIdx, "Defense: bidder out of trump — free count capture (score " + bestFreeScore + ")");
+      }
+    }
+
     // ── DEFENSIVE LEAD: force bidder to waste trump on low-value tricks ──
     // When on defense, instead of leading our own trumps (which bidder beats),
     // lead suits where the bidder is void — forces them to trump low-count tricks
@@ -7307,7 +7331,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.39.0';  // v17.39.0: defensive trump exhaustion, void-in-bidder-strength dump, follow void awareness
+const MP_VERSION = 'v17.40.0';  // v17.40.0: bidder-out-of-trump free capture lead
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables

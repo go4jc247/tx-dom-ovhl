@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.39.0 — defensive trump exhaustion, void-in-bidder-strength dump, follow void awareness
+// Version: v17.40.0 — bidder-out-of-trump free capture lead
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.39.0';
+const CACHE_NAME = 'tx-dom-v17.40.0';
 const urlsToCache = [
   './index.html',
   // CSS
