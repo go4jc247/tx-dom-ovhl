@@ -7224,7 +7224,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v14.0.0';  // v14.0.0: TX-DOM-OVHL — full codebase overhaul
+const MP_VERSION = 'v17.34.0';  // v17.34.0: Moon NaN fix, AI improvements
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
@@ -9594,8 +9594,8 @@ async function mpHandlePlayConfirmed(move) {
 
     // Handle hand completion
     if (move.handComplete && move.handResult) {
-      session.game.team_points = move.handResult.teamPoints || [0, 0];
-      session.team_marks = move.handResult.teamMarks || [0, 0];
+      session.game.team_points = move.handResult.teamPoints || (GAME_MODE === 'MOON' ? [0,0,0] : (GAME_MODE === 'TN51' ? [0,0,0] : [0,0]));
+      session.team_marks = move.handResult.teamMarks || (GAME_MODE === 'MOON' ? [0,0,0] : (GAME_MODE === 'TN51' ? [0,0,0] : [0,0]));
       // V10_121g: Ensure status is properly set from host's handResult
       session.status = move.handResult.status || 'Hand over';
       setStatus(session.status);
@@ -14851,9 +14851,9 @@ function updateScoreDisplay(){
       moonBar.style.display = 'flex';
       for(var s = 0; s < 3; s++){
         var el = document.getElementById('moonP'+(s+1)+'Score');
-        if(el) el.textContent = session ? session.team_marks[s] : 0;
+        if(el) el.textContent = (session && session.team_marks && session.team_marks[s] != null) ? session.team_marks[s] : 0;
         var tEl = document.getElementById('moonP'+(s+1)+'Tricks');
-        if(tEl) tEl.textContent = session && session.game ? session.game.tricks_team[s].length : 0;
+        if(tEl) tEl.textContent = (session && session.game && session.game.tricks_team[s]) ? session.game.tricks_team[s].length : 0;
         var bEl = document.getElementById('moonP'+(s+1)+'Bid');
         if(bEl){
           if(session && session.bid_winner_seat === s) bEl.textContent = session.current_bid + (session.moon_shoot ? '\u2605' : '');

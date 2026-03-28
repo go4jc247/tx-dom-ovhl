@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.33.0 — TN51 defender cooperation lead, Moon bidder dump fix verified
+// Version: v17.34.0 — Fix Moon Player 3 NaN score, update version display
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.33.0';
+const CACHE_NAME = 'tx-dom-v17.34.0';
 const urlsToCache = [
   './index.html',
   // CSS
