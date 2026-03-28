@@ -12930,10 +12930,21 @@ function aiWidowSwap(seat){
 
   function tileValue(t, handWithout){
     var val = t[0] + t[1];
+    var isTrump = (trumpMode === 'PIP' && (t[0] === trumpSuit || t[1] === trumpSuit))
+               || (trumpMode === 'DOUBLES' && t[0] === t[1]);
     // Trump tiles are more valuable
-    if(trumpMode === 'PIP' && (t[0] === trumpSuit || t[1] === trumpSuit)) val += 20;
-    if(trumpMode === 'DOUBLES' && t[0] === t[1]) val += 20;
+    if(isTrump) val += 20;
     if(t[0] === t[1]) val += 10; // Doubles generally strong
+    // Count tiles we can win are worth extra
+    var pipSum = t[0] + t[1];
+    if(isTrump && pipSum === 10) val += 8; // trump 10-count: we'll likely win it
+    else if(isTrump && pipSum === 5) val += 4; // trump 5-count: likely win
+    else if(!isTrump && pipSum === 10) val -= 3; // non-trump 10-count: risky to hold
+    // Sequential trump strength: higher-ranked trumps more valuable
+    if(isTrump && trumpMode === 'PIP'){
+      var otherPip = (t[0] === trumpSuit) ? t[1] : t[0];
+      val += otherPip; // 7-6 > 7-3 > 7-0
+    }
     // Bonus for creating/maintaining voids when swapping
     if(handWithout){
       var pA = t[0], pB = t[1];
@@ -12962,7 +12973,19 @@ function aiWidowSwap(seat){
     var pA = hand[i][0], pB = hand[i][1];
     var countA = handWithout.filter(h => h[0] === pA || h[1] === pA).length;
     var countB = handWithout.filter(h => h[0] === pB || h[1] === pB).length;
-    if(Math.min(countA, countB) === 0) gain += 3; // void creation bonus
+    if(Math.min(countA, countB) === 0){
+      gain += 3; // void creation bonus
+      // Extra bonus if the voided suit has count tiles remaining in the game
+      var voidPip = (countA === 0) ? pA : pB;
+      // Count tiles in that suit: 5-X (sum=5) and 10-X or X-10 (sum=10)
+      var suitHasCount = false;
+      for(var pip2 = 0; pip2 <= 6; pip2++){
+        if(pip2 === voidPip) continue;
+        var sum2 = voidPip + pip2;
+        if(sum2 === 5 || sum2 === 10) suitHasCount = true;
+      }
+      if(suitHasCount) gain += 4; // we can trump into count-rich tricks
+    }
     if(gain > bestSwapGain){ bestSwapGain = gain; bestSwapIdx = i; }
   }
 
