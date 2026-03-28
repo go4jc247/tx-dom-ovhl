@@ -3167,8 +3167,11 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       const nonTrumpInSuit = likelyLedPip !== null
         ? plays.filter(p2 => !gameState._is_trump_tile(p2.tile) && (p2.tile[0] === likelyLedPip || p2.tile[1] === likelyLedPip)).length
         : 0;
-      // Trump-led only if ALL or nearly all are trump AND no clear non-trump suit emerged
-      const wasTrumpLedTrick = trumpCount === plays.length || (trumpCount >= plays.length - 1 && nonTrumpInSuit <= 1);
+      // Trump-led only if ALL are trump. If ANY non-trump tile follows a non-trump suit,
+      // it was a non-trump lead (even if most players trumped in — they were void).
+      // Key fix: "3 players trump + 1 in-suit" is NOT trump-led, it's a suit lead where 3 are void.
+      const wasTrumpLedTrick = trumpCount === plays.length
+        || (nonTrumpInSuit === 0 && trumpCount >= plays.length - 1);
 
       if(likelyLedPip !== null && !wasTrumpLedTrick){
         for(const p2 of plays){
