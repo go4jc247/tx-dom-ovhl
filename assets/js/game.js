@@ -5437,17 +5437,24 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       }, 0);
       // With only 1 opponent behind, winning count-laden tricks is much safer
       if(trickCount3 >= 5 || canSetBid){
-        // Find lowest winning card to minimize risk from the one remaining opponent
-        let bestWin3 = highIdx, bestRank3 = Infinity;
+        // Find best winning card — prefer count tiles when bidder team needs count
+        let bestWin3 = highIdx, bestRank3 = Infinity, bestCount3 = 0;
+        const wantCount3 = isBidderTeam && pointsNeeded > 0;
         for(const idx of legal){
           const tile = hand[idx];
           if((tile[0] === ledPip || tile[1] === ledPip) && !gameState._is_trump_tile(tile)){
             const r = gameState._suit_rank(tile, ledPip);
             const rank = r[0] * 100 + r[1];
-            if(rank > winnerRank && rank < bestRank3){ bestRank3 = rank; bestWin3 = idx; }
+            if(rank <= winnerRank) continue;
+            const ps = tile[0] + tile[1];
+            const cnt = (ps === 5) ? 5 : (ps === 10) ? 10 : 0;
+            const preferThis = wantCount3
+              ? (cnt > bestCount3 || (cnt === bestCount3 && rank < bestRank3))
+              : (rank < bestRank3);
+            if(preferThis){ bestRank3 = rank; bestWin3 = idx; bestCount3 = cnt; }
           }
         }
-        return makeResult(bestWin3, "3rd-seat: win for " + (trickCount3 > 0 ? trickCount3 + "pts" : "defense") + " (1 opp left)");
+        return makeResult(bestWin3, "3rd-seat: win for " + (bestCount3 > 0 ? bestCount3 + "pts+" : "") + (trickCount3 > 0 ? trickCount3 + "pts" : "defense") + " (1 opp left)");
       }
     }
 
@@ -7247,7 +7254,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.37.0';  // v17.37.0: Last-in-trick count max, count trump protect
+const MP_VERSION = 'v17.38.0';  // v17.38.0: 3rd-seat count max, follow improvements
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
