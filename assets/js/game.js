@@ -1367,7 +1367,14 @@ class SessionV6_4g{
           this.status += ` Player ${winner+1} wins the game!`;
         }
       } else if(Math.max(this.team_marks[0], this.team_marks[1]) >= this.marks_to_win){
-        const winner=(this.team_marks[0] >= this.team_marks[1]) ? 0 : 1;
+        let winner;
+        if(this.team_marks[0] !== this.team_marks[1]){
+          winner = (this.team_marks[0] > this.team_marks[1]) ? 0 : 1;
+        } else {
+          // Tie: bidding team wins (standard 42 rule)
+          const bidderTeam = this.bid_winner_seat !== undefined ? (this.bid_winner_seat % 2) : 0;
+          winner = bidderTeam;
+        }
         this.status += ` Team ${winner+1} wins the game!`;
       }
     }
@@ -3541,8 +3548,9 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
             // Since we have trump control, opponents can't trump in either
             score += 10; // base bonus for having trump control
 
-            // Penalty for leading count
-            score -= myCount * 2;
+            // Penalty for leading count — harsher if double still in play
+            if(!info.winnerPlayed) score -= myCount * 3;
+            else score -= myCount * 2;
 
             // Prefer lower tiles (let partner play higher)
             score -= pipSum;
@@ -22059,7 +22067,7 @@ document.getElementById('ppHandoffBtn').addEventListener('click', () => {
         sim.current_trick = [];
         const winner = result[1];
         const winnerTeam = sim.team_of(winner);
-        const p1Team = isMoon ? 0 : 0;
+        const p1Team = 0; // P1 is always team 0
 
         if (currentSeat === 0 || isLeading) tricksPlayedByP1++;
 
@@ -22099,7 +22107,7 @@ document.getElementById('ppHandoffBtn').addEventListener('click', () => {
 
     // Collect scores from simulation
     const simPts = sim.team_points.slice();
-    const p1Team = isMoon ? 0 : 0;
+    const p1Team = 0; // P1 is always team 0
 
     // Per-scenario score accumulation
     if (isMoon) {
