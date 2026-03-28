@@ -2771,7 +2771,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     const winnerSeat = gameState._determine_trick_winner();
     currentWinner = winnerSeat;
     partnerWinning = GAME_MODE !== 'MOON' && isSameTeam(winnerSeat) && winnerSeat !== p;
-    if(isNello) bidderWinning = !isSameTeam(winnerSeat);
+    if(isNello) bidderWinning = (winnerSeat === (gameState.bid_winner_seat !== undefined ? gameState.bid_winner_seat : 0));
   }
 
   // ═══════════════════════════════════════════════════════════════════
