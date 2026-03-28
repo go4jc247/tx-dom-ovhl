@@ -4279,14 +4279,20 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       }
     }
     if(highIdx >= 0 && highRank > winnerRank){
-      // Play the LOWEST card that still wins (preserve double/higher cards for later)
-      let bestWinIdx = highIdx, bestWinRank = Infinity;
+      // Play the LOWEST card that still wins (preserve doubles for walking later)
+      let bestWinIdx = highIdx, bestWinRank = Infinity, bestWinIsDouble = true;
       for(const idx of legal){
         const tile = hand[idx];
         if((tile[0] === ledPip || tile[1] === ledPip) && !gameState._is_trump_tile(tile)){
           const r = gameState._suit_rank(tile, ledPip);
           const rank = r[0] * 100 + r[1];
-          if(rank > winnerRank && rank < bestWinRank){ bestWinRank = rank; bestWinIdx = idx; }
+          const isDbl = tile[0] === tile[1];
+          if(rank > winnerRank){
+            // Prefer non-doubles to preserve walking doubles
+            if((!isDbl && bestWinIsDouble) || (isDbl === bestWinIsDouble && rank < bestWinRank)){
+              bestWinRank = rank; bestWinIdx = idx; bestWinIsDouble = isDbl;
+            }
+          }
         }
       }
       return makeResult(bestWinIdx, "Following suit, lowest winning card");
