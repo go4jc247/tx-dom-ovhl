@@ -1449,12 +1449,19 @@ function evaluateHandForBid(hand) {
       const ntDblPips = new Set(ntDoubles.map(d => d[0]));
       const ntOffs = hand.filter(t => t[0] !== t[1] && t[0] !== pip && t[1] !== pip);
       const ntUncovered = ntOffs.filter(t => !ntDblPips.has(t[0]) && !ntDblPips.has(t[1])).length;
-      // Shoot the Moon (bid 7): 6+ trumps with double + 2nd, or 5 trumps with all sides covered
+      // Shoot the Moon (bid 7): very strong hand required
+      // RISK: failing a 7-bid subtracts 7 from your score — extremely punishing
+      // Need 6+ trumps with top 2, or 5 trumps with ALL sides locked down
       if (trumpTiles.length >= 6 && hasSecond) {
         return { action: "bid", bid: 7, marks: 2 };
       }
-      if (trumpTiles.length >= 5 && hasSecond && ntUncovered === 0 && ntDoubles.length >= 1) {
+      // 5 trumps: only shoot if ALL non-trump tiles are covered by doubles AND we have 3rd trump
+      if (trumpTiles.length >= 5 && hasSecond && hasThird && ntUncovered === 0 && ntDoubles.length >= 2) {
         return { action: "bid", bid: 7, marks: 2 };
+      }
+      // 5 trumps with 2nd but weaker coverage: bid 6 instead of 7 (safer)
+      if (trumpTiles.length >= 5 && hasSecond && ntUncovered === 0 && ntDoubles.length >= 1) {
+        return { action: "bid", bid: 6, marks: 1 };
       }
       // Bid 6: 5+ trumps with double + 2nd
       if (trumpTiles.length >= 5 && hasSecond) {
@@ -1481,9 +1488,10 @@ function evaluateHandForBid(hand) {
         return { action: "bid", bid: 5, marks: 1 };
       }
     }
-    // Moon: 6+ doubles → Shoot the Moon with doubles trump
-    if (doubles.length >= 6) return { action: "bid", bid: 7, marks: 2 };
-    // Moon: 5+ doubles → bid 6
+    // Moon: 7+ doubles → Shoot the Moon with doubles trump (very safe)
+    // 6 doubles: bid 6 not 7 — losing even 1 trick with a 7-bid costs 7 points
+    if (doubles.length >= 7) return { action: "bid", bid: 7, marks: 2 };
+    // Moon: 5-6 doubles → bid 6
     if (doubles.length >= 5) return { action: "bid", bid: 6, marks: 1 };
     if (doubles.length >= 4) {
       const dblPips = new Set(doubles.map(d => d[0]));
@@ -2972,43 +2980,50 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   // Total count points still in play (all hands + current trick, excludes completed tricks)
   // suitInfo.countRemaining excludes our hand (marked as "played" in playedSet),
   // so we add back our non-trump count. Trump count handled separately below.
+  // Moon: count is irrelevant (1 point per trick), skip count tallying
   let totalCountRemaining = 0;
-  for(const pip of Object.keys(suitInfo)) totalCountRemaining += suitInfo[pip].countRemaining;
-  // Add non-trump count from our hand (suitInfo excluded these)
-  for(const t of hand){
-    if(gameState._is_trump_tile(t)) continue; // trump handled below
-    const ps = t[0] + t[1];
-    if(ps === 5) totalCountRemaining += 5;
-    else if(ps === 10) totalCountRemaining += 10;
+  if(!isMoon) for(const pip of Object.keys(suitInfo)) totalCountRemaining += suitInfo[pip].countRemaining;
+  if(!isMoon){
+    // Add non-trump count from our hand (suitInfo excluded these)
+    for(const t of hand){
+      if(gameState._is_trump_tile(t)) continue; // trump handled below
+      const ps = t[0] + t[1];
+      if(ps === 5) totalCountRemaining += 5;
+      else if(ps === 10) totalCountRemaining += 10;
+    }
+    // Add trump count (remaining elsewhere + in our hand)
+    for(const t of trumpTilesRemaining){
+      const ps = t[0] + t[1];
+      if(ps === 5) totalCountRemaining += 5;
+      else if(ps === 10) totalCountRemaining += 10;
+    }
+    for(const t of trumpsInHand){
+      const ps = t[0] + t[1];
+      if(ps === 5) totalCountRemaining += 5;
+      else if(ps === 10) totalCountRemaining += 10;
+    }
   }
-  // Add trump count (remaining elsewhere + in our hand)
-  for(const t of trumpTilesRemaining){
-    const ps = t[0] + t[1];
-    if(ps === 5) totalCountRemaining += 5;
-    else if(ps === 10) totalCountRemaining += 10;
-  }
-  for(const t of trumpsInHand){
-    const ps = t[0] + t[1];
-    if(ps === 5) totalCountRemaining += 5;
-    else if(ps === 10) totalCountRemaining += 10;
-  }
-  // Add count from current trick tiles (on the table, not yet awarded)
-  // These are in playedSet so excluded from suitInfo, but the points are still "in play"
-  for(const play of trick){
-    if(!Array.isArray(play)) continue;
-    const t = play[1];
-    if(!t) continue;
-    const ps = t[0] + t[1];
-    if(ps === 5) totalCountRemaining += 5;
-    else if(ps === 10) totalCountRemaining += 10;
+  if(!isMoon){
+    // Add count from current trick tiles (on the table, not yet awarded)
+    // These are in playedSet so excluded from suitInfo, but the points are still "in play"
+    for(const play of trick){
+      if(!Array.isArray(play)) continue;
+      const t = play[1];
+      if(!t) continue;
+      const ps = t[0] + t[1];
+      if(ps === 5) totalCountRemaining += 5;
+      else if(ps === 10) totalCountRemaining += 10;
+    }
   }
 
   // Count points held in our hand vs. available elsewhere
   let countInOurHand = 0;
-  for(const t of hand){
-    const ps = t[0] + t[1];
-    if(ps === 5) countInOurHand += 5;
-    else if(ps === 10) countInOurHand += 10;
+  if(!isMoon){
+    for(const t of hand){
+      const ps = t[0] + t[1];
+      if(ps === 5) countInOurHand += 5;
+      else if(ps === 10) countInOurHand += 10;
+    }
   }
   const countElsewhere = totalCountRemaining - countInOurHand; // count held by others or in play
 
@@ -3599,7 +3614,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   // countNeeded = how many count points we need beyond base trick wins
   // If we hold enough count, we need fewer trick wins; if we don't, we need ALL remaining tricks
   const basePointsPerTrick = isMoon ? 1 : 1; // each trick = 1 point base
-  const countNeeded = isBidderTeam ? Math.max(0, pointsNeeded - tricksLeft) : 0;
+  // Moon: all points come from tricks (1 per trick), count is meaningless
+  const countNeeded = (isBidderTeam && !isMoon) ? Math.max(0, pointsNeeded - tricksLeft) : 0;
   // Can our held count tiles cover the gap?
   const countCanCover = countInOurHand >= countNeeded;
   // If count can cover the gap, we just need to win the tricks we play count in (not ALL tricks)
@@ -4318,7 +4334,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
 
     // ── ENDGAME COUNT HUNT: bidder needs count points to make bid ──
     // Trigger: must-win OR when count alone can close the gap (even before endgame)
-    const countHuntActive = isBidderTeam && !bidIsDoomed && pointsNeeded > 0
+    // Moon mode: count is irrelevant (1 point per trick only) — skip count hunt entirely
+    const countHuntActive = !isMoon && isBidderTeam && !bidIsDoomed && pointsNeeded > 0
       && (mustWin || (countNeeded > 0 && tricksLeft <= 3)
         || (countInOurHand >= pointsNeeded && tricksLeft <= 5 && weHaveTrumpControl));
     // In DOUBLES mode, all doubles are trump — include trump doubles as count hunt candidates

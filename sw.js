@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.16.0 — third-seat awareness, defensive count capture, position-aware play
+// Version: v17.17.0 — Moon mode count guards, Shoot-the-Moon bid tightening
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.16.0';
+const CACHE_NAME = 'tx-dom-v17.17.0';
 const urlsToCache = [
   './index.html',
   // CSS
