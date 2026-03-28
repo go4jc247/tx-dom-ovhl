@@ -4466,10 +4466,13 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       if(isLastInTrick && !partnerWinning && trickCount >= 5){
         return makeResult(winTrumpIdx, "Last in trick: trump to steal " + trickCount + "pts");
       }
-      // isBidderTeam defined above in BID SAFETY section
-      // Always trump if: bidder's team, endgame, trick has count, bid is close, or we can set the bid
-      if(!isBidderTeam && trickCount === 0 && !isEndgame && shouldSaveLastTrump && !bidderIsClose && !canSetBid){
-        // Low-value trick on defense with last trump — save it for a count-heavy trick
+      // TRUMP RATIO CONSERVATION: on defense, save trumps for higher-value tricks
+      // When trumps are scarce relative to remaining tricks, don't waste on 0-count tricks
+      const _trumpRatio = tricksLeft > 0 ? trumpsInHand.length / tricksLeft : 1;
+      const _shouldConserve = !isBidderTeam && trickCount === 0 && !isEndgame && !bidderIsClose && !canSetBid
+        && (shouldSaveLastTrump || (_trumpRatio <= 0.5 && trumpsInHand.length <= 2));
+      if(_shouldConserve){
+        // Low-value trick on defense with scarce trumps — save for count-heavy trick
         // Fall through to dump logic
       } else {
         return makeResult(winTrumpIdx, canSetBid && !isBidderTeam ? "Trump in (setting bid)" : "Trump in to win");
@@ -4482,9 +4485,12 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         const ps = play[1][0] + play[1][1];
         return sum + ((ps === 5) ? 5 : (ps === 10) ? 10 : 0);
       }, 0);
-      // isBidderTeam defined above in BID SAFETY section
-      if(!isBidderTeam && trickCount === 0 && !isEndgame && shouldSaveLastTrump && !bidderIsClose && !canSetBid){
-        // Save last trump for higher-value trick
+      // Same trump ratio conservation for first-trump play
+      const _trumpRatio2 = tricksLeft > 0 ? trumpsInHand.length / tricksLeft : 1;
+      const _shouldConserve2 = !isBidderTeam && trickCount === 0 && !isEndgame && !bidderIsClose && !canSetBid
+        && (shouldSaveLastTrump || (_trumpRatio2 <= 0.5 && trumpsInHand.length <= 2));
+      if(_shouldConserve2){
+        // Save trumps for higher-value trick
       } else {
         return makeResult(anyTrumpIdx, canSetBid && !isBidderTeam ? "Trump in (setting bid)" : "Trump in to win");
       }
