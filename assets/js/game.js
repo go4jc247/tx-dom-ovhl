@@ -16361,15 +16361,21 @@ function processAIBidWithEval(seat, evaluation) {
   }
 
   // If already in multiplier mode, AI with a strong hand should bid the next multiplier up
+  // BUT: moderate escalation — don't blindly escalate with any 2x hand
   const MAX_AI_MULTIPLIER = 4;
   if (biddingState.inMultiplierMode && evalMarks >= 2) {
-    // AI bids one level above the current highest multiplier, capped at MAX_AI_MULTIPLIER
     const nextMult = (biddingState.highMultiplier || 1) + 1;
-    if (nextMult <= MAX_AI_MULTIPLIER) {
+    // Only escalate to 3x with genuinely strong 2x hands (bid at max)
+    // Only escalate to 4x with dominant hands (all doubles or top trump combo)
+    const handIsMaxBid = evaluation.bid >= maxBid;
+    const shouldEscalate = (nextMult <= 2) ||
+      (nextMult === 3 && handIsMaxBid) ||
+      (nextMult === 4 && handIsMaxBid && evalMarks >= 2);
+    if (nextMult <= MAX_AI_MULTIPLIER && shouldEscalate) {
       bidMarks = nextMult;
       bidAmount = maxBid;
     } else {
-      // Cap reached — AI passes instead of escalating further
+      // Not strong enough to escalate — pass
       biddingState.passCount++;
       biddingState.bids.push({ seat, playerNumber: seatToPlayer(seat), bid: "pass" });
       return { action: "pass" };
