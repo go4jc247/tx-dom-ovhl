@@ -14182,6 +14182,13 @@ function aiWidowSwap(seat){
   var bestSwapGain = -Infinity;
 
   for(var i = 0; i < hand.length; i++){
+    var tile = hand[i];
+    // Trump tile protection: penalize swapping out trump tiles heavily
+    var isTrumpTile = false;
+    if(origTrump === 'DOUBLES'){ isTrumpTile = tile[0] === tile[1]; }
+    else if(origTrump !== 'NONE' && origTrump !== 'NELLO' && origTrump !== null){
+      isTrumpTile = tile[0] === Number(origTrump) || tile[1] === Number(origTrump);
+    }
     var postSwapHand = hand.filter(function(_, idx){ return idx !== i; });
     postSwapHand.push(widow);
     // Re-predict optimal trump for this new hand composition
@@ -14189,7 +14196,9 @@ function aiWidowSwap(seat){
     var newScore = evalHand(postSwapHand, newTrump);
     var gain = newScore - origScore;
     // Penalty for changing trump strategy (risky to shift mid-hand)
-    if(newTrump !== origTrump) gain -= 8; // high risk: committed to bid based on original trump
+    if(newTrump !== origTrump) gain -= 8;
+    // Heavy penalty for swapping out trump tiles (trump double = -20, other trump = -12)
+    if(isTrumpTile) gain -= (tile[0] === tile[1]) ? 20 : 12;
     if(gain > bestSwapGain){ bestSwapGain = gain; bestSwapIdx = i; }
   }
 
