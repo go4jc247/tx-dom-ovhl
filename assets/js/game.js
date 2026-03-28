@@ -4398,6 +4398,31 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       }
     }
     if(highIdx >= 0 && highRank > winnerRank){
+      // DEFENSIVE DUCK: on defense, if partner plays after us and likely has a higher card,
+      // duck to let partner win (they can then lead a strategic suit)
+      if(!isBidderTeam && !isMoon && !isLastInTrick && !canSetBid){
+        let partnerAfterUs = false;
+        for(let s = 0; s < gameState.player_count; s++){
+          if(!isSameTeam(s) || s === p) continue;
+          const partnerPlayed = trick.some(play => Array.isArray(play) && play[0] === s);
+          if(!partnerPlayed){ partnerAfterUs = true; break; }
+        }
+        // Duck if: partner plays after us, the double isn't played (partner might have it),
+        // and trick has no count (not worth fighting over)
+        const trickCountDuck = trick.reduce((sum, play) => {
+          if(!Array.isArray(play) || !play[1]) return sum;
+          const ps = play[1][0] + play[1][1];
+          return sum + ((ps === 5) ? 5 : (ps === 10) ? 10 : 0);
+        }, 0);
+        const info = suitInfo[ledPip];
+        if(partnerAfterUs && info && !info.winnerPlayed && trickCountDuck === 0){
+          // Partner might have the double — duck and let them win
+          if(lowIdx >= 0){
+            return makeResult(lowIdx, "Duck: let partner win (double still out)");
+          }
+        }
+      }
+
       // Play the LOWEST card that still wins (preserve doubles for walking later)
       let bestWinIdx = highIdx, bestWinRank = Infinity, bestWinIsDouble = true;
       for(const idx of legal){
