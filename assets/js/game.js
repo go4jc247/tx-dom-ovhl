@@ -3800,7 +3800,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   // Defensive awareness: track bidder's progress toward making/failing bid
   const bidderScore = gameState.team_points[bidderTeamIdx] || 0;
   const bidderNeedsMore = currentBid - bidderScore;
-  const bidderIsClose = !isBidderTeam && bidderNeedsMore > 0 && bidderNeedsMore <= 10;
+  const bidderIsClose = !isBidderTeam && bidderNeedsMore > 0 && bidderNeedsMore <= (isMoon ? 2 : 10);
   const canSetBid = !isBidderTeam && bidderNeedsMore > 0; // opponent's bid can still be set
   // SET BID URGENCY: how realistic is setting the bid? (0-100)
   // High urgency = close to settable, worth aggressive play
@@ -3815,11 +3815,18 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     // Endgame boost: setting gets more urgent as tricks run out
     if(tricksLeft <= 3) setBidUrgency = Math.min(100, setBidUrgency + 20);
     if(tricksLeft <= 2) setBidUrgency = Math.min(100, setBidUrgency + 15);
+    // Mark deficit: when our team is behind in marks, setting becomes more critical
+    if(!isMoon && session && session.team_marks){
+      const ourMarks = session.team_marks[myTeam] || 0;
+      const bidderMarks = session.team_marks[bidderTeamIdx] || 0;
+      if(bidderMarks > ourMarks) setBidUrgency = Math.min(100, setBidUrgency + (bidderMarks - ourMarks) * 5);
+    }
     // Desperation: if bidder winning this hand would win the game, maximum urgency
-    if(isMoon && session && session.team_marks){
+    // Applies to ALL modes — T42/TN51 marks-to-win check, Moon trick-to-win check
+    if(session && session.team_marks){
       const bidderGameScore = session.team_marks[bidderTeamIdx] || 0;
-      const bidWouldGive = bid || 4;
-      if(bidderGameScore + bidWouldGive >= (session.marks_to_win || 21)){
+      const bidWouldGive = isMoon ? (bid || 4) : 1; // Moon: bid amount; T42/TN51: 1 mark per hand
+      if(bidderGameScore + bidWouldGive >= (session.marks_to_win || (isMoon ? 21 : 7))){
         setBidUrgency = 100; // bidder is about to win the game — all-out defense
       }
     }
@@ -3836,8 +3843,10 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   // Moon: no count points, so the count gate doesn't apply
   // Only relax when margin exceeds half the remaining count — keep fighting for count margin
   // Moon: only relax with 2+ trick margin (every trick = 1 point, keep fighting)
+  // Moon: bidder scores bid amount (not tricks won), so once safe, relax with any surplus
+  // T42/TN51: keep fighting until margin exceeds half remaining count
   const canRelax = bidIsSafe && tricksLeft >= 2 && (
-    isMoon ? (pointsNeeded <= -2) : pointsNeeded < -(totalCountRemaining / 2)
+    isMoon ? (pointsNeeded <= -1) : pointsNeeded < -(totalCountRemaining / 2)
   );
   // COUNT-POINT ARITHMETIC: in endgame, compute if count tiles in hand are enough to make bid
   // countNeeded = how many count points we need beyond base trick wins
@@ -4983,7 +4992,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       }
     }
     const countHuntActive = !isMoon && isBidderTeam && !bidIsDoomed && pointsNeeded > 0
-      && (mustWin || (countNeeded > 0 && tricksLeft <= 3)
+      && (mustWin || (countNeeded > 0 && tricksLeft <= 4)
         || (countInOurHand >= pointsNeeded && tricksLeft <= 5 && weHaveTrumpControl)
         || (partnerCanThrowCount && tricksLeft <= 5 && weHaveTrumpControl));
     // In DOUBLES mode, all doubles are trump — include trump doubles as count hunt candidates
@@ -8075,7 +8084,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.90.0';  // v17.90.0: Restore 3-team fallback, team3 marks pass-through, final Moon count purge
+const MP_VERSION = 'v17.91.0';  // v17.91.0: Strategic context: desperation all modes, bidderIsClose mode-aware, mark deficit urgency
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables

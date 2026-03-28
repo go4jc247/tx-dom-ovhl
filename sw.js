@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.90.0 — Restore 3-team fallback, team3 marks pass-through, final Moon count purge
+// Version: v17.91.0 — Strategic context: desperation all modes, bidderIsClose mode-aware, mark deficit urgency
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.90.0';
+const CACHE_NAME = 'tx-dom-v17.91.0';
 const urlsToCache = [
   './index.html',
   // CSS
