@@ -4908,7 +4908,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
 
     // LAST-IN-TRICK ADVANTAGE: When we're the last player, we know exactly what we need
     // If we can win AND there's count in the trick, always win (no need to conserve)
-    if(isLastInTrick && highIdx >= 0 && highRank > winnerRank){
+    // BUT: if partner is already winning, don't overtake — count goes to our team anyway
+    if(isLastInTrick && highIdx >= 0 && highRank > winnerRank && !partnerWinning){
       const trickCountFollow = trick.reduce((sum, play) => {
         if(!Array.isArray(play) || !play[1]) return sum;
         const ps = play[1][0] + play[1][1];
