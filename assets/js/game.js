@@ -2797,6 +2797,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   const totalTricks = gameState.hand_size || 6;
   const posInTrick = trick.length; // 0 = leading, 1 = 2nd, etc.
   const isLastInTrick = posInTrick === gameState.active_players.length - 1;
+  const isThirdSeat = gameState.active_players.length >= 4 && posInTrick === 2; // exactly 1 opponent behind
 
   // ── Led suit via game engine ──
   let ledPip = null;
@@ -5083,6 +5084,30 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       }
     }
 
+    // THIRD-SEAT ADVANTAGE: only 1 opponent left to play — near-perfect info
+    // Safer to win with count tiles (only 1 opponent could over-trump)
+    if(isThirdSeat && highIdx >= 0 && highRank > winnerRank && !partnerWinning){
+      const trickCount3 = trick.reduce((sum, play) => {
+        if(!Array.isArray(play) || !play[1]) return sum;
+        const ps = play[1][0] + play[1][1];
+        return sum + ((ps === 5) ? 5 : (ps === 10) ? 10 : 0);
+      }, 0);
+      // With only 1 opponent behind, winning count-laden tricks is much safer
+      if(trickCount3 >= 5 || canSetBid){
+        // Find lowest winning card to minimize risk from the one remaining opponent
+        let bestWin3 = highIdx, bestRank3 = Infinity;
+        for(const idx of legal){
+          const tile = hand[idx];
+          if((tile[0] === ledPip || tile[1] === ledPip) && !gameState._is_trump_tile(tile)){
+            const r = gameState._suit_rank(tile, ledPip);
+            const rank = r[0] * 100 + r[1];
+            if(rank > winnerRank && rank < bestRank3){ bestRank3 = rank; bestWin3 = idx; }
+          }
+        }
+        return makeResult(bestWin3, "3rd-seat: win for " + (trickCount3 > 0 ? trickCount3 + "pts" : "defense") + " (1 opp left)");
+      }
+    }
+
     if(winnerIsTrump){
       // PARTNER TRUMPED: throw count in-suit if partner has this trick
       if(lowIdx >= 0 && partnerWinning){
@@ -5552,6 +5577,26 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       // LAST-IN-TRICK ADVANTAGE: perfect information — always trump count-heavy opponent tricks
       if(isLastInTrick && !partnerWinning && trickCount >= 5){
         return makeResult(winTrumpIdx, "Last in trick: trump to steal " + trickCount + "pts");
+      }
+      // DEFENSIVE COUNT CAPTURE: on defense, prioritize winning tricks with high count
+      // Use a stronger trump to reduce risk of being over-trumped when stakes are high
+      if(!isBidderTeam && trickCount >= 10 && !partnerWinning && !isLastInTrick){
+        // High-value trick — find our HIGHEST winning non-count trump to secure the steal
+        let secureTrumpIdx = winTrumpIdx, secureTrumpRank = -1;
+        for(const idx of legal){
+          const tile = hand[idx];
+          if(!gameState._is_trump_tile(tile)) continue;
+          const r = getTrumpRankNum(tile);
+          if(r <= highestTrickTrump) continue; // can't win
+          const ps = tile[0] + tile[1];
+          if(ps === 5 || ps === 10) continue; // skip count trumps
+          if(r > secureTrumpRank){ secureTrumpRank = r; secureTrumpIdx = idx; }
+        }
+        return makeResult(secureTrumpIdx, "Defend: secure " + trickCount + "pts with strong trump");
+      }
+      // THIRD-SEAT DEFENSIVE TRUMP: in 3rd seat with count in trick, safe to trump
+      if(isThirdSeat && !partnerWinning && trickCount >= 5 && winTrumpIdx >= 0){
+        return makeResult(winTrumpIdx, "3rd-seat defense: trump for " + trickCount + "pts (1 opp left)");
       }
       // COUNT-DRIVEN URGENCY: on offense, always trump in when we need count points to make bid
       // Even on 0-count tricks, winning trick = 1 point closer to bid
