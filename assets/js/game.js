@@ -5898,6 +5898,17 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       score -= Math.floor(pipSum * 0.5);
       _bd.sumPenalty = -Math.floor(pipSum * 0.5);
 
+      // OPPONENT STRENGTH: prefer dumping tiles in suits opponents are strong in
+      // (we'll lose those suits anyway; save tiles in suits we can win)
+      if(!isMoon && !gameState._is_trump_tile(tile) && tile[0] !== tile[1]){
+        const dumpHighPip = Math.max(tile[0], tile[1]);
+        if(oppSuitSignal[dumpHighPip] && oppSuitSignal[dumpHighPip] >= 15){
+          const oppStrBonus = Math.min(Math.floor(oppSuitSignal[dumpHighPip] / 3), 8);
+          score += oppStrBonus; // dump tiles in opponent strong suits
+          _bd.oppStrengthDump = oppStrBonus;
+        }
+      }
+
       // "Dead" tile bonus: if the double of this suit has been played,
       // this tile can never win its suit — safe to dump
       if(!gameState._is_trump_tile(tile) && tile[0] !== tile[1]){
