@@ -3453,6 +3453,9 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   const countCanCover = countInOurHand >= countNeeded;
   // If count can cover the gap, we just need to win the tricks we play count in (not ALL tricks)
   const mustWinCountTricks = isBidderTeam && !bidIsSafe && countNeeded > 0 && !countCanCover;
+  // DEFENSIVE COUNT DENIAL: opponents mathematically need count to make bid
+  // When bidder needs more points than tricks left, they MUST score count — deny it
+  const opponentsNeedCount = !isBidderTeam && canSetBid && bidderNeedsMore > tricksLeft;
 
   // ═══════════════════════════════════════════════════════════════════
   //  LAST TRUMP PROTECTION
@@ -3907,7 +3910,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     // ── DEFENSIVE LEAD: force bidder to waste trump on low-value tricks ──
     // When on defense, instead of leading our own trumps (which bidder beats),
     // lead suits where the bidder is void — forces them to trump low-count tricks
-    if(!isBidderTeam && !weHaveTrumpControl && nonTrumpDoubles.length > 0 && !isMoon){
+    if(!isBidderTeam && !weHaveTrumpControl && nonTrumpDoubles.length > 0){
       const bidderVoids = voidIn[bidderSeat] || new Set();
       if(bidderVoids.size > 0){
         // Find a non-trump double in a suit the bidder is void in
@@ -3932,7 +3935,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
 
     // ── DEFENSIVE TAP: lead any tile into bidder's void to exhaust trump ──
     // When we have no doubles in the bidder's void suits, lead low non-count singles
-    if(!isBidderTeam && !weHaveTrumpControl && nonTrumpSingles.length > 0 && !isMoon && !canRelax){
+    if(!isBidderTeam && !weHaveTrumpControl && nonTrumpSingles.length > 0 && !canRelax){
       const bidderVoids = voidIn[bidderSeat] || new Set();
       if(bidderVoids.size > 0){
         let bestTapIdx = -1, bestTapScore = -Infinity;
@@ -3959,7 +3962,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     // ── DEFENDER COUNT CAPTURE: lead doubles in count-rich suits to deny bidder points ──
     // When we can set the bid, lead our doubles in suits with lots of remaining count.
     // Winning the double guarantees the trick, then partner can throw count to us.
-    if(!isBidderTeam && canSetBid && !isMoon && nonTrumpDoubles.length > 0){
+    if(!isBidderTeam && canSetBid && nonTrumpDoubles.length > 0){
       let bestCapIdx = -1, bestCapScore = -Infinity;
       for(const idx of nonTrumpDoubles){
         const pip = hand[idx][0];
@@ -4122,7 +4125,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     // ── PHASE B: WE HAVE TRUMP CONTROL — play doubles, try partner-in-lead ──
     // BIDDER'S PARTNER TRUMP PULL: when we have trump control and bidder needs points,
     // pull remaining opponent trumps to clear the way for bidder's off-suit winners
-    if(iAmBidderPartner && weHaveTrumpControl && !bidIsSafe && bidderNeedsMore > 0 && trumpTilesRemaining.length > 0){
+    if(iAmBidderPartner && !isMoon && weHaveTrumpControl && !bidIsSafe && bidderNeedsMore > 0 && trumpTilesRemaining.length > 0){
       // Only pull if opponents still have trump (don't waste pulling partner/bidder trumps)
       let oppsHaveTrump = false;
       for(const rt of trumpTilesRemaining){
@@ -4274,6 +4277,10 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           if(dblSum === 10) score -= 15;
           else if(dblSum === 5) score -= 8;
         }
+        // Depleted-suit bonus: doubles in nearly-empty suits are safer
+        // (fewer opponents can follow, more likely to walk)
+        if(info.tilesLeft <= 2) score += 10;
+        else if(info.tilesLeft <= 4) score += 5;
         if(score > bestScore){ bestScore = score; bestIdx = idx; }
       }
       return makeResult(bestIdx, "Lead: double (controls suit)");
@@ -5093,7 +5100,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         // More opponents remaining = higher risk of losing count
         // EXTRA protection when we need these count points to make bid
         const countMult = oppWinning ? 5 : (3 + _oppsStillToPlay);
-        const countProtect = mustWinCountTricks ? 2 : 1; // double penalty if we need count to bid
+        // Double penalty if we need count for our bid, OR if opponents need count (deny it)
+        const countProtect = (mustWinCountTricks || opponentsNeedCount) ? 2 : 1;
         const countPenalty = Math.min(myCount * countMult * countProtect, 80); // cap at 80
         score -= countPenalty;
         _bd.countPenalty = -countPenalty;
