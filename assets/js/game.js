@@ -6192,7 +6192,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       // When trumps are scarce relative to remaining tricks, don't waste on 0-count tricks
       const _trumpRatio = tricksLeft > 0 ? trumpsInHand.length / tricksLeft : 1;
       // Don't conserve if bidder is close to making — we need every trick to defend
-      const bidderNearMaking = bidderNeedsMore <= tricksLeft + 5;
+      // +2 margin (was +5): allow conservation when bidder still needs significantly more than tricks left
+      const bidderNearMaking = bidderNeedsMore <= tricksLeft + 2;
       // Moon: never conserve based on count — every trick is worth 1 point regardless of count
       const _shouldConserve = !isMoon && !isBidderTeam && trickCount === 0 && !isEndgame && !bidderIsClose && !canSetBid
         && !bidderNearMaking
@@ -6220,7 +6221,24 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
             return makeResult(_ncWinIdx, (canSetBid && !isBidderTeam ? "Trump in (setting bid)" : "Trump in") + " — non-count to protect " + winTrumpCountVal + "pts");
           }
         }
-        return makeResult(winTrumpIdx, canSetBid && !isBidderTeam ? "Trump in (setting bid)" : "Trump in to win");
+        // OVER-TRUMP RISK: when not last in trick and opponents are behind,
+        // check if remaining unplayed trumps could beat our winning trump
+        // If our trump is mid-rank and higher trumps are still out, consider saving it
+        if(!isLastInTrick && !isBidderTeam && trickCount === 0 && !canSetBid && trumpTilesRemaining.length > 0){
+          const winRank = getTrumpRankNum(hand[winTrumpIdx]);
+          let higherTrumpsOut = 0;
+          for(const rt of trumpTilesRemaining){
+            if(getTrumpRankNum(rt) > winRank) higherTrumpsOut++;
+          }
+          // If 2+ higher trumps remain and trick has no count, save our trump
+          if(higherTrumpsOut >= 2 && trumpsInHand.length <= 2){
+            // Fall through to dump — our trump would likely be over-trumped anyway
+          } else {
+            return makeResult(winTrumpIdx, canSetBid && !isBidderTeam ? "Trump in (setting bid)" : "Trump in to win");
+          }
+        } else {
+          return makeResult(winTrumpIdx, canSetBid && !isBidderTeam ? "Trump in (setting bid)" : "Trump in to win");
+        }
       }
     }
     if(anyTrumpIdx >= 0 && highestTrickTrump < 0){
@@ -6232,7 +6250,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       }, 0);
       // Same trump ratio conservation for first-trump play
       const _trumpRatio2 = tricksLeft > 0 ? trumpsInHand.length / tricksLeft : 1;
-      const bidderNearMaking2 = bidderNeedsMore <= tricksLeft + 5;
+      const bidderNearMaking2 = bidderNeedsMore <= tricksLeft + 2;
       const _shouldConserve2 = !isMoon && !isBidderTeam && trickCount === 0 && !isEndgame && !bidderIsClose && !canSetBid
         && !bidderNearMaking2
         && (shouldSaveLastTrump || (_trumpRatio2 <= 0.5 && trumpsInHand.length <= 2));
@@ -6269,25 +6287,11 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         }
       }
     }
-    // Endgame desperation: trump in even if we can't beat existing trump
-    // to prevent opponents from scoring count and to use remaining trumps
-    // BUT only if our trump can actually WIN this trick (don't waste losing trumps)
-    if(mustWin && anyTrumpIdx >= 0 && !partnerHasTrumpInTrick){
-      // Check if we can actually beat what's on the table
-      if(winTrumpIdx >= 0){
-        return makeResult(winTrumpIdx, "Endgame: desperate trump in (can win)");
-      }
-      // Can't win — only play trump if trick has significant count worth contesting
-      const desperateCount = trick.reduce((sum, play) => {
-        if(!Array.isArray(play) || !play[1]) return sum;
-        const ps = play[1][0] + play[1][1];
-        return sum + ((ps === 5) ? 5 : (ps === 10) ? 10 : 0);
-      }, 0);
-      if(desperateCount >= 5){
-        return makeResult(anyTrumpIdx, "Endgame: desperate trump (can't win but contesting count)");
-      }
-      // No count, can't win — fall through to dump instead of wasting trump
+    // Endgame desperation: trump in if we CAN win this trick
+    if(mustWin && winTrumpIdx >= 0 && !partnerHasTrumpInTrick){
+      return makeResult(winTrumpIdx, "Endgame: desperate trump in (can win)");
     }
+    // If we CAN'T beat existing trump, never play a losing trump — fall through to dump
     // Can't beat existing trump — fall through to dump
   }
 
@@ -7457,7 +7461,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.51.0';  // v17.51.0: widow swap void creation, DFM pip quality, doubles trump bias
+const MP_VERSION = 'v17.52.0';  // v17.52.0: trump-in over-trump risk, conservation fix, remove losing trump waste
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables

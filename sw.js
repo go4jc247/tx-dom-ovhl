@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.51.0 — widow swap void creation, DFM pip quality, doubles trump bias
+// Version: v17.52.0 — trump-in over-trump risk, conservation fix
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.51.0';
+const CACHE_NAME = 'tx-dom-v17.52.0';
 const urlsToCache = [
   './index.html',
   // CSS
