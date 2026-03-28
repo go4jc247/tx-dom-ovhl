@@ -4484,10 +4484,27 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           if(hasCoveredOff) score += 20;
           // Depleted-suit bonus: fewer remaining tiles = safer double lead
           if(info.tilesLeft <= 2) score += 8;
-          // Count-safe: avoid leading count doubles when we might need those points
+          // Opponent void bonus: if opponents are void in this suit, our double is ultra-safe
+          let oppsVoidB = 0;
+          for(let s = 0; s < gameState.player_count; s++){
+            if(isSameTeam(s) || !gameState.active_players.includes(s)) continue;
+            if(voidIn[s].has(pip)) oppsVoidB++;
+          }
+          if(oppsVoidB > 0) score += 5; // opponents can't follow — but they also can't contribute count
+          // Count doubles with trump control: SAFE to lead and capture (opponents can't trump)
+          // Bidder team should PREFER count doubles when points are needed (guaranteed count win)
+          // Defenders should avoid giving away count on doubles they lead
           const dblSum = pip + pip;
           const dblIsCount = (dblSum === 5 || dblSum === 10);
-          if(dblIsCount && isBidderTeam && pointsNeeded > 0) score -= 10;
+          if(dblIsCount){
+            if(isBidderTeam && pointsNeeded > 0){
+              // Trump control = safe to lead count double for guaranteed capture
+              score += dblSum === 10 ? 10 : 5;
+            } else if(!isBidderTeam){
+              // Defender: count double gives points to US (defender) — slightly prefer it
+              score += 3;
+            }
+          }
           if(score > bestScore){ bestScore = score; bestIdx = idx; }
         }
         return makeResult(bestIdx, "Lead: double (trump control, safe win)");
