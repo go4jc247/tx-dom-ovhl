@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.20.0 — opponent strength dump scoring, Moon opponent leads
+// Version: v17.21.0 — fix Moon failed bid scoring (subtract bid from score, can go negative)
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.20.0';
+const CACHE_NAME = 'tx-dom-v17.21.0';
 const urlsToCache = [
   './index.html',
   // CSS

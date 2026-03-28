@@ -1289,13 +1289,13 @@ class SessionV6_4g{
           this.team_marks[bidderSeat] += 21;
           this.status = `Shoot the Moon! P${bidderSeat+1} took all 7 tricks. +21 points!`;
         } else {
-          // Shoot the moon fail: -21 points (floor at 0)
-          this.team_marks[bidderSeat] = Math.max(0, this.team_marks[bidderSeat] - 21);
+          // Shoot the moon fail: subtract 21 from bidder's score (CAN go negative)
+          this.team_marks[bidderSeat] -= 21;
           // Other players score their tricks
           for(let s = 0; s < 3; s++){
             if(s !== bidderSeat) this.team_marks[s] += this.game.tricks_team[s].length;
           }
-          this.status = `Shoot the Moon failed! P${bidderSeat+1} only took ${bidderTricks}. -21 points!`;
+          this.status = `Shoot the Moon failed! P${bidderSeat+1} only took ${bidderTricks}. -21 points! (${this.team_marks[bidderSeat]})`;
         }
       } else if(bidderTricks >= bidAmount){
         // Bid made: bidder scores their bid amount (capped, not actual tricks), others score their tricks
@@ -1305,13 +1305,15 @@ class SessionV6_4g{
         }
         this.status = `Bid made! P${bidderSeat+1} took ${bidderTricks} (bid ${bidAmount}). +${bidAmount} to P${bidderSeat+1}. Others score tricks.`;
       } else {
-        // Bid failed: bidder scores 0, others get their tricks + the bid
+        // Bid failed: subtract bid amount from bidder's score (CAN go negative)
+        // e.g., score 10, bid 5, fail → score becomes 5 (10 - 5)
+        // e.g., score 3, bid 5, fail → score becomes -2 (3 - 5)
+        this.team_marks[bidderSeat] -= bidAmount;
+        // Other players score their tricks
         for(let s = 0; s < 3; s++){
-          if(s !== bidderSeat){
-            this.team_marks[s] += this.game.tricks_team[s].length + bidAmount;
-          }
+          if(s !== bidderSeat) this.team_marks[s] += this.game.tricks_team[s].length;
         }
-        this.status = `Bid failed! P${bidderSeat+1} took ${bidderTricks} (bid ${bidAmount}). Opponents score tricks + ${bidAmount}.`;
+        this.status = `Bid failed! P${bidderSeat+1} took ${bidderTricks} (bid ${bidAmount}). -${bidAmount} points! (${this.team_marks[bidderSeat]})`;
       }
 
       // Check for Moon game winner (first to 21+)
