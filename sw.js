@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.78.0 — Signal tracking: opp decay, led-pip heuristic fix
+// Version: v17.79.0 — Moon count-tile fixes, widow swap, desperation defense
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.78.0';
+const CACHE_NAME = 'tx-dom-v17.79.0';
 const urlsToCache = [
   './index.html',
   // CSS

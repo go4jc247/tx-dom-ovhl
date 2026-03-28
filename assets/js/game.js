@@ -3774,6 +3774,14 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     // Endgame boost: setting gets more urgent as tricks run out
     if(tricksLeft <= 3) setBidUrgency = Math.min(100, setBidUrgency + 20);
     if(tricksLeft <= 2) setBidUrgency = Math.min(100, setBidUrgency + 15);
+    // Desperation: if bidder winning this hand would win the game, maximum urgency
+    if(isMoon && session && session.team_marks){
+      const bidderGameScore = session.team_marks[bidderTeamIdx] || 0;
+      const bidWouldGive = bid || 4;
+      if(bidderGameScore + bidWouldGive >= (session.marks_to_win || 21)){
+        setBidUrgency = 100; // bidder is about to win the game — all-out defense
+      }
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════════
@@ -4360,7 +4368,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           if(info && !info.winnerPlayed && !dbl) score -= 15; // double not out = risky
 
           // Count awareness: avoid leading count tiles (risk giving bidder points)
-          if(myCount > 0 && !dbl) score -= myCount;
+          // In Moon, count tiles have no special value — skip this penalty
+          if(!isMoon && myCount > 0 && !dbl) score -= myCount;
 
           // Covered offs are safe leads (double in hand + this tile)
           if(!dbl && !isTrump){
@@ -7936,7 +7945,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.78.0';  // v17.78.0: opp signal void decay, led-pip heuristic double-count fix
+const MP_VERSION = 'v17.79.0';  // v17.79.0: Moon count-tile fixes (lead + widow), desperation defense
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
@@ -15950,13 +15959,18 @@ function aiWidowSwap(seat){
           var otherPip = (t[0] === ts) ? t[1] : t[0];
           score += otherPip; // higher sequential trump = stronger
         }
-        // Trump count we'll likely win
-        if(pipSum === 10) score += 10;
-        else if(pipSum === 5) score += 5;
+        // Trump count we'll likely win (not relevant in Moon — tricks only)
+        if(GAME_MODE !== 'MOON'){
+          if(pipSum === 10) score += 10;
+          else if(pipSum === 5) score += 5;
+        }
       } else {
-        // Non-trump count is risky in Moon (individual scoring)
-        if(pipSum === 10) score -= 8;
-        else if(pipSum === 5) score -= 5;
+        // Non-trump count is risky (opponents may capture)
+        // In Moon, count tiles have no special value — skip penalty
+        if(GAME_MODE !== 'MOON'){
+          if(pipSum === 10) score -= 8;
+          else if(pipSum === 5) score -= 5;
+        }
       }
 
       // Doubles are strong (control their suit)
