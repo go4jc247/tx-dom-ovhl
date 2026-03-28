@@ -12837,30 +12837,53 @@ function _cleanupWidowSwap(){
 }
 
 function aiWidowSwap(seat){
-  // Simple AI: swap widow with worst tile if widow is better
+  // Enhanced AI widow swap: considers voids, trump strength, and count tiles
   if(!session || !session.moon_widow) { session.skipWidow(); afterWidowSwap(); return; }
   var hand = session.game.hands[seat];
   var widow = session.moon_widow;
   var trumpSuit = session.game.trump_suit;
   var trumpMode = session.game.trump_mode;
 
-  function tileValue(t){
+  function tileValue(t, handWithout){
     var val = t[0] + t[1];
     // Trump tiles are more valuable
     if(trumpMode === 'PIP' && (t[0] === trumpSuit || t[1] === trumpSuit)) val += 20;
     if(trumpMode === 'DOUBLES' && t[0] === t[1]) val += 20;
     if(t[0] === t[1]) val += 10; // Doubles generally strong
+    // Bonus for creating/maintaining voids when swapping
+    if(handWithout){
+      var pA = t[0], pB = t[1];
+      var cntA = 0, cntB = 0;
+      for(var h of handWithout){
+        if(h[0] === pA || h[1] === pA) cntA++;
+        if(h[0] === pB || h[1] === pB) cntB++;
+      }
+      // If removing this tile creates a void, it's less valuable to keep
+      if(Math.min(cntA, cntB) === 0) val -= 5;
+    }
     return val;
   }
 
-  var widowVal = tileValue(widow);
-  var worstIdx = 0, worstVal = tileValue(hand[0]);
-  for(var i = 1; i < hand.length; i++){
-    var v = tileValue(hand[i]);
-    if(v < worstVal){ worstVal = v; worstIdx = i; }
+  // Evaluate each possible swap: try replacing each hand tile with the widow
+  var bestSwapIdx = -1;
+  var bestSwapGain = 0;
+  var widowVal = tileValue(widow, null);
+
+  for(var i = 0; i < hand.length; i++){
+    var handWithout = hand.filter((_, idx) => idx !== i);
+    var removedVal = tileValue(hand[i], handWithout);
+    var addedVal = tileValue(widow, handWithout);
+    var gain = addedVal - removedVal;
+    // Also consider if swapping creates a void (bonus)
+    var pA = hand[i][0], pB = hand[i][1];
+    var countA = handWithout.filter(h => h[0] === pA || h[1] === pA).length;
+    var countB = handWithout.filter(h => h[0] === pB || h[1] === pB).length;
+    if(Math.min(countA, countB) === 0) gain += 3; // void creation bonus
+    if(gain > bestSwapGain){ bestSwapGain = gain; bestSwapIdx = i; }
   }
-  if(widowVal > worstVal){
-    session.swapWidow(worstIdx);
+
+  if(bestSwapIdx >= 0){
+    session.swapWidow(bestSwapIdx);
   } else {
     session.skipWidow();
   }
