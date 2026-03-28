@@ -6247,8 +6247,15 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           for(const rt of trumpTilesRemaining){
             if(getTrumpRankNum(rt) > winRank) higherTrumpsOut++;
           }
+          // If we KNOW who holds the remaining trump and they've already played in this trick,
+          // they can't over-trump us — safe to play
+          let knownHolderAlreadyPlayed = false;
+          if(knownTrumpHolder >= 0){
+            knownHolderAlreadyPlayed = trick.some(play => Array.isArray(play) && play[0] === knownTrumpHolder);
+          }
           // If 2+ higher trumps remain and trick has no count, save our trump
-          if(higherTrumpsOut >= 2 && trumpsInHand.length <= 2){
+          // UNLESS the known trump holder has already played (can't over-trump)
+          if(higherTrumpsOut >= 2 && trumpsInHand.length <= 2 && !knownHolderAlreadyPlayed){
             // Fall through to dump — our trump would likely be over-trumped anyway
           } else {
             return makeResult(winTrumpIdx, canSetBid && !isBidderTeam ? "Trump in (setting bid)" : "Trump in to win");
@@ -7478,7 +7485,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.53.0';  // v17.53.0: off-tracker trick index fix, per-opponent trump deduction
+const MP_VERSION = 'v17.54.0';  // v17.54.0: knownTrumpHolder integration in over-trump risk check
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
