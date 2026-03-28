@@ -1807,8 +1807,9 @@ function aiChooseTrump(hand, bidAmount) {
     if (hasDouble && hasSecond && hasThird) score += 10;
     // Gap penalty: scattered trumps (double + gap) are weak because opponents
     // hold the gap cards and beat our lower trumps
-    if (hasDouble && !hasSecond && trumpTiles.length >= 3) score -= 5;
-    if (hasDouble && hasSecond && !hasThird && trumpTiles.length >= 4) score -= 3;
+    // Scale penalty with trump count — more scattered trumps = worse control loss
+    if (hasDouble && !hasSecond && trumpTiles.length >= 3) score -= 5 + (trumpTiles.length - 3) * 3;
+    if (hasDouble && hasSecond && !hasThird && trumpTiles.length >= 4) score -= 3 + (trumpTiles.length - 4) * 2;
 
     // Void suit bonus: if choosing this trump leaves us void in other suits,
     // we can trump in when those suits are led
@@ -1828,7 +1829,19 @@ function aiChooseTrump(hand, bidAmount) {
       const hasDoubleSuit = hand.some(t => t[0] === s && t[1] === s);
       if (!hasSuit && !hasDoubleSuit) voidSuits++;
     }
-    score += voidSuits * 7; // each void suit = opportunity to trump in
+    // Moon: voids are more valuable (no partner to rely on) — must trump in yourself
+    const voidBonus = isMoon ? 12 : 7;
+    score += voidSuits * voidBonus;
+    // Near-void bonus: suits with exactly 1 non-trump tile are close to becoming voids
+    // (dump that one tile and we can trump in the rest of the game)
+    let nearVoids = 0;
+    for (let s = 0; s <= maxPip; s++) {
+      if (s === pip) continue;
+      const tilesInSuit = nonTrumpTiles.filter(t =>
+        (t[0] === s || t[1] === s) && !(t[0] === t[1]));
+      if (tilesInSuit.length === 1) nearVoids++;
+    }
+    score += nearVoids * 3;
 
     // Non-trump doubles bonus: each non-trump double is a guaranteed trick win
     // (the double always wins its suit unless trumped)
@@ -1856,12 +1869,25 @@ function aiChooseTrump(hand, bidAmount) {
 
     // Count tile awareness: penalty if our trump tiles are count tiles
     // (10-count: pip sum = 10; 5-count: pip sum = 5)
-    // These are valuable points we'd rather capture, not risk losing
+    // BUT skip penalty for sequentially protected trumps (they're safe winners)
+    // The double is always safe. 2nd is safe if we hold double. 3rd is safe if we hold double+2nd.
     let countExposure = 0;
-    for (const t of trumpTiles) {
-      const sum = t[0] + t[1];
-      if (sum === 10) countExposure += 3;
-      else if (sum === 5) countExposure += 2;
+    if (!isMoon) { // Moon scoring ignores count — no penalty needed
+      for (const t of trumpTiles) {
+        const sum = t[0] + t[1];
+        if (sum !== 5 && sum !== 10) continue;
+        const isDouble = t[0] === t[1];
+        if (isDouble) continue; // double is unbeatable — never penalize
+        const otherPip = t[0] === pip ? t[1] : t[0];
+        const isSecond = otherPip === pip - 1;
+        const isThird = otherPip === pip - 2;
+        // Skip if sequentially protected
+        if (isSecond && hasDouble) continue;
+        if (isThird && hasDouble && hasSecond) continue;
+        // Unprotected count trump — penalize
+        if (sum === 10) countExposure += 3;
+        else countExposure += 2;
+      }
     }
     score -= countExposure;
 
@@ -1877,8 +1903,9 @@ function aiChooseTrump(hand, bidAmount) {
   // ── Score NO TRUMP (NONE) alongside pip suits ──
   // NT is strong with many doubles spread across different suits + covered offs
   // In NT, each double is the guaranteed winner of its suit (no trumping possible)
+  let ntScore = -Infinity;
   if (doubles.length >= 3) {
-    let ntScore = 0;
+    ntScore = 0;
     // Each double wins its suit outright
     ntScore += doubles.length * 14;
     // Count covered offs (non-double tiles where we hold that suit's double)
@@ -1919,15 +1946,13 @@ function aiChooseTrump(hand, bidAmount) {
       if (!ntAllPips.has(s)) ntVoids++;
     }
     ntScore -= ntVoids * 3;
-    // Threshold: NT must beat best pip suit (NT is riskier with no trump protection)
-    if (ntScore > bestScore + 3) {
-      return "NONE";
-    }
+    // NT threshold saved for competitive evaluation below
   }
 
   // ── Score DOUBLES trump alongside pip suits ──
+  let doublesScore = -Infinity;
   if (doubles.length >= 3) {
-    let doublesScore = 0;
+    doublesScore = 0;
     // Each double is a guaranteed trump trick (ranked by pip value)
     doublesScore += doubles.length * 18;
     // Bonus for overwhelming trump count
@@ -1973,17 +1998,20 @@ function aiChooseTrump(hand, bidAmount) {
       const dfmBonus = (doubles.length >= 5 ? 15 : doubles.length >= 4 ? 12 : 8) + highDoubleBonus;
       doublesScore += dfmBonus;
     }
-    // Compare DOUBLES vs best pip suit — bias scales with risk (fewer doubles = more risk)
-    // 3 doubles in 7-tile hand = 4 unprotected tiles → need +8 advantage
-    // 4 doubles = 3 unprotected → need +4 advantage
-    // 5+ doubles = 2 or fewer unprotected → need only +2
+    // Apply bias — fewer doubles = more risk
     const doublesBias = doubles.length >= 5 ? 2 : doubles.length >= 4 ? 4 : 8;
-    if (doublesScore > bestScore + doublesBias) {
-      return "DOUBLES";
-    }
+    doublesScore -= doublesBias; // normalize for competitive comparison
   }
 
-  return bestSuit !== null ? bestSuit : maxPip;
+  // ── COMPETITIVE EVALUATION: pick the global best among pip, NT, DOUBLES ──
+  const ntAdjusted = (typeof ntScore !== 'undefined' && ntScore > -Infinity) ? ntScore - 3 : -Infinity;
+  const candidates = [
+    { suit: bestSuit !== null ? bestSuit : maxPip, score: bestScore },
+    { suit: "NONE", score: ntAdjusted },
+    { suit: "DOUBLES", score: doublesScore }
+  ];
+  candidates.sort((a, b) => b.score - a.score);
+  return candidates[0].suit;
 }
 
 // AI Tile Selection — v3: full strategy (void tracking, trump control, bid safety, partner play)
@@ -7677,7 +7705,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.63.0';  // v17.63.0: Nello Set bug fix, Moon opponent in-suit follow, Moon lead threshold
+const MP_VERSION = 'v17.64.0';  // v17.64.0: trump selection overhaul — competitive eval, gap penalty, count protection, Moon voids
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
