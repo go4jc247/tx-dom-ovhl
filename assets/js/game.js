@@ -3748,15 +3748,24 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         ? legal.some(i => hand[i][0] === hand[i][1])
         : (ledPip !== null && ledPip >= 0 && legal.some(i => hand[i][0] === ledPip || hand[i][1] === ledPip));
       if(!hasInSuit){
-        // Prefer dumping doubles (dangerous when led) and high-pip tiles
+        // Smart dump: prefer voiding suits (reduces future liability) + dump dangerous tiles
         let dumpIdx = legal[0], dumpScore = -Infinity;
         for(const idx of legal){
           const tile = hand[idx];
           const isDbl = tile[0] === tile[1];
-          let sc = tile[0] + tile[1] + (isDbl ? 5 : 0); // doubles slightly more dangerous (win their suit), pip sum is primary
+          const pipSum = tile[0] + tile[1];
+          let sc = pipSum;
+          // Doubles are very dangerous (they WIN their suit when led) — dump aggressively
+          // Scale with pip value: high doubles are far more dangerous
+          if(isDbl) sc += pipSum >= 8 ? 15 : pipSum >= 4 ? 10 : 5;
+          // Void-creation bonus: if this is our last card in a suit, dumping it voids us
+          // (being void means we can't be forced to follow in that suit later)
+          const suitPip = Math.max(tile[0], tile[1]);
+          const suitCount = hand.filter(h => h !== tile && (h[0] === suitPip || h[1] === suitPip)).length;
+          if(suitCount === 0) sc += 8; // voiding this suit = future safety
           if(sc > dumpScore){ dumpScore = sc; dumpIdx = idx; }
         }
-        return makeResult(dumpIdx, "Nel-O bidder: off-suit dump dangerous tile");
+        return makeResult(dumpIdx, "Nel-O bidder: off-suit dump (void/danger priority)");
       }
       return makeResult(lowIdx, "Nel-O bidder: play low (no safe dump)");
     }
