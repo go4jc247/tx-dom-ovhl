@@ -1851,6 +1851,14 @@ function aiChooseTrump(hand, bidAmount) {
       if (ntDoublePips.has(t[0]) || ntDoublePips.has(t[1])) ntCoveredOffs++;
     }
     ntScore += ntCoveredOffs * 8; // covered offs are near-guaranteed in NT
+    // Covered count bonus: count tiles protected by their suit's double are safe points
+    for (const t of hand) {
+      if (t[0] === t[1]) continue;
+      if (!ntDoublePips.has(t[0]) && !ntDoublePips.has(t[1])) continue;
+      const sum = t[0] + t[1];
+      if (sum === 10) ntScore += 5; // 10-count safely captured in NT
+      else if (sum === 5) ntScore += 3; // 5-count safely captured
+    }
     // Bonus for diverse doubles (spread across suits = control more suits)
     ntScore += ntDoublePips.size * 3;
     // Penalty for uncovered singles (no double for their suit = risky)
@@ -1919,8 +1927,10 @@ function aiChooseTrump(hand, bidAmount) {
     doublesScore += doublesVoids * 5;
     // DFM bonus: when Doubles Follow Me is active, leading a trump double forces
     // opponents to play their doubles — this strips their suit control massively
+    // Scale with doubles count: more doubles = more DFM rounds = more stripping
     if (typeof doublesFollowMe !== 'undefined' && doublesFollowMe !== 'off') {
-      doublesScore += 8; // DFM makes DOUBLES significantly stronger
+      const dfmBonus = doubles.length >= 5 ? 15 : doubles.length >= 4 ? 12 : 8;
+      doublesScore += dfmBonus;
     }
     // Compare DOUBLES vs best pip suit (+2 bias: DOUBLES is non-standard, needs clear advantage)
     if (doublesScore > bestScore + 2) {
@@ -17785,9 +17795,9 @@ function processAIBid(seat) {
     const isEarlyBidder = myIdx <= 1 && totalBidders >= 4; // first 2 of 4+ bidders
     const minBid = GAME_MODE === 'MOON' ? 4 : (GAME_MODE === 'T42' ? 30 : 34);
     const midBid = GAME_MODE === 'MOON' ? 5 : (GAME_MODE === 'T42' ? 36 : 39);
-    if (isEarlyBidder && evaluation.bid <= midBid && (evaluation.marks || 1) === 1) {
-      // Borderline hand in early position — pass and let partner evaluate
-      // Exception: if bid is above midBid or has marks, it's strong enough
+    if (isEarlyBidder && evaluation.bid <= minBid && (evaluation.marks || 1) === 1) {
+      // Minimum-bid hand in early position — pass and let partner evaluate
+      // Only suppress true min-bid hands, not mid/max bids (those are strong enough to open)
       biddingState.passCount++;
       biddingState.bids.push({ seat, playerNumber: seatToPlayer(seat), bid: "pass" });
       return { action: "pass" };
