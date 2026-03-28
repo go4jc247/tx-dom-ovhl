@@ -4759,6 +4759,22 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
               score += Math.floor(info.countRemaining * 0.8);
               _breakdown.setBidCountBonus = Math.floor(info.countRemaining * 0.8);
             }
+            // DEFENSIVE HIGH-CARD LEAD: in depleted suits where we hold the highest
+            // remaining card, leading it is a safe trick win that denies bidder
+            if(info && info.tilesLeft <= 2 && info.winnerPlayed){
+              // Double is out and few tiles left — our high card likely wins
+              const highPip = Math.max(tile[0], tile[1]);
+              const lowPip = Math.min(tile[0], tile[1]);
+              // Check if we're likely the highest remaining
+              let weAreHighest = true;
+              for(let checkPip = highPip - 1; checkPip > lowPip; checkPip--){
+                if(!isPlayed(highPip, checkPip)){ weAreHighest = false; break; }
+              }
+              if(weAreHighest){
+                score += 12;
+                _breakdown.defHighCardBonus = 12;
+              }
+            }
           }
         }
 
