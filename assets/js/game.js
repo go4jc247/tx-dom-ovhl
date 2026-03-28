@@ -2875,7 +2875,9 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   const totalTricks = gameState.hand_size || 6;
   const posInTrick = trick.length; // 0 = leading, 1 = 2nd, etc.
   const isLastInTrick = posInTrick === gameState.active_players.length - 1;
-  const isThirdSeat = gameState.active_players.length >= 4 && posInTrick === 2; // exactly 1 opponent behind
+  // Third seat = exactly 1 player behind us (penultimate position)
+  // T42: position 2 of 4. TN51: position 4 of 6. Dynamic for any player count.
+  const isThirdSeat = posInTrick === gameState.active_players.length - 2;
 
   // ── Led suit via game engine ──
   let ledPip = null;
@@ -3418,12 +3420,21 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
             }
           }
 
-          const N = opponentsInTrick.length; // opponents who played trump
+          const N = opponentsInTrick.length; // opponents who played trump in this trick
           // Effective unaccounted = total unaccounted minus partner hold-backs
           const U = Math.max(0, unaccountedAfterTrick.length - partnerHoldBack);
+          // Total opponents (not just those in this trick) — unaccounted trumps spread across all
+          let totalOpps = 0;
+          for(let s2 = 0; s2 < gameState.player_count; s2++){
+            if(isSameTeam(s2) || !gameState.active_players.includes(s2)) continue;
+            totalOpps++;
+          }
+          // Use max of trick opponents and total opponents for probability
+          // In TN51 (4 opps), unaccounted trumps spread thinner than in T42 (2 opps)
+          const effectiveN = Math.max(N, totalOpps);
 
           // Calculate void probability for each opponent in this trick
-          const voidProb = N > 0 ? Math.max(0, 1 - (U / N)) : 0.5;
+          const voidProb = effectiveN > 0 ? Math.max(0, 1 - (U / effectiveN)) : 0.5;
 
           for(const opp of opponentsInTrick){
             // Only update if this gives higher confidence than what we already have
@@ -3696,7 +3707,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   const isBidderTeam = isMoon ? (p === bidderSeat) : (myTeam === bidderTeamIdx);
   const iAmBidder = p === bidderSeat;
   const iAmBidderPartner = isBidderTeam && !iAmBidder; // on bidder's team but not the bidder
-  const currentBid = bid || 34; // passed from session.current_bid
+  const currentBid = bid || (isMoon ? 4 : (isTN51 ? 34 : 30)); // mode-specific min bid fallback
   const ourScore = gameState.team_points[myTeam] || 0;
   const pointsNeeded = currentBid - ourScore;
   const bidIsSafe = pointsNeeded <= 0;
@@ -7807,7 +7818,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.67.0';  // v17.67.0: count hunt — walker rank verify, suitInfo enrichment, partner count throw, non-count walkers
+const MP_VERSION = 'v17.68.0';  // v17.68.0: TN51 fixes — isThirdSeat dynamic, bid fallback, trump void probability
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables

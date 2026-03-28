@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.67.0 — count hunt: walker verify, suitInfo, partner throw, non-count walkers
+// Version: v17.68.0 — TN51: isThirdSeat dynamic, bid fallback, trump void probability
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.67.0';
+const CACHE_NAME = 'tx-dom-v17.68.0';
 const urlsToCache = [
   './index.html',
   // CSS
