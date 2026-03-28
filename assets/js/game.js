@@ -4081,6 +4081,20 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     }
 
     if(winnerIsTrump){
+      // PARTNER TRUMPED: throw count in-suit if partner has this trick
+      if(lowIdx >= 0 && partnerWinning){
+        let countInSuit3 = -1, countVal3 = 0;
+        for(const idx of legal){
+          const t = hand[idx];
+          if((t[0] === ledPip || t[1] === ledPip) && !gameState._is_trump_tile(t)){
+            const ps = t[0] + t[1];
+            if((ps === 5 || ps === 10) && ps > countVal3){ countVal3 = ps; countInSuit3 = idx; }
+          }
+        }
+        if(countInSuit3 >= 0){
+          return makeResult(countInSuit3, "Partner trumped, throw in-suit count (" + countVal3 + "pts)");
+        }
+      }
       // offTracker: When forced to play low, prefer discarding non-catcher tiles
       if(lowIdx >= 0){
         if(offTracker && offTracker.trumpMode === 'PIP' && (isMoon ? (offTracker.bidderTeam !== p) : ((p % 2) !== offTracker.bidderTeam))){
@@ -4118,6 +4132,20 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       return makeResult(bestWinIdx, "Following suit, lowest winning card");
     }
     if(lowIdx >= 0){
+      // PARTNER WINNING ON SUIT: throw count in-suit if partner has this trick
+      if(partnerWinning){
+        let countInSuit = -1, countVal2 = 0;
+        for(const idx of legal){
+          const t = hand[idx];
+          if((t[0] === ledPip || t[1] === ledPip) && !gameState._is_trump_tile(t)){
+            const ps = t[0] + t[1];
+            if((ps === 5 || ps === 10) && ps > countVal2){ countVal2 = ps; countInSuit = idx; }
+          }
+        }
+        if(countInSuit >= 0){
+          return makeResult(countInSuit, "Partner winning suit, throw count (" + countVal2 + "pts)");
+        }
+      }
       // offTracker: When can't win, protect catchers
       if(offTracker && offTracker.trumpMode === 'PIP' && (isMoon ? (offTracker.bidderTeam !== p) : ((p % 2) !== offTracker.bidderTeam))){
         const suspicion = getOffSuspicion();
