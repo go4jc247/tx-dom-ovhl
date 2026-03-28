@@ -3790,6 +3790,9 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       else if(dbl) nonTrumpDoubles.push(idx);
       else nonTrumpSingles.push(idx);
     }
+    // DOUBLES mode: all trumps are doubles, so otherTrumps is always empty.
+    // Use trumpDoubles as the pullable trump pool for P2/P3/P4 strategies.
+    const pullableTrumps = otherTrumps.length > 0 ? otherTrumps : trumpDoubles;
 
     if(_dbg.enabled){
       let phaseLabel;
@@ -4099,9 +4102,9 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         return makeResult(safestIdx, "Bid doomed: damage control (safe lead)");
       }
       // Only trumps left — lead lowest
-      if(otherTrumps.length > 0){
-        let lowIdx = otherTrumps[0], lowVal = Infinity;
-        for(const idx of otherTrumps){
+      if(pullableTrumps.length > 0){
+        let lowIdx = pullableTrumps[0], lowVal = Infinity;
+        for(const idx of pullableTrumps){
           const val = hand[idx][0]+hand[idx][1];
           if(val < lowVal){ lowVal = val; lowIdx = idx; }
         }
@@ -4132,10 +4135,10 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       // BUT respect last-trump protection
       // AND don't waste high trumps pulling partner's trumps
       // PICK safest trump: avoid count tiles (pipSum=5 or 10), then prefer low value
-      if(otherTrumps.length > 0 && iHaveHighestTrump && !shouldSaveLastTrump && !partnersHoldRemainingTrumps
+      if(pullableTrumps.length > 0 && iHaveHighestTrump && !shouldSaveLastTrump && !partnersHoldRemainingTrumps
         && trumpTilesRemaining.length > 0 && !opponentsVoidInTrump){
-        let bestIdx = otherTrumps[0], bestScore = -Infinity;
-        for(const idx of otherTrumps){
+        let bestIdx = pullableTrumps[0], bestScore = -Infinity;
+        for(const idx of pullableTrumps){
           const tile = hand[idx];
           const pipSum = tile[0] + tile[1];
           const isCount = (pipSum === 5 || pipSum === 10);
@@ -4157,9 +4160,9 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       // Defenders: more conservative — only pull early or when can set bid
       // Bidders: aggressive pulling to gain control
       const p3RoleOk = isBidderTeam || (canSetBid && !canRelax) || p3EarlyWindow;
-      if(otherTrumps.length >= 2 && trumpsInHand.length >= 3 && !opponentsVoidInTrump && (p3EarlyWindow || p3MidWindow || p3LateWindow || mustWin) && p3RoleOk && !bidIsSafe && !partnersHoldRemainingTrumps){
-        let bestIdx = otherTrumps[0], bestScore = -Infinity;
-        for(const idx of otherTrumps){
+      if(pullableTrumps.length >= 2 && trumpsInHand.length >= 3 && !opponentsVoidInTrump && (p3EarlyWindow || p3MidWindow || p3LateWindow || mustWin) && p3RoleOk && !bidIsSafe && !partnersHoldRemainingTrumps){
+        let bestIdx = pullableTrumps[0], bestScore = -Infinity;
+        for(const idx of pullableTrumps){
           const tile = hand[idx];
           const pipSum = tile[0] + tile[1];
           const isCount = (pipSum === 5 || pipSum === 10);
@@ -4176,11 +4179,11 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       // CRITICAL: Only do this if a partner's trump can actually BEAT our lowest trump.
       // If our lowest trump outranks all remaining trumps, we'd win our own trick (pointless).
       // Don't do this with only 1 trump (save it as get-back-in card).
-      if(partnersHoldRemainingTrumps && nonTrumpDoubles.length === 0 && otherTrumps.length >= 2
+      if(partnersHoldRemainingTrumps && nonTrumpDoubles.length === 0 && pullableTrumps.length >= 2
         && (opponentsVoidInTrump || trumpTilesRemaining.length <= 2)){
         // Find lowest non-double trump, preferring non-count tiles
-        let lowIdx = otherTrumps[0], lowR = Infinity, lowIsCount = true;
-        for(const idx of otherTrumps){
+        let lowIdx = pullableTrumps[0], lowR = Infinity, lowIsCount = true;
+        for(const idx of pullableTrumps){
           const r = getTrumpRankNum(hand[idx]);
           const ps = hand[idx][0] + hand[idx][1];
           const isCount = (ps === 5 || ps === 10);
@@ -4211,11 +4214,19 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         if(!inOurHand){ oppsHaveTrump = true; break; }
       }
       if(oppsHaveTrump && trumpDoubles.length > 0){
-        return makeResult(trumpDoubles[0], "Partner: pull opponent trump (helping bidder)");
+        // Pick lowest non-count trump double for pulling
+        let _pIdx = trumpDoubles[0], _pScore = Infinity;
+        for(const idx of trumpDoubles){
+          const ps = hand[idx][0] + hand[idx][1];
+          const isC = (ps === 5 || ps === 10);
+          const sc = ps + (isC ? 100 : 0);
+          if(sc < _pScore){ _pScore = sc; _pIdx = idx; }
+        }
+        return makeResult(_pIdx, "Partner: pull opponent trump (helping bidder)");
       }
-      if(oppsHaveTrump && otherTrumps.length >= 2 && iHaveHighestTrump){
-        let bestIdx = otherTrumps[0], bestScore = -Infinity;
-        for(const idx of otherTrumps){
+      if(oppsHaveTrump && pullableTrumps.length >= 2 && iHaveHighestTrump){
+        let bestIdx = pullableTrumps[0], bestScore = -Infinity;
+        for(const idx of pullableTrumps){
           const tile = hand[idx];
           const ps = tile[0] + tile[1];
           const isCount = (ps === 5 || ps === 10);
@@ -4329,15 +4340,24 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       }
 
       // Only trumps left — lead lowest trump
-      if(otherTrumps.length > 0){
-        let lowIdx = otherTrumps[0], lowVal = Infinity;
-        for(const idx of otherTrumps){
+      if(pullableTrumps.length > 0){
+        let lowIdx = pullableTrumps[0], lowVal = Infinity;
+        for(const idx of pullableTrumps){
           const val = hand[idx][0]+hand[idx][1];
           if(val < lowVal){ lowVal = val; lowIdx = idx; }
         }
         return makeResult(lowIdx, "Lead: low trump (only trumps left)");
       }
-      if(trumpDoubles.length > 0) return makeResult(trumpDoubles[0], "Lead: trump double (only option)");
+      if(trumpDoubles.length > 0){
+        // Pick lowest non-count trump double
+        let _oIdx = trumpDoubles[0], _oScore = Infinity;
+        for(const idx of trumpDoubles){
+          const ps = hand[idx][0] + hand[idx][1];
+          const sc = ps + ((ps === 5 || ps === 10) ? 100 : 0);
+          if(sc < _oScore){ _oScore = sc; _oIdx = idx; }
+        }
+        return makeResult(_oIdx, "Lead: trump double (only option)");
+      }
     }
 
     // ── PHASE C: NO TRUMP CONTROL, no more trump leads — play safe non-trumps ──
@@ -4556,9 +4576,9 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     }
 
     // Last resort: lead trump (even without highest)
-    if(otherTrumps.length > 0){
-      let lowIdx = otherTrumps[0], lowVal = Infinity;
-      for(const idx of otherTrumps){
+    if(pullableTrumps.length > 0){
+      let lowIdx = pullableTrumps[0], lowVal = Infinity;
+      for(const idx of pullableTrumps){
         const val = hand[idx][0]+hand[idx][1];
         if(val < lowVal){ lowVal = val; lowIdx = idx; }
       }
