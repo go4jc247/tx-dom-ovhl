@@ -3149,6 +3149,12 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   const bidIsSafe = pointsNeeded <= 0;
   const bidIsClose = pointsNeeded > 0 && pointsNeeded <= 10;
   const tricksLeft = totalTricks - trickNum;
+  // Defensive awareness: track bidder's progress toward making/failing bid
+  const bidderTeamIdx = isMoon ? bidderSeat : (bidderSeat % 2);
+  const bidderScore = gameState.team_points[bidderTeamIdx] || 0;
+  const bidderNeedsMore = currentBid - bidderScore;
+  const bidderIsClose = !isBidderTeam && bidderNeedsMore > 0 && bidderNeedsMore <= 10;
+  const canSetBid = !isBidderTeam && bidderNeedsMore > 0; // opponent's bid can still be set
 
   // ═══════════════════════════════════════════════════════════════════
   //  ENDGAME AWARENESS — adjust strategy in final tricks
@@ -3998,7 +4004,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         return sum + ((ps === 5) ? 5 : (ps === 10) ? 10 : 0);
       }, 0);
       // isBidderTeam defined above in BID SAFETY section
-      if(!isBidderTeam && trickCount === 0 && !isEndgame && shouldSaveLastTrump){
+      // Always trump if: bidder's team, endgame, trick has count, or bid is close to being set
+      if(!isBidderTeam && trickCount === 0 && !isEndgame && shouldSaveLastTrump && !bidderIsClose){
         // Low-value trick on defense with last trump — save it for a count-heavy trick
         // Fall through to dump logic
       } else {
@@ -4013,7 +4020,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         return sum + ((ps === 5) ? 5 : (ps === 10) ? 10 : 0);
       }, 0);
       // isBidderTeam defined above in BID SAFETY section
-      if(!isBidderTeam && trickCount === 0 && !isEndgame && shouldSaveLastTrump){
+      if(!isBidderTeam && trickCount === 0 && !isEndgame && shouldSaveLastTrump && !bidderIsClose){
         // Save last trump for higher-value trick
       } else {
         return makeResult(anyTrumpIdx, "Trump in to win");
