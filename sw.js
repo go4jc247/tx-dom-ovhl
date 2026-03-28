@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v14.0.0 — TX-DOM-OVHL full codebase overhaul
+// Version: v14.1.0 — AI overhaul: endgame, defense, Nello, trump conservation
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v14.0.0';
+const CACHE_NAME = 'tx-dom-v14.1.0';
 const urlsToCache = [
   './index.html',
   // CSS
