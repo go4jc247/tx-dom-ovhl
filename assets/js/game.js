@@ -3579,8 +3579,9 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     }
 
     // Following in Nello
-    if(bidderWinning){
-      // Bidder is currently winning (bad!) — play highest to try to let someone overtake
+    // Non-bidders: when bidder is winning, play high to rescue (overtake bidder)
+    // Bidder: should NOT play high — they WANT to lose
+    if(bidderWinning && !iAmBidder){
       let highIdx = legal[0], highVal = 0;
       for(const idx of legal){
         const val = hand[idx][0]+hand[idx][1];
