@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v16.0.0 — Phase 7: partner coordination, widow rewrite, trump rebalance, bidding fixes
+// Version: v16.1.0 — Phase 8: lead scoring, endgame, defense, trump pulling, bidding patterns
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v16.0.0';
+const CACHE_NAME = 'tx-dom-v16.1.0';
 const urlsToCache = [
   './index.html',
   // CSS
