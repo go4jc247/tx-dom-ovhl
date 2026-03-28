@@ -7450,7 +7450,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.49.0';  // v17.49.0: TN51 bidding caution & Nello threshold adjustments
+const MP_VERSION = 'v17.50.0';  // v17.50.0: in-game TechSupport chat feature
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
@@ -30250,6 +30250,256 @@ document.addEventListener('keydown', function(e) {
   } else {
     initPopupObserver();
     initPopupSettingsUI();
+  }
+})();
+
+// ═══════════════════════════════════════════════════════════════════
+//  TECH SUPPORT CHAT — In-game chat with Claude/Saya
+//  Only visible when screen name is "TechSupport343"
+// ═══════════════════════════════════════════════════════════════════
+(function(){
+  const CHAT_REPO = 'go4jc247/tx-dom-ovhl';
+  const CHAT_FILE = 'techsupport_chat.json';
+  const CHAT_BRANCH = 'main';
+  const POLL_INTERVAL = 5000; // 5 seconds
+  const TECH_SUPPORT_NAME = 'TechSupport343';
+
+  let chatOpen = false;
+  let chatMessages = [];
+  let chatVersion = 0;
+  let chatPollTimer = null;
+  let chatIcon = null;
+  let chatPanel = null;
+  let chatFileSha = null;
+  let chatSending = false;
+
+  function isTechSupport(){
+    return typeof playerName !== 'undefined' && playerName === TECH_SUPPORT_NAME;
+  }
+
+  function getToken(){
+    return localStorage.getItem('ts_chat_token') || null;
+  }
+
+  function setToken(token){
+    localStorage.setItem('ts_chat_token', token);
+  }
+
+  // ── Create chat icon ──
+  function createChatIcon(){
+    if(chatIcon) return;
+    chatIcon = document.createElement('div');
+    chatIcon.id = 'tsChatIcon';
+    chatIcon.innerHTML = '\ud83d\udcac';
+    chatIcon.style.cssText = 'position:fixed;top:12px;left:12px;z-index:10000;width:44px;height:44px;'
+      + 'background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:50%;display:flex;'
+      + 'align-items:center;justify-content:center;font-size:22px;cursor:pointer;'
+      + 'box-shadow:0 2px 8px rgba(0,0,0,0.3);transition:transform 0.2s;user-select:none;';
+    chatIcon.addEventListener('click', toggleChat);
+    chatIcon.addEventListener('mouseenter', ()=>{ chatIcon.style.transform='scale(1.15)'; });
+    chatIcon.addEventListener('mouseleave', ()=>{ chatIcon.style.transform='scale(1)'; });
+    document.body.appendChild(chatIcon);
+  }
+
+  function removeChatIcon(){
+    if(chatIcon){ chatIcon.remove(); chatIcon = null; }
+    if(chatPanel){ chatPanel.remove(); chatPanel = null; }
+    if(chatPollTimer){ clearInterval(chatPollTimer); chatPollTimer = null; }
+    chatOpen = false;
+  }
+
+  // ── Create chat panel ──
+  function createChatPanel(){
+    if(chatPanel) return;
+    chatPanel = document.createElement('div');
+    chatPanel.id = 'tsChatPanel';
+    chatPanel.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:10001;'
+      + 'background:rgba(0,0,0,0.6);display:none;flex-direction:column;align-items:center;justify-content:center;';
+    chatPanel.innerHTML = ''
+      + '<div id="tsChatBox" style="width:90%;max-width:420px;height:75vh;max-height:600px;'
+      + 'background:#1e1e2e;border-radius:16px;display:flex;flex-direction:column;overflow:hidden;'
+      + 'box-shadow:0 8px 32px rgba(0,0,0,0.5);border:1px solid #333;">'
+      +   '<div style="padding:12px 16px;background:#2a2a3e;display:flex;align-items:center;justify-content:space-between;">'
+      +     '<span style="color:#e0e0e0;font-weight:bold;font-size:16px;">\ud83d\udcac Tech Support Chat</span>'
+      +     '<button id="tsChatClose" style="background:none;border:none;color:#aaa;font-size:22px;cursor:pointer;padding:4px 8px;">\u2715</button>'
+      +   '</div>'
+      +   '<div id="tsChatMessages" style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;"></div>'
+      +   '<div style="padding:10px 12px;background:#2a2a3e;display:flex;gap:8px;">'
+      +     '<input id="tsChatInput" type="text" placeholder="Type a message..." '
+      +       'style="flex:1;padding:10px 14px;border-radius:20px;border:1px solid #444;background:#333;color:#fff;font-size:14px;outline:none;" />'
+      +     '<button id="tsChatSend" style="padding:8px 16px;border-radius:20px;border:none;background:#6366f1;color:#fff;font-weight:bold;cursor:pointer;font-size:14px;">Send</button>'
+      +   '</div>'
+      + '</div>';
+    document.body.appendChild(chatPanel);
+
+    document.getElementById('tsChatClose').addEventListener('click', toggleChat);
+    document.getElementById('tsChatSend').addEventListener('click', sendMessage);
+    document.getElementById('tsChatInput').addEventListener('keydown', (e)=>{
+      if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); sendMessage(); }
+    });
+    // Close on backdrop click
+    chatPanel.addEventListener('click', (e)=>{
+      if(e.target === chatPanel) toggleChat();
+    });
+  }
+
+  function toggleChat(){
+    chatOpen = !chatOpen;
+    if(!chatPanel) createChatPanel();
+    chatPanel.style.display = chatOpen ? 'flex' : 'none';
+    if(chatOpen){
+      renderMessages();
+      fetchChat();
+      document.getElementById('tsChatInput').focus();
+      // Start polling
+      if(!chatPollTimer) chatPollTimer = setInterval(fetchChat, POLL_INTERVAL);
+    }
+  }
+
+  // ── Render messages ──
+  function renderMessages(){
+    const container = document.getElementById('tsChatMessages');
+    if(!container) return;
+    container.innerHTML = '';
+    for(const msg of chatMessages){
+      const isMe = msg.sender_id === 'techsupport';
+      const bubble = document.createElement('div');
+      bubble.style.cssText = 'max-width:80%;padding:8px 14px;border-radius:16px;font-size:14px;line-height:1.4;word-wrap:break-word;'
+        + (isMe
+          ? 'background:#6366f1;color:#fff;align-self:flex-end;border-bottom-right-radius:4px;'
+          : 'background:#3a3a4e;color:#e0e0e0;align-self:flex-start;border-bottom-left-radius:4px;');
+      // Sender label for non-me messages
+      if(!isMe){
+        const label = document.createElement('div');
+        label.style.cssText = 'font-size:11px;color:#8b8ba0;margin-bottom:2px;font-weight:600;';
+        label.textContent = msg.sender || 'Saya';
+        bubble.appendChild(label);
+      }
+      const text = document.createElement('div');
+      text.textContent = msg.text;
+      bubble.appendChild(text);
+      // Timestamp
+      const ts = document.createElement('div');
+      ts.style.cssText = 'font-size:10px;margin-top:4px;opacity:0.6;' + (isMe ? 'text-align:right;' : '');
+      const d = new Date((msg.ts || 0) * 1000);
+      ts.textContent = d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+      bubble.appendChild(ts);
+      container.appendChild(bubble);
+    }
+    container.scrollTop = container.scrollHeight;
+  }
+
+  // ── Fetch chat from GitHub ──
+  async function fetchChat(){
+    try {
+      const token = getToken();
+      const headers = token ? {'Authorization': 'token ' + token, 'Accept': 'application/vnd.github.v3+json'} : {};
+      const resp = await fetch('https://api.github.com/repos/' + CHAT_REPO + '/contents/' + CHAT_FILE + '?ref=' + CHAT_BRANCH + '&t=' + Date.now(), {headers});
+      if(!resp.ok) return;
+      const data = await resp.json();
+      chatFileSha = data.sha;
+      const content = JSON.parse(atob(data.content.replace(/\n/g, '')));
+      if(content.version > chatVersion){
+        chatVersion = content.version;
+        chatMessages = content.messages || [];
+        if(chatOpen) renderMessages();
+      }
+    } catch(e){
+      console.log('[TechSupport Chat] Fetch error:', e.message);
+    }
+  }
+
+  // ── Send message to GitHub ──
+  async function sendMessage(){
+    const input = document.getElementById('tsChatInput');
+    if(!input) return;
+    const text = input.value.trim();
+    if(!text || chatSending) return;
+
+    let token = getToken();
+    if(!token){
+      token = prompt('Enter your GitHub Personal Access Token (with repo scope) to enable chat:');
+      if(!token) return;
+      setToken(token);
+    }
+
+    chatSending = true;
+    const sendBtn = document.getElementById('tsChatSend');
+    if(sendBtn){ sendBtn.textContent = '...'; sendBtn.disabled = true; }
+
+    try {
+      // Add message locally first for instant feedback
+      const newMsg = {
+        id: Date.now(),
+        sender: 'TechSupport',
+        sender_id: 'techsupport',
+        text: text,
+        ts: Date.now() / 1000
+      };
+      chatMessages.push(newMsg);
+      chatVersion++;
+      input.value = '';
+      renderMessages();
+
+      // Push to GitHub
+      const newContent = JSON.stringify({version: chatVersion, messages: chatMessages}, null, 2);
+      const encoded = btoa(unescape(encodeURIComponent(newContent)));
+      const resp = await fetch('https://api.github.com/repos/' + CHAT_REPO + '/contents/' + CHAT_FILE, {
+        method: 'PUT',
+        headers: {
+          'Authorization': 'token ' + token,
+          'Accept': 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          message: 'TechSupport chat: ' + text.substring(0, 50),
+          content: encoded,
+          sha: chatFileSha,
+          branch: CHAT_BRANCH
+        })
+      });
+      if(resp.ok){
+        const result = await resp.json();
+        chatFileSha = result.content.sha;
+      } else {
+        const err = await resp.json();
+        console.log('[TechSupport Chat] Send error:', err.message);
+        if(resp.status === 401){
+          localStorage.removeItem('ts_chat_token');
+          alert('Invalid token. Please try again.');
+        }
+      }
+    } catch(e){
+      console.log('[TechSupport Chat] Send error:', e.message);
+    } finally {
+      chatSending = false;
+      if(sendBtn){ sendBtn.textContent = 'Send'; sendBtn.disabled = false; }
+    }
+
+    // Also write to Saya channel for Claude Code to pick up
+    // (This is a secondary channel — the primary is the GitHub file)
+  }
+
+  // ── Visibility check: show/hide chat icon based on screen name ──
+  function checkVisibility(){
+    if(isTechSupport()){
+      if(!chatIcon) createChatIcon();
+      if(!chatPollTimer && chatOpen) chatPollTimer = setInterval(fetchChat, POLL_INTERVAL);
+    } else {
+      removeChatIcon();
+    }
+  }
+
+  // Check on name changes
+  const origSaveName = typeof updateScreenNameUI === 'function' ? updateScreenNameUI : null;
+  // Poll for name changes (handles all entry points)
+  setInterval(checkVisibility, 2000);
+
+  // Initial check
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', checkVisibility);
+  } else {
+    checkVisibility();
   }
 })();
 

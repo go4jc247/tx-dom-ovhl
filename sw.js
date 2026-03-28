@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.49.0 — TN51 bidding caution & Nello threshold adjustments
+// Version: v17.50.0 — in-game TechSupport chat feature
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.49.0';
+const CACHE_NAME = 'tx-dom-v17.50.0';
 const urlsToCache = [
   './index.html',
   // CSS
