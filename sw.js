@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.76.0 — CRITICAL: winnerSeat scope fix, walker verify, trick history marks, Moon MP scores
+// Version: v17.77.0 — DOUBLES walker pair fix, Nello cleanup
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.76.0';
+const CACHE_NAME = 'tx-dom-v17.77.0';
 const urlsToCache = [
   './index.html',
   // CSS

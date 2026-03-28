@@ -1527,7 +1527,7 @@ function evaluateHandForBid(hand) {
     }
     // TN51 Nello is 1v1 (bidder picks one opponent), same as T42 Nello
     // Both: need 0-1 as anchor + low pips + at most one non-blank double
-    const nelloSmallPipLimit = (GAME_MODE === 'TN51') ? 2 : 2;
+    const nelloSmallPipLimit = 2;
     const nelloBlanksOk = (GAME_MODE === 'TN51') ? (blanks.length >= 3 || maxDoublePip === 0) : true;
     if (has01 && maxSmallPip <= nelloSmallPipLimit && maxDoublePip <= 1 && nelloBlanksOk) {
       return { action: "bid", bid: maxBid, marks: 1 };
@@ -7027,7 +7027,11 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         const lowPip2 = Math.min(tile[0], tile[1]);
         // Only penalize if the double hasn't been played (walker pair still viable)
         const suitInfW = suitInfo[highPip2];
-        const doubleStillViable = !suitInfW || !suitInfW.winnerPlayed;
+        // In DOUBLES mode, winnerPlayed is always true (doubles are trump, not suit winners)
+        // So check if we actually hold the double instead
+        const doubleStillViable = trumpMode === 'DOUBLES'
+          ? holdDouble  // we hold the trump double = walker pair is viable
+          : (!suitInfW || !suitInfW.winnerPlayed);
         const isCoveredOff = holdDouble && doubleStillViable;
         if(isCoveredOff){
           // Scale penalty by remaining tricks — breaking a walker pair matters less in endgame
@@ -7921,7 +7925,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.76.0';  // v17.76.0: winnerSeat scope fix, walker verify, trick history 3-team marks, Moon MP scores
+const MP_VERSION = 'v17.77.0';  // v17.77.0: DOUBLES walker pair penalty fix, Nello dead ternary cleanup
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
