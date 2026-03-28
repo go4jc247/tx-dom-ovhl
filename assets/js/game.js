@@ -4567,7 +4567,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           for(let ti = 0; ti < oppTiles.length; ti++){
             const ot = oppTiles[ti];
             const val = ot[0] + ot[1];
-            const isCount = (val === 5 || val === 10);
+            const isCount = !isMoon && (val === 5 || val === 10);
             // For "can't win" dump: prefer non-count, then lowest
             if((!isCount && worstIsCount) || (isCount === worstIsCount && val < worstVal)){
               worstVal = val; worstIdx = ti; worstIsCount = isCount;
@@ -6461,7 +6461,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
             const r = getTrumpRankNum(tile);
             if(r > highestTrickTrumpF){
               const ps = tile[0] + tile[1];
-              const isCount = (ps === 5 || ps === 10);
+              const isCount = !isMoon && (ps === 5 || ps === 10);
               if(r > secureTrumpFRank){ secureTrumpFRank = r; secureTrumpFIdx = idx; }
               if(!isCount && r > secureTrumpFNonCountRank){
                 secureTrumpFNonCountRank = r; secureTrumpFNonCount = idx;
@@ -8075,7 +8075,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.89.0';  // v17.89.0: TN51 friendly defender trump cooperation + remaining Moon count guards
+const MP_VERSION = 'v17.90.0';  // v17.90.0: Restore 3-team fallback, team3 marks pass-through, final Moon count purge
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
@@ -15162,7 +15162,7 @@ function _executeNelloSetup(opponent, marks){
     handsCopy,
     session.dealer,
     bidderSeat,       // Bidder leads
-    { team1: session.team_marks[0] || 0, team2: session.team_marks[1] || 0 }
+    { team1: session.team_marks[0] || 0, team2: session.team_marks[1] || 0, team3: session.team_marks[2] || 0 }
   );
 
   // V10_121: Host broadcasts nello_confirmed to all clients
@@ -15285,7 +15285,7 @@ function setupAINello(bidderSeat, marks = 1){
     handsCopy,
     session.dealer,
     bidderSeat,       // Bidder leads
-    { team1: session.team_marks[0] || 0, team2: session.team_marks[1] || 0 }
+    { team1: session.team_marks[0] || 0, team2: session.team_marks[1] || 0, team3: session.team_marks[2] || 0 }
   );
 
   // Sync sprites
@@ -23180,8 +23180,8 @@ function resumeGameFromSave(){
     const snap = saved.session;
     session.game.hands = snap.hands;
     session.game.current_trick = snap.current_trick || [];
-    session.game.tricks_team = snap.tricks_team || [[], []];
-    session.game.team_points = snap.team_points || [0, 0];
+    session.game.tricks_team = snap.tricks_team || ((GAME_MODE === 'MOON' || GAME_MODE === 'TN51') ? [[],[],[]] : [[],[]]);
+    session.game.team_points = snap.team_points || ((GAME_MODE === 'MOON' || GAME_MODE === 'TN51') ? [0,0,0] : [0,0]);
     session.game.trump_suit = snap.trump_suit;
     session.game.trump_mode = snap.trump_mode;
     session.game.trick_number = snap.trick_number || 0;
