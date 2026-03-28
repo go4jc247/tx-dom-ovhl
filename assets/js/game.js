@@ -3004,7 +3004,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       if(trumpMode === "PIP" && (a === trumpSuit || b === trumpSuit)) continue;
       if(trumpMode === "DOUBLES" && a === b) continue;
       if(!isPlayed(a, b)){
-        const pts = (a + b === 5) ? 5 : (a + b === 10) ? 10 : 0;
+        const pts = isMoon ? 0 : ((a + b === 5) ? 5 : (a + b === 10) ? 10 : 0);
         suitTiles.push({ tile: [a, b], count: pts });
         countRemaining += pts;
       }
@@ -5454,10 +5454,12 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         const trumpRiskPerOpp = isTN51 ? 12 : 15;
         if(oppsVoidInSuit > 0 && !opponentsVoidInTrump){
           score -= oppsVoidInSuit * trumpRiskPerOpp; // high penalty: double will lose
-          // Extra penalty if this double is a count tile
-          const dblSum = pip + pip;
-          if(dblSum === 10) score -= 15;
-          else if(dblSum === 5) score -= 8;
+          // Extra penalty if this double is a count tile (not in Moon — no count value)
+          if(!isMoon){
+            const dblSum = pip + pip;
+            if(dblSum === 10) score -= 15;
+            else if(dblSum === 5) score -= 8;
+          }
         }
         // Depleted-suit bonus: doubles in nearly-empty suits are safer
         // (fewer opponents can follow, more likely to walk)
@@ -6224,8 +6226,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           const t = hand[idx];
           if((t[0] === ledPip || t[1] === ledPip) && !gameState._is_trump_tile(t)){
             const ps = t[0] + t[1];
-            const isCount = (ps === 5 || ps === 10);
-            let sc = ps + (isCount ? 100 : 0); // heavily penalize count tiles
+            const isCount = !isMoon && (ps === 5 || ps === 10);
+            let sc = ps + (isCount ? 100 : 0); // heavily penalize count tiles (not in Moon)
             // Void potential: if playing this tile gets us closer to voiding a suit AND we have trump
             if(trumpsInHand.length > 0 && !isCount){
               const otherPip = (t[0] === ledPip) ? t[1] : t[0];
@@ -6780,7 +6782,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     for(const idx of legal){
       const tile = hand[idx];
       const pipSum = tile[0] + tile[1];
-      const myCount = (pipSum === 5) ? 5 : (pipSum === 10) ? 10 : 0;
+      const myCount = isMoon ? 0 : ((pipSum === 5) ? 5 : (pipSum === 10) ? 10 : 0);
       let score = 0;
       const _bd = {};
 
@@ -7945,7 +7947,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.79.0';  // v17.79.0: Moon count-tile fixes (lead + widow), desperation defense
+const MP_VERSION = 'v17.80.0';  // v17.80.0: comprehensive Moon count-tile exemptions (suitInfo, dump, follow, doubles)
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables

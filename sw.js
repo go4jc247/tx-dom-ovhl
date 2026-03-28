@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.79.0 — Moon count-tile fixes, widow swap, desperation defense
+// Version: v17.80.0 — Comprehensive Moon count-tile exemptions across all AI paths
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.79.0';
+const CACHE_NAME = 'tx-dom-v17.80.0';
 const urlsToCache = [
   './index.html',
   // CSS
