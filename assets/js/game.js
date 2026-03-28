@@ -3919,7 +3919,9 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         const pipSum = hand[idx][0] + hand[idx][1];
         const myCount = (pipSum === 5) ? 5 : (pipSum === 10) ? 10 : 0;
         // Score: count remaining in suit + own count value + bonus if bidder is void (can't capture)
-        let score = info.countRemaining * 2 + myCount;
+        // Scale by bidder desperation (closer to making = more urgent to deny)
+        const desperation = Math.max(0.5, Math.min(1.5, (35 - bidderNeedsMore) / 20));
+        let score = Math.round(info.countRemaining * 2 * desperation) + myCount;
         const bidderVoidHere = voidIn[bidderSeat] && voidIn[bidderSeat].has(pip);
         if(bidderVoidHere) score += 10; // bidder can't follow, must trump or lose
         if(score > bestCapScore){ bestCapScore = score; bestCapIdx = idx; }
@@ -4310,8 +4312,10 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           if(!isBidderTeam && !isMoon){
             const bidderVoidInSuit = voidIn[bidderSeat] && voidIn[bidderSeat].has(ledSuit);
             if(bidderVoidInSuit){
-              score += 15; // bonus: force bidder to trump or discard
-              _breakdown.bidderVoidBonus = 15;
+              // Scale bonus by urgency — more valuable as bidder approaches making bid
+              const voidUrgency = bidderNeedsMore <= 15 ? 20 : (bidderNeedsMore <= 25 ? 15 : 10);
+              score += voidUrgency;
+              _breakdown.bidderVoidBonus = voidUrgency;
             }
             // When we can still set the bid, prefer leading count-rich suits
             // where our team can capture points the bidder needs
@@ -4914,7 +4918,9 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       }, 0);
       // Same trump ratio conservation for first-trump play
       const _trumpRatio2 = tricksLeft > 0 ? trumpsInHand.length / tricksLeft : 1;
+      const bidderNearMaking2 = bidderNeedsMore <= tricksLeft + 5;
       const _shouldConserve2 = !isBidderTeam && trickCount === 0 && !isEndgame && !bidderIsClose && !canSetBid
+        && !bidderNearMaking2
         && (shouldSaveLastTrump || (_trumpRatio2 <= 0.5 && trumpsInHand.length <= 2));
       if(_shouldConserve2){
         // Save trumps for higher-value trick
@@ -4924,9 +4930,15 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     }
     // DEFENSIVE SACRIFICE: on defense with trump control, trump 0-count tricks to get the lead
     // This lets us lead into count-rich suits on the next trick
+    // Only sacrifice non-count trumps and verify we have count-rich lead options
     if(!isBidderTeam && canSetBid && !isMoon && winTrumpIdx >= 0 && weHaveTrumpControl
       && countElsewhere >= 10 && tricksLeft >= 2){
-      return makeResult(winTrumpIdx, "Defense sacrifice: trump to get lead for count capture");
+      const sacTile = hand[winTrumpIdx];
+      const sacPs = sacTile[0] + sacTile[1];
+      const sacIsCount = (sacPs === 5 || sacPs === 10);
+      if(!sacIsCount){
+        return makeResult(winTrumpIdx, "Defense sacrifice: trump to get lead for count capture");
+      }
     }
     // Endgame desperation: trump in even if we can't beat existing trump
     // to prevent opponents from scoring count and to use remaining trumps
