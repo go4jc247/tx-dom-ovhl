@@ -2101,7 +2101,7 @@ function initOffTracker() {
   if (session.contract === 'NELLO') return;
 
   const bidderSeat = session.bid_winner_seat;
-  const bidderTeam = bidderSeat % 2; // 0 or 1
+  const bidderTeam = GAME_MODE === 'MOON' ? bidderSeat : (bidderSeat % 2); // Moon: individual, not team-based
   const trumpSuit = session.game.trump_suit;
   const trumpMode = session.game.trump_mode;
   const maxPip = session.game.max_pip;
@@ -2141,8 +2141,9 @@ function updateOffTracker() {
   const maxPip = gs.max_pip;
 
   // Analyze all completed tricks
+  const _otTeamCount = GAME_MODE === 'MOON' ? 3 : 2;
   const allTricks = [];
-  for (let team = 0; team < 2; team++) {
+  for (let team = 0; team < _otTeamCount; team++) {
     for (let ti = 0; ti < (gs.tricks_team[team] || []).length; ti++) {
       const record = gs.tricks_team[team][ti];
       allTricks.push({ record, team, trickIndex: ti });
@@ -2152,7 +2153,7 @@ function updateOffTracker() {
   // Sort by trick index to process in order
   // We track which tricks we've already analyzed
   let trickCount = 0;
-  for (let team = 0; team < 2; team++) {
+  for (let team = 0; team < _otTeamCount; team++) {
     trickCount += (gs.tricks_team[team] || []).length;
   }
 
@@ -2173,7 +2174,7 @@ function updateOffTracker() {
 
   // Build ordered trick list with lead info
   const orderedTricks = [];
-  for (let team = 0; team < 2; team++) {
+  for (let team = 0; team < _otTeamCount; team++) {
     for (const record of (gs.tricks_team[team] || [])) {
       orderedTricks.push(record);
     }
@@ -2254,7 +2255,7 @@ function updateOffTracker() {
     if (offTracker.suitSuspicion[pip] === undefined) continue;
     // Check if this suit's double has been played
     let doubleFound = false;
-    for (let team = 0; team < 2; team++) {
+    for (let team = 0; team < _otTeamCount; team++) {
       for (const record of (gs.tricks_team[team] || [])) {
         for (let seat = 0; seat < gs.player_count; seat++) {
           const t = record[seat];
@@ -2339,7 +2340,8 @@ function detectLayDownHand(gameState, seat) {
 
   // Build played set
   const playedSet = new Set();
-  for (let team = 0; team < 2; team++) {
+  const teamCount = GAME_MODE === 'MOON' ? 3 : 2;
+  for (let team = 0; team < teamCount; team++) {
     for (const record of (gameState.tricks_team[team] || [])) {
       for (let s = 0; s < gameState.player_count; s++) {
         const t = record[s];
