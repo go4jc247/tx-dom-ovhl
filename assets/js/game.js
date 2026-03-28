@@ -4069,22 +4069,22 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
 
     // ── DEFENSIVE TAP: lead any tile into bidder's void to exhaust trump ──
     // When we have no doubles in the bidder's void suits, lead low non-count singles
+    // IMPORTANT: led suit = max(pip0, pip1). Only the led suit matters for forcing trump.
+    // If bidder is void in low pip but not high pip, they follow suit — no trump forced.
     if(!isBidderTeam && !weHaveTrumpControl && nonTrumpSingles.length > 0){
       const bidderVoids = voidIn[bidderSeat] || new Set();
       if(bidderVoids.size > 0){
         let bestTapIdx = -1, bestTapScore = -Infinity;
         for(const idx of nonTrumpSingles){
           const tile = hand[idx];
-          // Check BOTH pips — tile [2,5] can tap bidder void in either pip 2 or pip 5
           const pip0 = tile[0], pip1 = tile[1];
-          const void0 = bidderVoids.has(pip0), void1 = bidderVoids.has(pip1);
-          if(!void0 && !void1) continue;
-          // Use the void pip as the led suit; if both void, prefer the one with fewer tiles left
-          const pip = (void0 && void1) ? ((suitInfo[pip0] && suitInfo[pip1]) ? (suitInfo[pip0].tilesLeft <= suitInfo[pip1].tilesLeft ? pip0 : pip1) : pip0) : (void0 ? pip0 : pip1);
+          // The led suit is the higher pip — that's the suit the bidder must follow
+          const ledPipForTile = Math.max(pip0, pip1);
+          if(!bidderVoids.has(ledPipForTile)) continue; // bidder can follow this suit — no tap
           const pipSum = tile[0] + tile[1];
           const myCount = (pipSum === 5) ? 5 : (pipSum === 10) ? 10 : 0;
           // Prefer non-count, low-value tiles in depleted suits
-          const tapInfo = suitInfo[pip];
+          const tapInfo = suitInfo[ledPipForTile];
           let score = 20 - pipSum - myCount * 5;
           // Bonus for suits with fewer tiles (more likely to force repeated trumping)
           if(tapInfo && tapInfo.tilesLeft <= 2) score += 8;
