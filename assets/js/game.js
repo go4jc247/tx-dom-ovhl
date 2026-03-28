@@ -5288,7 +5288,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         // Only penalize if the double hasn't been played (walker pair still viable)
         const suitInfW = suitInfo[highPip2];
         const doubleStillViable = !suitInfW || !suitInfW.winnerPlayed;
-        const isCoveredOff = holdDouble && lowPip2 === highPip2 - 1 && doubleStillViable;
+        const isCoveredOff = holdDouble && doubleStillViable;
         if(isCoveredOff){
           // Scale penalty by remaining tricks — breaking a walker pair matters less in endgame
           // Moon: walker pairs are proportionally more valuable (9 tricks, solo player)
@@ -5300,10 +5300,13 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         }
       }
 
-      // Save trumps (especially the last one!)
+      // Save trumps (especially high-ranked and last ones!)
       if(gameState._is_trump_tile(tile)){
-        score -= 20;
-        _bd.trumpPenalty = -20;
+        const _tRank = getTrumpRankNum(tile);
+        // Higher-ranked trumps get bigger penalty (save them for later)
+        const rankPenalty = Math.min(Math.round(_tRank * 0.3), 15);
+        score -= (20 + rankPenalty);
+        _bd.trumpPenalty = -(20 + rankPenalty);
         if(isLastTrump){ score -= 30; _bd.lastTrumpPenalty = -30; }
       }
 
