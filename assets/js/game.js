@@ -4735,22 +4735,25 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       }
     }
     if(highIdx >= 0 && highRank > winnerRank){
+      // MUST-WIN: bidder team must win every remaining trick — no ducking, play to win
+      if(mustWin && isBidderTeam){
+        return makeResult(highIdx, "Must-win endgame: take every trick");
+      }
       // MOON BIDDER: always win when bid not safe and endgame (no partners to help)
       if(isMoon && iAmBidder && !bidIsSafe && tricksLeft <= 3){
         return makeResult(highIdx, "Moon endgame: must win every trick");
       }
       // MOON OPPONENT: aggressively win when bidder is on pace for all tricks
-      // If bidder has won all tricks so far, opponents MUST block or bidder gets Moon
       if(isMoon && !iAmBidder && canSetBid){
         const bidderTricksWon = gameState.team_points[bidderTeamIdx] || 0;
-        const bidderOnPace = bidderTricksWon >= trickNum; // won every trick so far
+        const bidderOnPace = bidderTricksWon >= trickNum;
         if(bidderOnPace && tricksLeft <= 4){
           return makeResult(highIdx, "Moon opp: block bidder from winning all tricks");
         }
       }
       // DUCK: if partner plays after us and likely has the double (higher card),
       // duck to let partner win (they can then lead a strategic suit)
-      if(!isMoon && !isLastInTrick && !canSetBid && !winnerIsTrump){
+      if(!isMoon && !isLastInTrick && !canSetBid && !winnerIsTrump && !mustWin){
         let partnerAfterUs = false;
         for(let s = 0; s < gameState.player_count; s++){
           if(!isSameTeam(s) || s === p) continue;
