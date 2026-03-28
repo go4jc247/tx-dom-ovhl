@@ -4374,6 +4374,93 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     }
   }
 
+  // ── TRUMP-LED FOLLOW: when trump suit is led, we must play trump ──
+  // This is distinct from off-suit trump-in: we MUST follow, so no conservation logic applies
+  if(trumpWasLed && !isLead){
+    let highestTrickTrumpF = -1;
+    let trickWinnerSeatF = -1;
+    for(const play of trick){
+      if(!Array.isArray(play)) continue;
+      const [seat, t] = play;
+      if(t && gameState._is_trump_tile(t)){
+        const r = getTrumpRankNum(t);
+        if(r > highestTrickTrumpF){ highestTrickTrumpF = r; trickWinnerSeatF = seat; }
+      }
+    }
+    const partnerWinningTrumpF = trickWinnerSeatF >= 0 && isSameTeam(trickWinnerSeatF);
+
+    // Find lowest winning trump and lowest trump overall (prefer non-count)
+    let winTrumpF = -1, winRankF = Infinity, winIsCountF = true;
+    let lowTrumpF = -1, lowRankF = Infinity, lowIsCountF = true;
+    for(const idx of legal){
+      const tile = hand[idx];
+      if(!gameState._is_trump_tile(tile)) continue;
+      const r = getTrumpRankNum(tile);
+      const ps = tile[0] + tile[1];
+      const isCount = (ps === 5 || ps === 10);
+      // Track lowest trump (prefer non-count)
+      if((!isCount && lowIsCountF) || (isCount === lowIsCountF && r < lowRankF)){
+        lowRankF = r; lowTrumpF = idx; lowIsCountF = isCount;
+      }
+      // Track lowest WINNING trump (prefer non-count)
+      if(r > highestTrickTrumpF){
+        if((!isCount && winIsCountF) || (isCount === winIsCountF && r < winRankF)){
+          winRankF = r; winTrumpF = idx; winIsCountF = isCount;
+        }
+      }
+    }
+
+    const trickCountF = trick.reduce((sum, play) => {
+      if(!Array.isArray(play) || !play[1]) return sum;
+      const ps = play[1][0] + play[1][1];
+      return sum + ((ps === 5) ? 5 : (ps === 10) ? 10 : 0);
+    }, 0);
+
+    // Partner winning the trump trick
+    if(partnerWinningTrumpF){
+      // Throw count trump if safe, otherwise lowest trump
+      let oppsLeftF = 0;
+      for(let s = 0; s < gameState.player_count; s++){
+        if(isSameTeam(s) || s === p) continue;
+        if(!trick.some(play => Array.isArray(play) && play[0] === s)) oppsLeftF++;
+      }
+      const safeF = oppsLeftF === 0 || isLastInTrick;
+      let countTrumpF = -1, countValF = 0;
+      for(const idx of legal){
+        const tile = hand[idx];
+        if(!gameState._is_trump_tile(tile)) continue;
+        const ps = tile[0] + tile[1];
+        if((ps === 5 || ps === 10) && ps > countValF){ countValF = ps; countTrumpF = idx; }
+      }
+      if(countTrumpF >= 0 && safeF){
+        return makeResult(countTrumpF, "Trump led, partner winning — throw count trump (" + countValF + "pts)");
+      }
+      if(lowTrumpF >= 0) return makeResult(lowTrumpF, "Trump led, partner winning — play low trump");
+    }
+
+    // Last in trick: always win if count in trick
+    if(isLastInTrick && winTrumpF >= 0 && trickCountF > 0){
+      return makeResult(winTrumpF, "Trump led, last: win for " + trickCountF + "pts");
+    }
+
+    // Can we beat the current winner?
+    if(winTrumpF >= 0){
+      // On defense trying to set bid: always overtake
+      if(canSetBid && !isBidderTeam){
+        return makeResult(winTrumpF, "Trump led: overtake to set bid");
+      }
+      // Bidder team or count in trick: win it
+      if(isBidderTeam || trickCountF > 0){
+        return makeResult(winTrumpF, "Trump led: lowest winning trump");
+      }
+      // Defense with no count: still overtake (denies bidder the trick)
+      return makeResult(winTrumpF, "Trump led: overtake opponent");
+    }
+
+    // Can't beat — play lowest trump (preserve higher ones)
+    if(lowTrumpF >= 0) return makeResult(lowTrumpF, "Trump led: can't beat, play low trump");
+  }
+
   // ── Off-suit: trump in ──
   const canTrump = legalTiles.some(t => gameState._is_trump_tile(t));
   if(canTrump){
@@ -16613,6 +16700,23 @@ function processAIBid(seat) {
     }
   }
 
+  // EARLY-POSITION CONSERVATIVE BIDDING: first/second bidders pass on borderline hands
+  // Rationale: early bidders reveal hand strength to opponents; better to let partner bid
+  if (evaluation.action === "bid" && biddingState.bidderOrder) {
+    const myIdx = biddingState.bidderOrder.indexOf(seat);
+    const totalBidders = biddingState.bidderOrder.length;
+    const isEarlyBidder = myIdx <= 1 && totalBidders >= 4; // first 2 of 4+ bidders
+    const minBid = GAME_MODE === 'MOON' ? 4 : (GAME_MODE === 'T42' ? 30 : 34);
+    const midBid = GAME_MODE === 'MOON' ? 5 : (GAME_MODE === 'T42' ? 36 : 39);
+    if (isEarlyBidder && evaluation.bid <= midBid && (evaluation.marks || 1) === 1) {
+      // Borderline hand in early position — pass and let partner evaluate
+      // Exception: if bid is above midBid or has marks, it's strong enough
+      biddingState.passCount++;
+      biddingState.bids.push({ seat, playerNumber: seatToPlayer(seat), bid: "pass" });
+      return { action: "pass" };
+    }
+  }
+
   if (evaluation.action !== "bid") {
     biddingState.passCount++;
     biddingState.bids.push({ seat, playerNumber: seatToPlayer(seat), bid: "pass" });
@@ -16655,11 +16759,22 @@ function processAIBidWithEval(seat, evaluation) {
     }
   }
 
-  // Competitive outbid: if our natural bid ties the leader, bump by 1 if we have a strong hand
+  // Competitive outbid: if our natural bid ties the leader, bump by 1 — but only if hand can sustain it
+  // Sustainability check: require double trump + second trump (top 2 in suit) to justify the bump
   if (bidAmount === biddingState.highBid && bidMarks === (biddingState.highMarks || 1) && evalMarks >= 1) {
     const maxBidForMode = GAME_MODE === 'MOON' ? 7 : (GAME_MODE === 'T42' ? 42 : 51);
-    if (bidAmount < maxBidForMode) {
-      bidAmount += 1; // outbid by minimum increment
+    const maxPip = session.game.max_pip;
+    // Check if hand has a strong trump suit (double + second) to sustain the higher bid
+    let canSustain = false;
+    for (let pip = maxPip; pip >= 0; pip--) {
+      const trumpTiles = hand.filter(t => t[0] === pip || t[1] === pip);
+      const hasDouble = trumpTiles.some(t => t[0] === pip && t[1] === pip);
+      const hasSecond = trumpTiles.some(t =>
+        t[0] !== t[1] && ((t[0] === pip && t[1] === pip - 1) || (t[0] === pip - 1 && t[1] === pip)));
+      if (trumpTiles.length >= 4 && hasDouble && hasSecond) { canSustain = true; break; }
+    }
+    if (canSustain && bidAmount < maxBidForMode) {
+      bidAmount += 1; // outbid by minimum increment — hand can support it
     }
   }
 
