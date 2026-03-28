@@ -13050,8 +13050,11 @@ function aiWidowSwap(seat){
   if(!session || !session.moon_widow) { session.skipWidow(); afterWidowSwap(); return; }
   var hand = session.game.hands[seat];
   var widow = session.moon_widow;
-  var trumpSuit = session.game.trump_suit;
-  var trumpMode = session.game.trump_mode;
+  // Trump hasn't been chosen yet during widow swap — predict what we'd pick
+  // so we can evaluate tiles relative to our likely trump choice
+  var predictedTrump = aiChooseTrump(hand, session.current_bid || 4);
+  var trumpSuit = (typeof predictedTrump === 'number') ? predictedTrump : null;
+  var trumpMode = (predictedTrump === 'DOUBLES') ? 'DOUBLES' : (trumpSuit !== null ? 'PIP' : 'NONE');
 
   function tileValue(t, handWithout){
     var val = t[0] + t[1];
