@@ -4078,7 +4078,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     if(winnerIsTrump){
       // offTracker: When forced to play low, prefer discarding non-catcher tiles
       if(lowIdx >= 0){
-        if(offTracker && offTracker.trumpMode === 'PIP' && (p % 2) !== offTracker.bidderTeam){
+        if(offTracker && offTracker.trumpMode === 'PIP' && (isMoon ? (offTracker.bidderTeam !== p) : ((p % 2) !== offTracker.bidderTeam))){
           const suspicion = getOffSuspicion();
           if(suspicion && suspicion.length > 0 && suspicion[0].suspicion >= 40){
             // Find the lowest non-catcher tile in suit
@@ -4114,7 +4114,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     }
     if(lowIdx >= 0){
       // offTracker: When can't win, protect catchers
-      if(offTracker && offTracker.trumpMode === 'PIP' && (p % 2) !== offTracker.bidderTeam){
+      if(offTracker && offTracker.trumpMode === 'PIP' && (isMoon ? (offTracker.bidderTeam !== p) : ((p % 2) !== offTracker.bidderTeam))){
         const suspicion = getOffSuspicion();
         if(suspicion && suspicion.length > 0 && suspicion[0].suspicion >= 40){
           let safeLow = lowIdx, safeRank = Infinity;
