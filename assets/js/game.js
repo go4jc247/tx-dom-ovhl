@@ -3145,11 +3145,18 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   const tricksLeft = totalTricks - trickNum;
 
   // ═══════════════════════════════════════════════════════════════════
+  //  ENDGAME AWARENESS — adjust strategy in final tricks
+  // ═══════════════════════════════════════════════════════════════════
+  const isEndgame = tricksLeft <= 2;
+  const mustWin = isEndgame && !bidIsSafe; // must win remaining tricks to make bid
+  const canRelax = bidIsSafe && tricksLeft >= 2; // bid is safe, play conservatively
+
+  // ═══════════════════════════════════════════════════════════════════
   //  LAST TRUMP PROTECTION
   // ═══════════════════════════════════════════════════════════════════
   const isLastTrump = trumpsInHand.length === 1;
-  // Save last trump UNLESS: bid is not safe and we need to win now, OR it's the last trick
-  const shouldSaveLastTrump = isLastTrump && !bidIsClose && tricksLeft > 1;
+  // Save last trump UNLESS: we must win (endgame + bid not safe), OR it's the last trick
+  const shouldSaveLastTrump = isLastTrump && !mustWin && tricksLeft > 1;
 
   // Debug: bid safety + last trump
   if(_dbg.enabled){
@@ -3456,11 +3463,11 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         return makeResult(bestIdx, "Lead: low-value trump (pulling remaining trumps)");
       }
 
-      // P3: Early game trump aggression — lead trump even without highest
-      // if we have 2+ trumps, it's trick 0 or 1, and bid isn't safe yet
+      // P3: Trump aggression — lead trump even without highest
+      // Early game (trick 0-1) OR endgame must-win: force opponent trumps
       // Skip if remaining trumps are only held by partners (don't pull partner trumps)
       // PICK LOWEST VALUE trump to avoid wasting count tiles
-      if(otherTrumps.length >= 2 && trickNum <= 1 && !bidIsSafe && !partnersHoldRemainingTrumps){
+      if(otherTrumps.length >= 2 && (trickNum <= 1 || mustWin) && !bidIsSafe && !partnersHoldRemainingTrumps){
         let bestIdx = otherTrumps[0], bestVal = Infinity;
         for(const idx of otherTrumps){
           const tile = hand[idx];
@@ -3884,6 +3891,11 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     }
     if(anyTrumpIdx >= 0 && highestTrickTrump < 0){
       return makeResult(anyTrumpIdx, "Trump in to win");
+    }
+    // Endgame desperation: trump in even if we can't beat existing trump
+    // to prevent opponents from scoring count and to use remaining trumps
+    if(mustWin && anyTrumpIdx >= 0 && !partnerHasTrumpInTrick){
+      return makeResult(anyTrumpIdx, "Endgame: desperate trump in");
     }
     // Can't beat existing trump — fall through to dump
   }
