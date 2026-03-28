@@ -1693,19 +1693,6 @@ function aiChooseTrump(hand, bidAmount) {
   let bestScore = -Infinity;
   const maxPip = GAME_MODE === 'MOON' ? 6 : 7;
 
-  // Count tiles per suit for void detection
-  const suitCounts = {};
-  for (let pip = 0; pip <= maxPip; pip++) suitCounts[pip] = 0;
-  for (const tile of hand) {
-    const [a, b] = tile;
-    if (a !== b) { // non-doubles belong to both suits
-      suitCounts[a]++;
-      suitCounts[b]++;
-    }
-    // doubles belong to their own suit
-    if (a === b) suitCounts[a]++;
-  }
-
   for (let pip = maxPip; pip >= 0; pip--) {
     const trumpTiles = hand.filter(t => t[0] === pip || t[1] === pip);
     if (trumpTiles.length === 0) continue;
@@ -3443,8 +3430,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   // ═══════════════════════════════════════════════════════════════════
   //  ENDGAME AWARENESS — adjust strategy in final tricks
   // ═══════════════════════════════════════════════════════════════════
-  const isPreEndgame = tricksLeft <= 3; // influences count-hunting and conservation earlier
-  const isEndgame = tricksLeft <= 2;
+  const isPreEndgame = isMoon ? (tricksLeft <= 4) : (tricksLeft <= 3);
+  const isEndgame = isMoon ? (tricksLeft <= 3) : (tricksLeft <= 2);
   const mustWin = isEndgame && !bidIsSafe; // must win remaining tricks to make bid
   // Bid safe but opponents still have dangerous count? Don't relax yet
   const canRelax = bidIsSafe && tricksLeft >= 2 && !(totalCountRemaining >= 10 && pointsNeeded >= -5);
@@ -3590,13 +3577,20 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     if(iAmBidder){
       // NELLO BIDDER following: play HIGHEST card that still LOSES
       // This dumps dangerous high cards while safely under the current winner
+      const _nLedSuitB = gameState._led_suit_for_trick();
+      const _doublesLed = _nLedSuitB === -2;
       const winnerSeat = gameState._determine_trick_winner();
       let winnerRank = -1;
       for(const play of trick){
         if(!Array.isArray(play)) continue;
         if(play[0] === winnerSeat && play[1]){
-          const wr = gameState._suit_rank(play[1], ledPip);
-          winnerRank = wr[0] * 100 + wr[1];
+          if(_doublesLed){
+            // In doubles-as-suit, rank by pip value (higher double = higher rank)
+            winnerRank = play[1][0]; // doubles have equal pips, so [0] is the rank
+          } else if(ledPip !== null && ledPip >= 0){
+            const wr = gameState._suit_rank(play[1], ledPip);
+            winnerRank = wr[0] * 100 + wr[1];
+          }
         }
       }
       let bestDumpIdx = -1, bestDumpRank = -1;
@@ -3606,7 +3600,15 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         const val = tile[0] + tile[1];
         if(val < lowVal){ lowVal = val; lowIdx = idx; }
         // Check if this tile would lose (rank < winner)
-        if((tile[0] === ledPip || tile[1] === ledPip) && !gameState._is_trump_tile(tile)){
+        if(_doublesLed){
+          // In doubles-as-suit mode, only doubles follow; rank by pip
+          if(tile[0] === tile[1]){
+            const rank = tile[0];
+            if(rank < winnerRank && rank > bestDumpRank){
+              bestDumpRank = rank; bestDumpIdx = idx;
+            }
+          }
+        } else if(ledPip !== null && ledPip >= 0 && (tile[0] === ledPip || tile[1] === ledPip) && !gameState._is_trump_tile(tile)){
           const r = gameState._suit_rank(tile, ledPip);
           const rank = r[0] * 100 + r[1];
           if(rank < winnerRank && rank > bestDumpRank){
@@ -3616,7 +3618,9 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       }
       if(bestDumpIdx >= 0) return makeResult(bestDumpIdx, "Nel-O bidder: highest losing card (dump danger)");
       // Off-suit: dump the HIGHEST dangerous card (can't win off-suit, so discard future threats)
-      const hasInSuit = legal.some(i => hand[i][0] === ledPip || hand[i][1] === ledPip);
+      const hasInSuit = _doublesLed
+        ? legal.some(i => hand[i][0] === hand[i][1])
+        : (ledPip !== null && ledPip >= 0 && legal.some(i => hand[i][0] === ledPip || hand[i][1] === ledPip));
       if(!hasInSuit){
         // Prefer dumping doubles (dangerous when led) and high-pip tiles
         let dumpIdx = legal[0], dumpScore = -Infinity;
@@ -4087,7 +4091,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       const p3LateWindow = trickNum === 3 && trumpsInHand.length >= 5; // stricter late
       // Defenders: more conservative — only pull early or when can set bid
       // Bidders: aggressive pulling to gain control
-      const p3RoleOk = isBidderTeam || canSetBid || p3EarlyWindow;
+      const p3RoleOk = isBidderTeam || (canSetBid && !canRelax) || p3EarlyWindow;
       if(otherTrumps.length >= 2 && trumpsInHand.length >= 3 && !opponentsVoidInTrump && (p3EarlyWindow || p3MidWindow || p3LateWindow || mustWin) && p3RoleOk && !bidIsSafe && !partnersHoldRemainingTrumps){
         let bestIdx = otherTrumps[0], bestScore = -Infinity;
         for(const idx of otherTrumps){
@@ -5154,8 +5158,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       // COUNT-HIDING: when opponents need count, prefer dumping non-count tiles
       // This denies them scoring opportunities when they win tricks
       if(opponentsNeedCount && myCount === 0){
-        score += 6; // bonus for dumping count-free tiles (hides our count)
-        _bd.countHideBonus = 6;
+        score += 12; // bonus for dumping count-free tiles (hides our count)
+        _bd.countHideBonus = 12;
       }
 
       // SUIT WIN PROBABILITY: preserve tiles in depleted suits (likely to win later)
@@ -5183,7 +5187,10 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         const isCoveredOff = holdDouble && lowPip2 === highPip2 - 1 && doubleStillViable;
         if(isCoveredOff){
           // Scale penalty by remaining tricks — breaking a walker pair matters less in endgame
-          const walkerPenalty = tricksLeft <= 3 ? -9 : (tricksLeft <= 5 ? -14 : -18);
+          // Moon: walker pairs are proportionally more valuable (9 tricks, solo player)
+          const walkerPenalty = isMoon
+            ? (tricksLeft <= 2 ? -30 : (tricksLeft <= 4 ? -22 : -18))
+            : (tricksLeft <= 3 ? -9 : (tricksLeft <= 5 ? -14 : -18));
           score += walkerPenalty;
           _bd.walkerPenalty = walkerPenalty;
         }
