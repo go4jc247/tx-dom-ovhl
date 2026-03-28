@@ -5896,6 +5896,12 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           return makeResult(winTrumpIdx, "Trump in: need " + pointsNeeded + "pts, can't afford to lose tricks");
         }
       }
+      // DEFENDER BID-SAFE AGGRESSION: when bid is already made, defenders should
+      // aggressively trump in on count-bearing tricks to grab points and deny extras
+      if(bidIsSafe && !isBidderTeam && trickCount >= 5 && winTrumpIdx >= 0 && !partnerWinning){
+        return makeResult(winTrumpIdx, "Defend bid-safe: trump in to grab " + trickCount + "pts (deny extras)");
+      }
+
       // TRUMP RATIO CONSERVATION: on defense, save trumps for higher-value tricks
       // When trumps are scarce relative to remaining tricks, don't waste on 0-count tricks
       const _trumpRatio = tricksLeft > 0 ? trumpsInHand.length / tricksLeft : 1;
@@ -6113,6 +6119,27 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           score += Math.min(info.countRemaining, 10); // bonus for count-rich void
           _bd.countVoidBonus = Math.min(info.countRemaining, 10);
         }
+        // SUIT DENSITY BONUS: voiding a suit with many remaining tiles = more future trump-in opportunities
+        if(info && info.tilesLeft >= 3){
+          const densityBonus = Math.min(info.tilesLeft * 2, 8);
+          score += densityBonus;
+          _bd.voidDensityBonus = densityBonus;
+        }
+      }
+
+      // DEFENDER BID-SAFE COUNTER: when bidder team already made their bid,
+      // defenders should aggressively grab count and deny free points
+      if(bidIsSafe && !isBidderTeam && !isMoon){
+        // Dump low non-count tiles (save count for our own tricks)
+        if(myCount === 0){
+          score += 6; // non-count tiles are preferred dumps
+          _bd.defBidSafeDumpNonCount = 6;
+        }
+        // Protect our count tiles more aggressively — don't give bidder extras
+        if(myCount > 0 && !partnerWinning){
+          score -= myCount * 2;
+          _bd.defBidSafeCountProtect = -(myCount * 2);
+        }
       }
 
       // Prefer lower pip sum
@@ -6140,6 +6167,20 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         if(iAmBidder){
           score += pipSum; // prefer dumping HIGH tiles (they'd win tricks we don't want)
           _bd.moonBidderDumpHigh = pipSum;
+        }
+      }
+
+      // TN51 3-TEAM DUMP: in TN51, two defender teams cooperate against bidder
+      // When another defender is already winning the trick, throw count more freely
+      if(isTN51 && !isBidderTeam && !partnerWinning && trick.length > 0){
+        const trickWinner = gameState._determine_trick_winner();
+        const winnerOnBidTeam = trickWinner >= 0 && (trickWinner % 3) === bidderTeamIdx;
+        if(!winnerOnBidTeam && trickWinner >= 0 && (trickWinner % 3) !== myTeam){
+          // Other defender team is winning — safe to throw count (it goes to fellow defender)
+          if(myCount > 0){
+            score += myCount * 2;
+            _bd.tn51DefCoopCount = myCount * 2;
+          }
         }
       }
 

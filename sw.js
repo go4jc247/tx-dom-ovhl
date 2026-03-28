@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.28.0 — Fix tap-to-sort during trump selection
+// Version: v17.29.0 — Defender bid-safe counter, void density, TN51 dump
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.28.0';
+const CACHE_NAME = 'tx-dom-v17.29.0';
 const urlsToCache = [
   './index.html',
   // CSS
