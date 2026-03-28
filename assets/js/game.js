@@ -4136,6 +4136,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           const dbl = tile[0] === tile[1];
           const isTrump = gameState._is_trump_tile(tile);
           const suitPip = dbl ? tile[0] : Math.max(tile[0], tile[1]);
+          const pipSum = tile[0] + tile[1];
+          const myCount = (pipSum === 5) ? 5 : (pipSum === 10) ? 10 : 0;
           let score = 0;
 
           // Doubles = guaranteed wins in their suit (unless trumped)
@@ -4152,15 +4154,21 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           if(info && info.tilesLeft <= 2 && !dbl) score += 5; // depleted suit = safer
           if(info && !info.winnerPlayed && !dbl) score -= 15; // double not out = risky
 
+          // Count awareness: avoid leading count tiles (risk giving bidder points)
+          if(myCount > 0 && !dbl) score -= myCount;
+
           // Covered offs are safe leads (double in hand + this tile)
           if(!dbl && !isTrump){
             const haveDouble = hand.some(h => h[0] === suitPip && h[1] === suitPip);
             if(haveDouble) score += 18; // walker pair
           }
 
+          // Prefer non-trump tiles to save trump for critical moments
+          if(isTrump && !dbl) score -= 8;
+
           if(score > bestScore){ bestScore = score; bestIdx = idx; }
         }
-        if(bestScore > 10){
+        if(bestScore > 5){
           return makeResult(bestIdx, "Moon opp: strategic lead (score " + bestScore + ")");
         }
       }
@@ -7224,7 +7232,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.34.0';  // v17.34.0: Moon NaN fix, AI improvements
+const MP_VERSION = 'v17.35.0';  // v17.35.0: Moon opp lead, count/trump awareness
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
