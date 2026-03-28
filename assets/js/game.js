@@ -4096,17 +4096,15 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
 
     // ── MOON OPPONENT LEAD: maximize trick wins to deny the bidder ──
     // In Moon, there are no partners — every non-bidder must win tricks independently.
-    // When the bidder is on pace for all tricks, lead suits where bidder is likely void
-    // to force bidder to waste trump or play off-suit.
     if(isMoon && !iAmBidder){
       const bidderTricksWon = gameState.team_points[bidderTeamIdx] || 0;
       const isShootMoon = session && session.moon_shoot;
       const bidderOnPace = bidderTricksWon >= trickNum;
+
       if(bidderOnPace || isShootMoon){
         // Bidder winning everything — lead our guaranteed winners first
         // Priority: doubles (guaranteed), then highest non-trump tiles
         if(nonTrumpDoubles.length > 0){
-          // Lead doubles — they win unless trumped
           let bestDblIdx = nonTrumpDoubles[0], bestDblPip = -1;
           for(const idx of nonTrumpDoubles){
             if(hand[idx][0] > bestDblPip){ bestDblPip = hand[idx][0]; bestDblIdx = idx; }
@@ -4114,10 +4112,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           return makeResult(bestDblIdx, "Moon opp lead: double to deny bidder");
         }
         if(trumpDoubles.length > 0){
-          // Lead trump double if no non-trump doubles
           return makeResult(trumpDoubles[0], "Moon opp lead: trump double to deny bidder");
         }
-        // Lead highest trump to assert dominance
         if(pullableTrumps.length > 0){
           let highIdx = pullableTrumps[0], highRank = -Infinity;
           for(const idx of pullableTrumps){
@@ -4125,6 +4121,45 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
             if(r > highRank){ highRank = r; highIdx = idx; }
           }
           return makeResult(highIdx, "Moon opp lead: high trump to win trick");
+        }
+      }
+
+      // MOON OPPONENT GENERAL LEAD: bidder is NOT on pace — lead strategically
+      // Prefer suits where bidder is known void (can't follow = no forced win)
+      // and where we have the double (guaranteed trick)
+      if(!bidderOnPace && tricksLeft >= 2){
+        let bestIdx = legal[0], bestScore = -Infinity;
+        for(const idx of legal){
+          const tile = hand[idx];
+          const dbl = tile[0] === tile[1];
+          const isTrump = gameState._is_trump_tile(tile);
+          const suitPip = dbl ? tile[0] : Math.max(tile[0], tile[1]);
+          let score = 0;
+
+          // Doubles = guaranteed wins in their suit (unless trumped)
+          if(dbl && !isTrump) score += 25;
+          if(dbl && isTrump) score += 20;
+
+          // Lead into suits where bidder is void — they can't be forced to follow
+          if(bidderSeat !== undefined && voidIn[bidderSeat] && voidIn[bidderSeat].has(suitPip)){
+            score += 12; // bidder void = they dump, we likely win
+          }
+
+          // Avoid leading suits where bidder has shown strength
+          const info = suitInfo[suitPip];
+          if(info && info.tilesLeft <= 2 && !dbl) score += 5; // depleted suit = safer
+          if(info && !info.winnerPlayed && !dbl) score -= 15; // double not out = risky
+
+          // Covered offs are safe leads (double in hand + this tile)
+          if(!dbl && !isTrump){
+            const haveDouble = hand.some(h => h[0] === suitPip && h[1] === suitPip);
+            if(haveDouble) score += 18; // walker pair
+          }
+
+          if(score > bestScore){ bestScore = score; bestIdx = idx; }
+        }
+        if(bestScore > 10){
+          return makeResult(bestIdx, "Moon opp: strategic lead (score " + bestScore + ")");
         }
       }
     }
