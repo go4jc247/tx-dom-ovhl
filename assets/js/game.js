@@ -2471,7 +2471,7 @@ function getOffSuspicion() {
   if (!offTracker) return null;
   const entries = Object.entries(offTracker.suitSuspicion)
     .map(([pip, sus]) => ({ pip: Number(pip), suspicion: sus }))
-    .filter(e => e.suspicion > 0)
+    .filter(e => e.suspicion > 0 && !(offTracker.confirmedVoid && offTracker.confirmedVoid.has(e.pip)))
     .sort((a, b) => b.suspicion - a.suspicion);
   return entries;
 }
@@ -5165,12 +5165,17 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     // This lets us lead into count-rich suits on the next trick
     // Only sacrifice non-count trumps and verify we have count-rich lead options
     if(!isBidderTeam && canSetBid && winTrumpIdx >= 0 && weHaveTrumpControl
-      && countElsewhere >= 10 && tricksLeft >= 2){
-      const sacTile = hand[winTrumpIdx];
-      const sacPs = sacTile[0] + sacTile[1];
-      const sacIsCount = (sacPs === 5 || sacPs === 10);
-      if(!sacIsCount){
-        return makeResult(winTrumpIdx, "Defense sacrifice: trump to get lead for count capture");
+      && countElsewhere >= 10 && tricksLeft >= 2
+      && !shouldSaveLastTrump && trumpsInHand.length >= 3){
+      // Verify we have non-trump tiles to lead next trick (otherwise sacrifice is pointless)
+      const hasNonTrumpLead = hand.some(t => !gameState._is_trump_tile(t));
+      if(hasNonTrumpLead){
+        const sacTile = hand[winTrumpIdx];
+        const sacPs = sacTile[0] + sacTile[1];
+        const sacIsCount = (sacPs === 5 || sacPs === 10);
+        if(!sacIsCount){
+          return makeResult(winTrumpIdx, "Defense sacrifice: trump to get lead for count capture");
+        }
       }
     }
     // Endgame desperation: trump in even if we can't beat existing trump
