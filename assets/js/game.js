@@ -3658,27 +3658,32 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       // P2: Lead trump IF we have the highest remaining
       // BUT respect last-trump protection
       // AND don't waste high trumps pulling partner's trumps
-      // PICK LOWEST VALUE trump to avoid wasting count tiles (5-1 worth 5pts, etc.)
+      // PICK safest trump: avoid count tiles (pipSum=5 or 10), then prefer low value
       if(otherTrumps.length > 0 && iHaveHighestTrump && !shouldSaveLastTrump && !partnersHoldRemainingTrumps){
-        let bestIdx = otherTrumps[0], bestVal = Infinity;
+        let bestIdx = otherTrumps[0], bestScore = -Infinity;
         for(const idx of otherTrumps){
           const tile = hand[idx];
           const pipSum = tile[0] + tile[1];
-          if(pipSum < bestVal){ bestVal = pipSum; bestIdx = idx; }
+          const isCount = (pipSum === 5 || pipSum === 10);
+          // Prefer non-count trumps, then lowest pipSum
+          let score = -pipSum + (isCount ? -50 : 0);
+          if(score > bestScore){ bestScore = score; bestIdx = idx; }
         }
-        return makeResult(bestIdx, "Lead: low-value trump (pulling remaining trumps)");
+        return makeResult(bestIdx, "Lead: safe trump (pulling remaining trumps)");
       }
 
       // P3: Trump aggression — lead trump even without highest
       // Early game (trick 0-1) OR endgame must-win: force opponent trumps
       // Skip if remaining trumps are only held by partners (don't pull partner trumps)
-      // PICK LOWEST VALUE trump to avoid wasting count tiles
+      // PICK safest trump: avoid count tiles, then prefer low value
       if(otherTrumps.length >= 2 && (trickNum <= 1 || mustWin) && !bidIsSafe && !partnersHoldRemainingTrumps){
-        let bestIdx = otherTrumps[0], bestVal = Infinity;
+        let bestIdx = otherTrumps[0], bestScore = -Infinity;
         for(const idx of otherTrumps){
           const tile = hand[idx];
           const pipSum = tile[0] + tile[1];
-          if(pipSum < bestVal){ bestVal = pipSum; bestIdx = idx; }
+          const isCount = (pipSum === 5 || pipSum === 10);
+          let score = -pipSum + (isCount ? -50 : 0);
+          if(score > bestScore){ bestScore = score; bestIdx = idx; }
         }
         return makeResult(bestIdx, "Lead: early trump (forcing opponent trumps)");
       }
