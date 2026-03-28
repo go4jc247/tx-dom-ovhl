@@ -3012,7 +3012,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         // Player is void in led suit — probably void in trump too, but not certain
         // (they may be strategically saving trump for a bigger trick)
         voidIn[seat].add(ledPip);
-        trumpVoidLikely[seat] = Math.min(1, trumpVoidLikely[seat] + 0.4);
+        trumpVoidLikely[seat] = Math.min(1, trumpVoidLikely[seat] + 0.55);
       } else if(!tileHasSuit && tileIsTrump){
         // Player is void in led suit, but has trump
         voidIn[seat].add(ledPip);
@@ -3089,7 +3089,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
             voidIn[seat].add(likelyLedPip);
             // Not trumping when off-suit is a SIGNAL but not proof of trump void
             // Player may be saving trump — increase likelihood but don't confirm
-            trumpVoidLikely[seat] = Math.min(1, trumpVoidLikely[seat] + 0.3);
+            trumpVoidLikely[seat] = Math.min(1, trumpVoidLikely[seat] + 0.4);
           } else if(!hasSuit && isTrump){
             voidIn[seat].add(likelyLedPip);
           }
@@ -17193,7 +17193,7 @@ function processAIBidWithEval(seat, evaluation) {
     const handIsMaxBid = evaluation.bid >= maxBid;
     const shouldEscalate = (nextMult <= 2 && handIsMaxBid) ||
       (nextMult === 3 && handIsMaxBid && evalMarks >= 2) ||
-      (nextMult === 4 && handIsMaxBid && evalMarks >= 2);
+      (nextMult === 4 && handIsMaxBid && evalMarks >= 3); // 4x requires dominant hand
     if (nextMult <= MAX_AI_MULTIPLIER && shouldEscalate) {
       bidMarks = nextMult;
       bidAmount = maxBid;
