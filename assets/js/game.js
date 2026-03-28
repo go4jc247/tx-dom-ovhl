@@ -6544,9 +6544,13 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       };
     }
 
-    // If partner already trumped and is winning, DON'T over-trump — throw count or play low
-    // BUT: check if opponents can still over-trump partner (they haven't played yet)
-    if(partnerHasTrumpInTrick && !opponentHasTrumpInTrick){
+    // If partner (or TN51 friendly defender) already trumped and is winning, DON'T over-trump
+    // BUT: check if opponents (bidder's team) can still over-trump
+    const friendlyTrumpWinning = partnerHasTrumpInTrick
+      || (isTN51 && !isBidderTeam && currentWinner !== null && currentWinner !== p
+          && gameState.team_of(currentWinner) !== bidderTeamIdx
+          && trick.some(play => Array.isArray(play) && play[0] === currentWinner && gameState._is_trump_tile(play[1])));
+    if(friendlyTrumpWinning && !opponentHasTrumpInTrick){
       // Check: can opponents still over-trump?
       let oppsYetToPlay = 0;
       for(let s = 0; s < gameState.player_count; s++){
@@ -6582,7 +6586,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     // BID-SAFE TRUMP CONSERVATION: when bid is already made, don't waste trump on 0-count tricks
     // Only trump in if: trick has count, or it's the final trick
     if(bidIsSafe && isBidderTeam && canRelax){
-      const trickCountSafe = trick.reduce((sum, play) => {
+      const trickCountSafe = isMoon ? 0 : trick.reduce((sum, play) => {
         if(!Array.isArray(play) || !play[1]) return sum;
         const ps = play[1][0] + play[1][1];
         return sum + ((ps === 5) ? 5 : (ps === 10) ? 10 : 0);
@@ -8071,7 +8075,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.88.0';  // v17.88.0: Complete Moon count-tile purge: follow, dump, trump-led, lookahead
+const MP_VERSION = 'v17.89.0';  // v17.89.0: TN51 friendly defender trump cooperation + remaining Moon count guards
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
