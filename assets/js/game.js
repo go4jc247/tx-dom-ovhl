@@ -5168,6 +5168,34 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           }
         }
 
+        // TN51 DEFENDER COOPERATION: In TN51, oppSuitSignal includes both the bidder team
+        // AND the other defender team. Leading into the other defender's strong suit is GOOD
+        // (they can win and deny the bidder). Compensate for the oppSuitSignal penalty.
+        if(isTN51 && !isBidderTeam && oppSuitSignal[ledSuit]){
+          // Build a signal for just the OTHER defender team (not bidder team, not our team)
+          let otherDefSignal = 0;
+          for(let team = 0; team < (gameState.tricks_team || []).length; team++){
+            for(const record of (gameState.tricks_team[team] || [])){
+              for(let seat = 0; seat < record.length; seat++){
+                if(seat === p || isSameTeam(seat)) continue; // skip self and partners
+                if((seat % 3) === bidderTeamIdx) continue; // skip bidder team
+                const t = record[seat];
+                if(!t || gameState._is_trump_tile(t)) continue;
+                const hp = Math.max(t[0], t[1]);
+                if(hp === ledSuit){
+                  otherDefSignal += (t[0] === t[1]) ? 20 : 5;
+                }
+              }
+            }
+          }
+          if(otherDefSignal > 0){
+            // Reverse the penalty from oppSuitSignal for this defender team's signal
+            const coopBonus = Math.min(otherDefSignal, 20);
+            score += coopBonus;
+            _breakdown.tn51DefCoopLead = coopBonus;
+          }
+        }
+
         // PARTNER SUIT RETURN: prefer suits where partner showed strength
         if(!isMoon && partnerSuitSignal[ledSuit]){
           const sigCapC = (iAmBidderPartner && bidderNeedsMore > 10) ? 25 : 20;

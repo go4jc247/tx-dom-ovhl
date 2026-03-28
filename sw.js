@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.32.0 — Bidder desperate dump, Nello double scaling, Moon bidder dump fix
+// Version: v17.33.0 — TN51 defender cooperation lead, Moon bidder dump fix verified
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.32.0';
+const CACHE_NAME = 'tx-dom-v17.33.0';
 const urlsToCache = [
   './index.html',
   // CSS
