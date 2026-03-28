@@ -17400,6 +17400,11 @@ function processAIBid(seat) {
           return processAIBidWithEval(seat, rescueEval);
         }
       }
+      // Rescue with DOUBLES trump: 3+ doubles is playable when everyone else passed
+      if (doubles.length >= 3) {
+        const rescueEval = { action: "bid", bid: minBid, marks: 1, rescue: true };
+        return processAIBidWithEval(seat, rescueEval);
+      }
     }
   }
 
@@ -17480,7 +17485,9 @@ function processAIBidWithEval(seat, evaluation) {
     if (canSustain && biddingState.highBid < maxBidForMode) {
       // Adjust up to highBid + 1 (but only if within reasonable range of our natural bid)
       const gap = biddingState.highBid - bidAmount;
-      if (gap <= 2) {
+      // Strong hands (marks >= 2) can stretch further
+      const maxGap = evalMarks >= 2 ? 3 : 2;
+      if (gap <= maxGap) {
         bidAmount = biddingState.highBid + 1; // outbid by minimum increment
       }
     }
