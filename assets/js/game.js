@@ -3322,18 +3322,37 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       if(bestDumpIdx >= 0) return makeResult(bestDumpIdx, "Nel-O bidder: highest losing card (dump danger)");
       return makeResult(lowIdx, "Nel-O bidder: play low (no safe dump)");
     }
+    if(iAmOpponent){
+      // OPPONENT following in Nello: play HIGH to put pressure on bidder
+      // If bidder hasn't played yet, play just below the current winner to keep
+      // the trick competitive, forcing bidder into a difficult position
+      const bidderPlayed = trick.some(play => Array.isArray(play) && play[0] === bidderSeat);
+      if(!bidderPlayed){
+        // Bidder still has to play — play our highest to set a high bar
+        let highIdx = legal[0], highVal = 0;
+        for(const idx of legal){
+          const val = hand[idx][0]+hand[idx][1];
+          if(val > highVal){ highVal = val; highIdx = idx; }
+        }
+        return makeResult(highIdx, "Nel-O opp: play high (bidder hasn't played)");
+      }
+      // Bidder already played — play high to try to overtake bidder if bidder is close to winning
+      let highIdx = legal[0], highVal = 0;
+      for(const idx of legal){
+        const val = hand[idx][0]+hand[idx][1];
+        if(val > highVal){ highVal = val; highIdx = idx; }
+      }
+      return makeResult(highIdx, "Nel-O opp: play high (pressure bidder)");
+    }
     {
-      // Partner or general follow — play low
+      // Partner of bidder follow — play low to help bidder avoid winning
       let lowNDIdx = -1, lowNDVal = Infinity, lowIdx = legal[0], lowVal = Infinity;
       for(const idx of legal){
         const tile = hand[idx], val = tile[0]+tile[1], dbl = tile[0]===tile[1];
         if(val < lowVal){ lowVal = val; lowIdx = idx; }
         if((!dbl || _nelloDbls) && val < lowNDVal){ lowNDVal = val; lowNDIdx = idx; }
       }
-      const reason = partnerWinning
-        ? (lowNDIdx >= 0 ? "Nel-O: partner winning, play low" : "Nel-O: partner winning, forced to play double")
-        : (lowNDIdx >= 0 ? "Nel-O: play low" : "Nel-O: play low to avoid winning");
-      return makeResult(lowNDIdx >= 0 ? lowNDIdx : lowIdx, reason);
+      return makeResult(lowNDIdx >= 0 ? lowNDIdx : lowIdx, "Nel-O partner: play low to help bidder");
     }
   }
 
