@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.0.0 — Phase 11: Shoot-the-Moon, DOUBLES rescue, 3-team coordination
+// Version: v17.2.0 — Phase 12: NT scoring, Moon opponents, widow swap, mustWin, sacrifice guards
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.0.0';
+const CACHE_NAME = 'tx-dom-v17.2.0';
 const urlsToCache = [
   './index.html',
   // CSS
