@@ -1611,6 +1611,10 @@ function evaluateHandForBid(hand) {
     if (trumpCount >= 2 && hasDoubleTrump && nonTrumpDoubles.length >= 2 && ntUncoveredOffs === 0) {
       return { action: "bid", bid: minBid, marks: 1 };
     }
+    // 2+ trumps (double + 2nd) + 1 side double + at most 1 uncovered off → min bid
+    if (trumpCount >= 2 && hasDoubleTrump && hasSecondTrump && nonTrumpDoubles.length >= 1 && ntUncoveredOffs <= 1) {
+      return { action: "bid", bid: minBid, marks: 1 };
+    }
     if (trumpCount >= 3 && hasDoubleTrump && hasSecondTrump && doubles.length >= 1) {
       // TN51: 3 trumps in 6-tile hand = 50% trump — bid higher
       const bid = handSize <= 6 ? midBid : minBid;
@@ -4698,7 +4702,15 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           return sum + ((ps === 5) ? 5 : (ps === 10) ? 10 : 0);
         }, 0);
         const info = suitInfo[ledPip];
-        if(partnerAfterUs && info && !info.winnerPlayed && trickCountDuck === 0){
+        // Check partner isn't void in the led suit (ducking is pointless if partner can't follow)
+        let partnerVoidInLed = false;
+        if(ledPip !== null && ledPip >= 0){
+          for(let s = 0; s < gameState.player_count; s++){
+            if(!isSameTeam(s) || s === p) continue;
+            if(voidIn[s] && voidIn[s].has(ledPip)){ partnerVoidInLed = true; break; }
+          }
+        }
+        if(partnerAfterUs && !partnerVoidInLed && info && !info.winnerPlayed && trickCountDuck === 0){
           // Partner might have the double — duck and let them win
           if(lowIdx >= 0){
             return makeResult(lowIdx, "Duck: let partner win (double still out)");
@@ -5075,6 +5087,13 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
 
   // ── ENDGAME COUNT DUMP: if partner is winning in final tricks, throw our best count ──
   if(isPreEndgame && partnerWinning && isBidderTeam && pointsNeeded > 0){
+    // Check opponents behind us can't overtrump
+    let _egOppsLeft = 0;
+    for(let s = 0; s < gameState.player_count; s++){
+      if(isSameTeam(s) || s === p) continue;
+      if(!trick.some(play => Array.isArray(play) && play[0] === s)) _egOppsLeft++;
+    }
+    const _egSafe = _egOppsLeft === 0 || opponentsVoidInTrump || isLastInTrick;
     let bestCountIdx = -1, bestCountVal = 0;
     for(const idx of legal){
       const ps = hand[idx][0] + hand[idx][1];
@@ -5082,7 +5101,10 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       if(cnt > bestCountVal){ bestCountVal = cnt; bestCountIdx = idx; }
     }
     if(bestCountIdx >= 0 && bestCountVal > 0){
-      return makeResult(bestCountIdx, "Last trick: throw count to partner (" + bestCountVal + "pts)");
+      // Throw 10-count only when safe; always throw 5-count (low risk)
+      if(_egSafe || bestCountVal === 5){
+        return makeResult(bestCountIdx, "Last trick: throw count to partner (" + bestCountVal + "pts)");
+      }
     }
   }
 
@@ -14038,6 +14060,14 @@ function aiWidowSwap(seat){
       }
       if(trumpCount >= 4) score += 10; // strong trump mass
       if(trumpCount >= 5) score += 8;
+
+      // Walker pair bonus: double + covered off = guaranteed 2-trick combo
+      var dblPips = new Set();
+      for(var t3 of h){ if(t3[0] === t3[1]) dblPips.add(t3[0]); }
+      for(var t4 of h){
+        if(t4[0] === t4[1]) continue; // skip doubles themselves
+        if(dblPips.has(t4[0]) || dblPips.has(t4[1])) score += 7; // covered off bonus
+      }
     }
 
     return score;
