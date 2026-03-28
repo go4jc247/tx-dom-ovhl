@@ -2853,11 +2853,14 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
 
   const makeResult = (idx, reason) => {
     if(!returnRec) return idx;
-    return { index: idx, tile: hand[idx], reason: reason, debugInfo: _dbg.enabled ? _dbg : null };
+    return { index: idx, tile: idx >= 0 ? hand[idx] : null, reason: reason, debugInfo: _dbg.enabled ? _dbg : null };
   };
 
   if(legal.length === 0) return makeResult(-1, "No legal moves");
   if(legal.length === 1) return makeResult(legal[0], "Only legal move");
+
+  try {
+  // ── MAIN AI SCORING LOGIC (wrapped in try/catch for resilience) ──
 
   const trumpSuit = gameState.trump_suit;
   const trumpMode = gameState.trump_mode;
@@ -6892,6 +6895,13 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     if(_dbg.enabled) _dbg.dumpCandidates = _dumpCandidates;
     return makeResult(bestIdx, "Cannot win, play low");
   }
+
+  } catch(e) {
+    // AI SAFETY NET: any crash in scoring → fall back to random legal tile
+    console.error('choose_tile_ai error:', e);
+    const fallbackIdx = legal[Math.floor(Math.random() * legal.length)];
+    return makeResult(fallbackIdx, "Fallback: AI error - " + (e.message || e));
+  }
 }
 
 // Global session
@@ -7739,7 +7749,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.65.0';  // v17.65.0: defensive play — set-bid urgency, off-tracker probe, conservation fix, void targeting
+const MP_VERSION = 'v17.66.0';  // v17.66.0: safety + widow — try/catch fallback, session guard, trump change penalty, void fix
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
@@ -15620,7 +15630,11 @@ function _cleanupWidowSwap(){
 
 function aiWidowSwap(seat){
   // Enhanced AI widow swap: evaluates whole-hand strength with re-predicted trump per swap
-  if(!session || !session.moon_widow) { session.skipWidow(); afterWidowSwap(); return; }
+  if(!session || !session.moon_widow || !session.game || !session.game.hands || !session.game.hands[seat]) {
+    if(session && session.skipWidow) session.skipWidow();
+    afterWidowSwap();
+    return;
+  }
   var hand = session.game.hands[seat];
   var widow = session.moon_widow;
   var bid = session.current_bid || 4;
@@ -15768,15 +15782,17 @@ function aiWidowSwap(seat){
       // Also check if the widow tile adds this pip back
       if(widow[0] === vp || widow[1] === vp) remainingInSuit++;
       if(remainingInSuit === 0){
-        // This swap creates a new void! Extra bonus beyond evalHand's passive void scoring
-        var _moonBidder = GAME_MODE === 'MOON' && session.bid_winner_seat === seat;
-        gain += _moonBidder ? 6 : 3;
+        // Void creation noted — evalHand already scores voids in the post-swap hand,
+        // so only add a small bonus for the strategic value of creating a NEW void
+        // (evalHand doesn't distinguish existing voids from newly created ones)
+        gain += 2;
       }
     }
     // Penalty for changing trump strategy (risky to shift mid-hand)
     // Smarter: reduce penalty if new trump is clearly stronger (higher score gain)
     if(newTrump !== origTrump){
-      var trumpChangePenalty = (newScore - origScore > 15) ? 3 : 8; // small penalty if big improvement
+      // Scale penalty inversely with gain — large improvement = small penalty
+      var trumpChangePenalty = Math.max(2, 10 - Math.floor(gain / 3));
       gain -= trumpChangePenalty;
     }
     // Heavy penalty for swapping out trump tiles (trump double = -20, other trump = -12)

@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.65.0 — defensive: set-bid urgency, off-tracker probe, conservation, voids
+// Version: v17.66.0 — safety: try/catch, session guard, widow trump penalty, void fix
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.65.0';
+const CACHE_NAME = 'tx-dom-v17.66.0';
 const urlsToCache = [
   './index.html',
   // CSS
