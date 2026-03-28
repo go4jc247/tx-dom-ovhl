@@ -23031,7 +23031,7 @@ document.getElementById('btnGameSettingsBack').addEventListener('click', () => {
   // If carousel is open, show color picker toggle again
   var gs = document.getElementById('gameSelectScreen');
   if(gs && gs.style.display !== 'none'){
-    document.getElementById('gsColorPickerToggle').style.display = 'flex';
+    /* colorPickerToggle hidden — document.getElementById('gsColorPickerToggle').style.display = 'flex'; */
   } else {
     showStartScreen();
   }
@@ -23256,7 +23256,7 @@ document.getElementById('btnResumeMP').addEventListener('click', () => {
   document.getElementById('btnStartNewGame').addEventListener('click', function(){
     gsGoTo(0, false);
     document.getElementById('gameSelectScreen').style.display = 'flex';
-    document.getElementById('gsColorPickerToggle').style.display = 'flex';
+    /* colorPickerToggle hidden — document.getElementById('gsColorPickerToggle').style.display = 'flex'; */
     if(typeof _cpShowToggle === 'function') _cpShowToggle();
   });
 
@@ -23273,7 +23273,7 @@ document.getElementById('btnResumeMP').addEventListener('click', () => {
       + '<button id="moonWarningBack" style="padding:10px 24px;font-size:14px;font-weight:600;color:rgba(255,255,255,0.7);background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);border-radius:10px;cursor:pointer;">Go Back</button>'
       + '</div></div>';
     document.body.appendChild(w);
-    document.getElementById('moonWarningBack').addEventListener('click', function(){ w.remove(); document.getElementById('gsColorPickerToggle').style.display = 'flex'; });
+    document.getElementById('moonWarningBack').addEventListener('click', function(){ w.remove(); /* colorPickerToggle hidden — document.getElementById('gsColorPickerToggle').style.display = 'flex'; */ });
     document.getElementById('moonWarningContinue').addEventListener('click', function(){ w.remove(); updateGameSettingsForMode('MOON'); showGameSettings(); });
   }
 
@@ -23394,7 +23394,7 @@ document.getElementById('btnResumeMP').addEventListener('click', () => {
   });
 
   window._gsShowCarousel = function(){
-    document.getElementById('gsColorPickerToggle').style.display = 'flex';
+    /* colorPickerToggle hidden — document.getElementById('gsColorPickerToggle').style.display = 'flex'; */
   };
   window._gsHideCarousel = function(){
     document.getElementById('gsColorPickerToggle').style.display = 'none';
