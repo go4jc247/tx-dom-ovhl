@@ -4054,17 +4054,29 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           if (suspicion && suspicion.length > 0) {
             const topSuspect = suspicion[0];
             if (isBidderOpponent && topSuspect.suspicion >= 40) {
+              // TIERED SUSPICION: scale aggression with confidence
+              const susp = topSuspect.suspicion;
+              const catcherPenalty = susp >= 80 ? -60 : susp >= 60 ? -50 : -40;
+              const flushBonus = susp >= 80 ? 50 : susp >= 60 ? 40 : 30;
               // OPPONENT: Protect catcher tiles — don't lead tiles in the suspected off suit
               if (ledSuit === topSuspect.pip && tile[0] !== tile[1]) {
-                score -= 40; // Heavy penalty: save this catcher tile
-                _breakdown.catcherProtect = -40;
+                score += catcherPenalty;
+                _breakdown.catcherProtect = catcherPenalty;
               }
               // OPPONENT: Prefer leading the suspected off suit's double to flush it
               if (ledSuit === topSuspect.pip && tile[0] === tile[1]) {
-                score += 30; // Bonus: lead the double to flush the off
-                _breakdown.flushDouble = 30;
+                score += flushBonus;
+                _breakdown.flushDouble = flushBonus;
               }
-            } else if (!isBidderOpponent && topSuspect.suspicion >= 40) {
+            } else if (!isBidderOpponent && iAmBidder && topSuspect.suspicion >= 60) {
+              // BIDDER EVASION: if opponents are closing in on our off suit,
+              // consider leading it early while we still have trump control
+              // (walking the off reduces suspicion by showing we "have" the suit)
+              if (ledSuit === topSuspect.pip && tile[0] !== tile[1] && weHaveTrumpControl) {
+                score += 15; // Bonus: lead the off early to defuse tracking
+                _breakdown.bidderEvasion = 15;
+              }
+            } else if (!isBidderOpponent && !iAmBidder && topSuspect.suspicion >= 40) {
               // PARTNER: Misdirection — avoid leading the off suit to protect bidder
               // Lead low tiles in OTHER suits to create false signals
               if (ledSuit === topSuspect.pip) {
