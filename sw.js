@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.5.0 — offTracker DOUBLES, count hunt integration, dump count fix
+// Version: v17.6.0 — Nello fix, trump count avoidance, DOUBLES uncovered penalty
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.5.0';
+const CACHE_NAME = 'tx-dom-v17.6.0';
 const urlsToCache = [
   './index.html',
   // CSS
