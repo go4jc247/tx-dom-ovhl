@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.58.0 — partner cooperation: lead trump back + preserve partner suit
+// Version: v17.59.0 — partner cooperation suite: signals, feed, dump preserve
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.58.0';
+const CACHE_NAME = 'tx-dom-v17.59.0';
 const urlsToCache = [
   './index.html',
   // CSS

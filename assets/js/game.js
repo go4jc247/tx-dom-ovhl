@@ -3479,7 +3479,9 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       }
     }
     // Also check current trick for partner signals
-    for(const play of trick){
+    // GAP 1 FIX: leader vs follower distinction — leading a suit shows more strength
+    for(let _pi = 0; _pi < trick.length; _pi++){
+      const play = trick[_pi];
       if(!Array.isArray(play)) continue;
       const [seat, t] = play;
       if(seat === p || !isSameTeam(seat)) continue;
@@ -3488,8 +3490,23 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       const highPip = Math.max(t[0], t[1]);
       const isDouble = t[0] === t[1];
       const lowPip = Math.min(t[0], t[1]);
-      const strength = isDouble ? 20 : (highPip === lowPip + 1 ? 8 : 5);
+      const baseStrength = isDouble ? 20 : (highPip === lowPip + 1 ? 8 : 5);
+      // Leading = freely chose this suit (strong signal). Following = forced (weaker signal)
+      const isLeader = (_pi === 0);
+      const strength = isLeader ? Math.round(baseStrength * 1.5) : baseStrength;
       partnerSuitSignal[highPip] = (partnerSuitSignal[highPip] || 0) + strength;
+    }
+    // GAP 5 FIX: signal decay — if partner is confirmed void in a suit, their earlier
+    // plays in that suit were forced follows, not real strength signals. Zero out.
+    for(let s = 0; s < gameState.player_count; s++){
+      if(s === p || !isSameTeam(s)) continue;
+      if(voidIn[s]){
+        for(const voidPip of voidIn[s]){
+          if(partnerSuitSignal[voidPip]){
+            partnerSuitSignal[voidPip] = 0; // partner can't lead this suit anymore
+          }
+        }
+      }
     }
   }
 
@@ -5351,6 +5368,14 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
               }
             }
           }
+        }
+
+        // PARTNER FEED: bidder's partner leads suits where bidder showed strength
+        // This "returns" the bidder's suit so they can win tricks with their high cards
+        if(!isMoon && iAmBidderPartner && !bidIsSafe && partnerSuitSignal[ledSuit]){
+          const feedBonus = Math.min(partnerSuitSignal[ledSuit], 20);
+          score += feedBonus;
+          _breakdown.partnerFeedBonus = feedBonus;
         }
 
         // PARTNER VOID AWARENESS: context-dependent response to partner voids
@@ -7568,7 +7593,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.58.0';  // v17.58.0: partner cooperation — lead trump back to bidder + preserve partner suit in dump
+const MP_VERSION = 'v17.59.0';  // v17.59.0: partner cooperation suite — signal leader boost, void decay, partner feed, preserve suit
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
