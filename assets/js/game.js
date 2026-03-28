@@ -5068,9 +5068,17 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         else if(info.tilesLeft <= 4) score += 5;
         // Partner void penalty: if partner is void in this suit, leading our double
         // doesn't help them (they dump low while opponents follow normally)
+        // BUT if partner IS in suit, they might throw count to us (bonus)
         if(!isMoon){
+          let partnerVoidHere = false;
           for(const ps of _partnerSeats(p)){
-            if(voidIn[ps] && voidIn[ps].has(pip)){ score -= 8; break; }
+            if(voidIn[ps] && voidIn[ps].has(pip)){ partnerVoidHere = true; break; }
+          }
+          if(partnerVoidHere){
+            score -= 8;
+          } else if(isBidderTeam && pointsNeeded > 0 && info.countRemaining > 0){
+            // Partner can follow and suit has count — they might throw count to us
+            score += 5;
           }
         }
         if(score > bestScore){ bestScore = score; bestIdx = idx; }
@@ -7358,7 +7366,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.43.0';  // v17.43.0: endgame defensive urgency lead, Nello comment fix
+const MP_VERSION = 'v17.44.0';  // v17.44.0: double lead partner count synergy
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
