@@ -3861,6 +3861,19 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
             // Since we have trump control, opponents can't trump in either
             score += 10; // base bonus for having trump control
 
+            // Partner suit signal: prefer suits partner showed strength in
+            if(!isMoon && partnerSuitSignal[ledSuit]){
+              score += Math.min(partnerSuitSignal[ledSuit], 15);
+            }
+
+            // Partner void check: don't lead into suits partner can't follow
+            if(!isMoon){
+              for(let ps = 0; ps < gameState.player_count; ps++){
+                if(!isSameTeam(ps) || ps === p) continue;
+                if(voidIn[ps].has(ledSuit)){ score -= 25; break; } // partner void — bad lead
+              }
+            }
+
             // Penalty for leading count — harsher if double still in play
             if(!info.winnerPlayed) score -= myCount * 3;
             else score -= myCount * 2;
@@ -4093,10 +4106,10 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       const alreadyPlayed = trick.some(play => Array.isArray(play) && play[0] === s);
       if(!alreadyPlayed) oppsRemaining++;
     }
-    // Safe to throw count: no opponents left OR partner has trump AND opponents can't over-trump
+    // Safe to throw count: last in trick (perfect info), no opponents left, OR partner has trump AND opponents can't over-trump
     const partnerHasTrump = trick.some(play => Array.isArray(play) && play[0] !== p && isSameTeam(play[0]) && gameState._is_trump_tile(play[1]));
     const oppsMayOvertrumpHere = oppsRemaining > 0 && !opponentsVoidInTrump;
-    const safeToThrowCount = oppsRemaining === 0 || (partnerHasTrump && !oppsMayOvertrumpHere);
+    const safeToThrowCount = isLastInTrick || oppsRemaining === 0 || (partnerHasTrump && !oppsMayOvertrumpHere);
 
     let countIdx = -1, countVal = 0, lowIdx = pwCandidates[0], lowVal = Infinity;
     for(const idx of pwCandidates){
@@ -4378,6 +4391,10 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         const ps = play[1][0] + play[1][1];
         return sum + ((ps === 5) ? 5 : (ps === 10) ? 10 : 0);
       }, 0);
+      // LAST-IN-TRICK ADVANTAGE: perfect information — always trump count-heavy opponent tricks
+      if(isLastInTrick && !partnerWinning && trickCount >= 5){
+        return makeResult(winTrumpIdx, "Last in trick: trump to steal " + trickCount + "pts");
+      }
       // isBidderTeam defined above in BID SAFETY section
       // Always trump if: bidder's team, endgame, trick has count, bid is close, or we can set the bid
       if(!isBidderTeam && trickCount === 0 && !isEndgame && shouldSaveLastTrump && !bidderIsClose && !canSetBid){
