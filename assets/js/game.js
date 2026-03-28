@@ -3022,10 +3022,16 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         if(cnt > maxCount){ maxCount = cnt; likelyLedPip = Number(pip); }
       }
 
-      // Skip suit-void analysis if this was a trump-led trick
-      // (most tiles are trump → the non-trump tiles are dumps, not suit indicators)
+      // Determine if this was a trump-led trick
+      // Old heuristic (trumpCount > plays/2) was wrong: multiple players trumping into
+      // a non-trump suit would falsely mark it as trump-led, skipping void detection.
+      // Better: if we found a likely led pip with multiple non-trump followers, it's NOT trump-led.
       const trumpCount = plays.filter(p2 => gameState._is_trump_tile(p2.tile)).length;
-      const wasTrumpLedTrick = trumpCount > plays.length / 2;
+      const nonTrumpInSuit = likelyLedPip !== null
+        ? plays.filter(p2 => !gameState._is_trump_tile(p2.tile) && (p2.tile[0] === likelyLedPip || p2.tile[1] === likelyLedPip)).length
+        : 0;
+      // Trump-led only if ALL or nearly all are trump AND no clear non-trump suit emerged
+      const wasTrumpLedTrick = trumpCount === plays.length || (trumpCount >= plays.length - 1 && nonTrumpInSuit <= 1);
 
       if(likelyLedPip !== null && !wasTrumpLedTrick){
         for(const p2 of plays){
