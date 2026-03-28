@@ -4017,6 +4017,32 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     }
 
     // ── PHASE B: WE HAVE TRUMP CONTROL — play doubles, try partner-in-lead ──
+    // BIDDER'S PARTNER TRUMP PULL: when we have trump control and bidder needs points,
+    // pull remaining opponent trumps to clear the way for bidder's off-suit winners
+    if(iAmBidderPartner && weHaveTrumpControl && !bidIsSafe && bidderNeedsMore > 0 && trumpTilesRemaining.length > 0){
+      // Only pull if opponents still have trump (don't waste pulling partner/bidder trumps)
+      let oppsHaveTrump = false;
+      for(const rt of trumpTilesRemaining){
+        // If remaining trump isn't in our hand, might be in opponent's
+        const inOurHand = hand.some(h => h[0] === rt[0] && h[1] === rt[1]);
+        if(!inOurHand){ oppsHaveTrump = true; break; }
+      }
+      if(oppsHaveTrump && trumpDoubles.length > 0){
+        return makeResult(trumpDoubles[0], "Partner: pull opponent trump (helping bidder)");
+      }
+      if(oppsHaveTrump && otherTrumps.length >= 2 && iHaveHighestTrump){
+        let bestIdx = otherTrumps[0], bestScore = -Infinity;
+        for(const idx of otherTrumps){
+          const tile = hand[idx];
+          const ps = tile[0] + tile[1];
+          const isCount = (ps === 5 || ps === 10);
+          let score = -ps + (isCount ? -50 : 0);
+          if(score > bestScore){ bestScore = score; bestIdx = idx; }
+        }
+        return makeResult(bestIdx, "Partner: pull opponent trump with highest");
+      }
+    }
+
     if(weHaveTrumpControl){
 
       // Don't lead more trumps — don't pull partner's trumps!
@@ -4073,6 +4099,11 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
             // Partner suit signal: prefer suits partner showed strength in
             if(!isMoon && partnerSuitSignal[ledSuit]){
               score += Math.min(partnerSuitSignal[ledSuit], 15);
+            }
+
+            // Bidder's partner: when bidder is close, prefer count-heavy suits
+            if(iAmBidderPartner && bidderIsClose && info.countRemaining >= 5){
+              score += info.countRemaining; // bonus for leading into count-rich suits
             }
 
             // Partner void check: don't lead into suits partner can't follow
