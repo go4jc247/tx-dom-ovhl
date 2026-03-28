@@ -3867,11 +3867,15 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       const coveredOffs = [];   // {offIdx, offTile, coverPip, coverDoubleIdx}
       const coveringDoubleIdxs = new Set();
 
+      // In DOUBLES mode, all doubles are trump — check trumpDoubles as covering sources too
+      const coveringDoubleCandidates = trumpMode === "DOUBLES"
+        ? [...nonTrumpDoubles, ...trumpDoubles]
+        : nonTrumpDoubles;
       for (const idx of nonTrumpSingles) {
         const tile = hand[idx];
         const highPip = Math.max(tile[0], tile[1]);
         // Check if we hold the double of the high pip
-        for (const dIdx of nonTrumpDoubles) {
+        for (const dIdx of coveringDoubleCandidates) {
           const dTile = hand[dIdx];
           if (dTile[0] === highPip && dTile[1] === highPip) {
             coveredOffs.push({ offIdx: idx, offTile: tile, coverPip: highPip, coverDoubleIdx: dIdx });
@@ -3888,14 +3892,20 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       // - Must have at least 1 covered off
       // - At most 2 uncovered offs (still viable)
       // - Rest should be doubles (covering or regular) and possibly trumps
-      const regularDoubles = nonTrumpDoubles.filter(idx => !coveringDoubleIdxs.has(idx));
-      const allTrumps = [...trumpDoubles, ...otherTrumps];
+      // In DOUBLES mode, "regular doubles" are trump doubles not covering any off
+      const regularDoubles = trumpMode === "DOUBLES"
+        ? trumpDoubles.filter(idx => !coveringDoubleIdxs.has(idx))
+        : nonTrumpDoubles.filter(idx => !coveringDoubleIdxs.has(idx));
+      const allTrumps = trumpMode === "DOUBLES"
+        ? [] // In DOUBLES, trump doubles already counted in regularDoubles/coveringDoubles
+        : [...trumpDoubles, ...otherTrumps];
       const totalManaged = allTrumps.length + regularDoubles.length + coveringDoubleIdxs.size + coveredOffs.length;
 
       // Strategy activates when hand is mostly doubles + covered offs
       // and bid is high (>=42 in T42 or >= 42 in TN51) OR it's No Trumps
       const isNT = trumpMode === 'NONE';
-      const isHighBid = (bid >= 36) || isNT;
+      const isDOUBLES = trumpMode === 'DOUBLES';
+      const isHighBid = (bid >= 36) || isNT || isDOUBLES;
       const handMostlyManaged = totalManaged >= legal.length - 2; // allow up to 2 unmanaged tiles
 
       if (coveredOffs.length >= 1 && uncoveredOffs.length <= 2 && isHighBid && handMostlyManaged) {
@@ -3924,8 +3934,17 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           return makeResult(bestTrumpIdx, "Lead: covered-off strategy — play trump first");
         }
 
-        // 2. Regular doubles (NOT covering any off) — low to high
+        // 2. Regular doubles (NOT covering any off)
+        // DOUBLES mode: lead high→low (pull opponent trumps); NT/PIP: lead low→high (clear suits)
         if (regularDoubles.length > 0) {
+          if (isDOUBLES) {
+            let highestIdx = regularDoubles[0], highestPip = -1;
+            for (const idx of regularDoubles) {
+              const pip = hand[idx][0];
+              if (pip > highestPip) { highestPip = pip; highestIdx = idx; }
+            }
+            return makeResult(highestIdx, "Lead: covered-off strategy — trump double (pull opps, high→low)");
+          }
           let lowestIdx = regularDoubles[0], lowestPip = Infinity;
           for (const idx of regularDoubles) {
             const pip = hand[idx][0];
@@ -5427,9 +5446,11 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         if(isCoveredOff){
           // Scale penalty by remaining tricks — breaking a walker pair matters less in endgame
           // Moon: walker pairs are proportionally more valuable (9 tricks, solo player)
+          // When bid is already safe, walker pairs are less critical (can afford to break them)
+          const bidSafeMult = (bidIsSafe && isBidderTeam) ? 0.5 : 1;
           const walkerPenalty = isMoon
-            ? (tricksLeft <= 2 ? -30 : (tricksLeft <= 4 ? -22 : -18))
-            : (tricksLeft <= 3 ? -9 : (tricksLeft <= 5 ? -14 : -18));
+            ? Math.round((tricksLeft <= 2 ? -30 : (tricksLeft <= 4 ? -22 : -18)) * bidSafeMult)
+            : Math.round((tricksLeft <= 3 ? -9 : (tricksLeft <= 5 ? -14 : -18)) * bidSafeMult);
           score += walkerPenalty;
           _bd.walkerPenalty = walkerPenalty;
         }
