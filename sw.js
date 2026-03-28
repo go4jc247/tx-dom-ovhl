@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.87.0 — Comprehensive Moon count-tile cleanup across all lead phases
+// Version: v17.88.0 — Complete Moon count-tile purge: follow, dump, trump-led, lookahead
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.87.0';
+const CACHE_NAME = 'tx-dom-v17.88.0';
 const urlsToCache = [
   './index.html',
   // CSS

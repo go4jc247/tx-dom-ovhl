@@ -4325,12 +4325,10 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     if(isMoon && iAmBidder && !bidIsSafe){
       // Priority 1: Lead trump doubles — guaranteed wins that pull opponents' trump
       if(trumpDoubles.length > 0){
-        // Prefer non-count trump doubles first
+        // Prefer high trump doubles first (Moon: no count, so pure rank ordering)
         let bestTdIdx = trumpDoubles[0], bestTdScore = -Infinity;
         for(const idx of trumpDoubles){
-          const ps = hand[idx][0] + hand[idx][1];
-          const isCount = (ps === 5 || ps === 10);
-          let sc = hand[idx][0] * 10 - (isCount ? 5 : 0); // high doubles first, avoid count
+          let sc = hand[idx][0] * 10; // high doubles first
           if(sc > bestTdScore){ bestTdScore = sc; bestTdIdx = idx; }
         }
         return makeResult(bestTdIdx, "Moon bidder: lead trump double (guaranteed win)");
@@ -4339,9 +4337,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       if(pullableTrumps.length > 0 && iHaveHighestTrump && trumpTilesRemaining.length > 0){
         let bestPullIdx = pullableTrumps[0], bestPullScore = -Infinity;
         for(const idx of pullableTrumps){
-          const ps = hand[idx][0] + hand[idx][1];
-          const isCount = (ps === 5 || ps === 10);
-          let sc = getTrumpRankNum(hand[idx]) - (isCount ? 50 : 0);
+          let sc = getTrumpRankNum(hand[idx]);
           if(sc > bestPullScore){ bestPullScore = sc; bestPullIdx = idx; }
         }
         return makeResult(bestPullIdx, "Moon bidder: pull trump (highest remaining)");
@@ -4503,12 +4499,14 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           }
 
           const myPipSum = myTile[0] + myTile[1];
-          const myCount = (myPipSum === 5) ? 5 : (myPipSum === 10) ? 10 : 0;
+          const myCount = isMoon ? 0 : ((myPipSum === 5) ? 5 : (myPipSum === 10) ? 10 : 0);
           // Sum count from ALL tiles in the trick (including opponents' tiles we'd capture)
           let trickPotCount = myCount;
-          for(const opp of oppTiles){
-            const ops = opp.tile[0] + opp.tile[1];
-            if(ops === 5 || ops === 10) trickPotCount += (ops === 5 ? 5 : 10);
+          if(!isMoon){
+            for(const opp of oppTiles){
+              const ops = opp.tile[0] + opp.tile[1];
+              if(ops === 5 || ops === 10) trickPotCount += (ops === 5 ? 5 : 10);
+            }
           }
           // Score: winning is paramount, then maximize count captured
           let score = iWin ? 1000 : 0;
@@ -5521,7 +5519,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         let _oIdx = trumpDoubles[0], _oScore = Infinity;
         for(const idx of trumpDoubles){
           const ps = hand[idx][0] + hand[idx][1];
-          const sc = ps + ((ps === 5 || ps === 10) ? 100 : 0);
+          const sc = ps + ((!isMoon && (ps === 5 || ps === 10)) ? 100 : 0);
           if(sc < _oScore){ _oScore = sc; _oIdx = idx; }
         }
         return makeResult(_oIdx, "Lead: trump double (only option)");
@@ -5896,7 +5894,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       for(const idx of pullableTrumps){
         const t = hand[idx];
         const ps = t[0] + t[1];
-        const isCount = (ps === 5 || ps === 10);
+        const isCount = !isMoon && (ps === 5 || ps === 10);
         const sc = (isCount ? 100 : 0) + ps;
         if(sc < lowScore){ lowScore = sc; lowIdx = idx; }
       }
@@ -5943,7 +5941,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     for(const idx of pwCandidates){
       const tile = hand[idx];
       const pipSum = tile[0] + tile[1];
-      if(pipSum === 5 || pipSum === 10){
+      if(!isMoon && (pipSum === 5 || pipSum === 10)){
         if(pipSum > countVal){ countVal = pipSum; countIdx = idx; }
       }
       if(pipSum < lowVal){ lowVal = pipSum; lowIdx = idx; }
@@ -6017,7 +6015,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     // If we can win AND there's count in the trick, always win (no need to conserve)
     // BUT: if partner is already winning, don't overtake — count goes to our team anyway
     if(isLastInTrick && highIdx >= 0 && highRank > winnerRank && !partnerWinning){
-      const trickCountFollow = trick.reduce((sum, play) => {
+      const trickCountFollow = isMoon ? 0 : trick.reduce((sum, play) => {
         if(!Array.isArray(play) || !play[1]) return sum;
         const ps = play[1][0] + play[1][1];
         return sum + ((ps === 5) ? 5 : (ps === 10) ? 10 : 0);
@@ -6035,7 +6033,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
             const rank = r[0] * 100 + r[1];
             if(rank <= winnerRank) continue; // can't win
             const ps = tile[0] + tile[1];
-            const cnt = (ps === 5) ? 5 : (ps === 10) ? 10 : 0;
+            const cnt = isMoon ? 0 : ((ps === 5) ? 5 : (ps === 10) ? 10 : 0);
             // When we need count: prefer count tiles (they add to trick value)
             // Otherwise: prefer lowest winning card (conserve strength)
             const preferThis = wantCount
@@ -6051,7 +6049,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     // THIRD-SEAT ADVANTAGE: only 1 opponent left to play — near-perfect info
     // Safer to win with count tiles (only 1 opponent could over-trump)
     if(isThirdSeat && highIdx >= 0 && highRank > winnerRank && !partnerWinning){
-      const trickCount3 = trick.reduce((sum, play) => {
+      const trickCount3 = isMoon ? 0 : trick.reduce((sum, play) => {
         if(!Array.isArray(play) || !play[1]) return sum;
         const ps = play[1][0] + play[1][1];
         return sum + ((ps === 5) ? 5 : (ps === 10) ? 10 : 0);
@@ -6070,7 +6068,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
             const rank = r[0] * 100 + r[1];
             if(rank <= winnerRank) continue;
             const ps = tile[0] + tile[1];
-            const cnt = (ps === 5) ? 5 : (ps === 10) ? 10 : 0;
+            const cnt = isMoon ? 0 : ((ps === 5) ? 5 : (ps === 10) ? 10 : 0);
             const preferThis = wantCount3
               ? (cnt > bestCount3 || (cnt === bestCount3 && rank < bestRank3))
               : (rank < bestRank3);
@@ -6096,7 +6094,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           const t = hand[idx];
           if((t[0] === ledPip || t[1] === ledPip) && !gameState._is_trump_tile(t)){
             const ps = t[0] + t[1];
-            if((ps === 5 || ps === 10) && ps > countVal3){ countVal3 = ps; countInSuit3 = idx; }
+            if(!isMoon && (ps === 5 || ps === 10) && ps > countVal3){ countVal3 = ps; countInSuit3 = idx; }
           }
         }
         if(countInSuit3 >= 0 && (_safeFromOvertrump || countVal3 === 5)){
@@ -6179,7 +6177,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         }
         // Duck if: partner plays after us, the double isn't played (partner might have it),
         // and trick has no count (not worth fighting over)
-        const trickCountDuck = trick.reduce((sum, play) => {
+        const trickCountDuck = isMoon ? 0 : trick.reduce((sum, play) => {
           if(!Array.isArray(play) || !play[1]) return sum;
           const ps = play[1][0] + play[1][1];
           return sum + ((ps === 5) ? 5 : (ps === 10) ? 10 : 0);
@@ -6297,7 +6295,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           const t = hand[idx];
           if((t[0] === ledPip || t[1] === ledPip) && !gameState._is_trump_tile(t)){
             const ps = t[0] + t[1];
-            if((ps === 5 || ps === 10) && ps > countVal2){ countVal2 = ps; countInSuit = idx; }
+            if(!isMoon && (ps === 5 || ps === 10) && ps > countVal2){ countVal2 = ps; countInSuit = idx; }
           }
         }
         if(countInSuit >= 0 && (_safeHere || countVal2 === 5)){
@@ -6377,7 +6375,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       if(!gameState._is_trump_tile(tile)) continue;
       const r = getTrumpRankNum(tile);
       const ps = tile[0] + tile[1];
-      const countVal = (ps === 5) ? 5 : (ps === 10) ? 10 : 0;
+      const countVal = isMoon ? 0 : ((ps === 5) ? 5 : (ps === 10) ? 10 : 0);
       // Track lowest trump (prefer non-count; among count, prefer playing 5 over 10)
       if(countVal < lowCountValF || (countVal === lowCountValF && r < lowRankF)){
         lowRankF = r; lowTrumpF = idx; lowCountValF = countVal;
@@ -6390,7 +6388,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       }
     }
 
-    const trickCountF = trick.reduce((sum, play) => {
+    const trickCountF = isMoon ? 0 : trick.reduce((sum, play) => {
       if(!Array.isArray(play) || !play[1]) return sum;
       const ps = play[1][0] + play[1][1];
       return sum + ((ps === 5) ? 5 : (ps === 10) ? 10 : 0);
@@ -6410,7 +6408,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         const tile = hand[idx];
         if(!gameState._is_trump_tile(tile)) continue;
         const ps = tile[0] + tile[1];
-        if((ps === 5 || ps === 10) && ps > countValF){ countValF = ps; countTrumpF = idx; }
+        if(!isMoon && (ps === 5 || ps === 10) && ps > countValF){ countValF = ps; countTrumpF = idx; }
       }
       if(countTrumpF >= 0 && safeF){
         return makeResult(countTrumpF, "Trump led, partner winning — throw count trump (" + countValF + "pts)");
@@ -6562,7 +6560,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       for(const idx of legal){
         const tile = hand[idx];
         const pipSum = tile[0] + tile[1];
-        if(pipSum === 5 || pipSum === 10){
+        if(!isMoon && (pipSum === 5 || pipSum === 10)){
           if(pipSum > countVal){ countVal = pipSum; countIdx = idx; }
         }
         if(pipSum < lowVal){ lowVal = pipSum; lowIdx = idx; }
@@ -6890,11 +6888,13 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   {
     // Count already in this trick — higher existing count makes our count dumps worse
     let _trickCountValue = 0;
-    for(const play of trick){
-      if(!Array.isArray(play) || !play[1]) continue;
-      const ps = play[1][0] + play[1][1];
-      if(ps === 5) _trickCountValue += 5;
-      else if(ps === 10) _trickCountValue += 10;
+    if(!isMoon){
+      for(const play of trick){
+        if(!Array.isArray(play) || !play[1]) continue;
+        const ps = play[1][0] + play[1][1];
+        if(ps === 5) _trickCountValue += 5;
+        else if(ps === 10) _trickCountValue += 10;
+      }
     }
     let bestIdx = legal[0], bestScore = -Infinity;
     const _dumpCandidates = [];
@@ -8071,7 +8071,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.87.0';  // v17.87.0: Comprehensive Moon count-tile cleanup across all lead phases
+const MP_VERSION = 'v17.88.0';  // v17.88.0: Complete Moon count-tile purge: follow, dump, trump-led, lookahead
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
