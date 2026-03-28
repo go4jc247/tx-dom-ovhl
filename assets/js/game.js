@@ -3861,6 +3861,25 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           if(oppsVoid > 0 && opponentsVoidInTrump){ score += 10; _breakdown.oppVoidSafe = +10; }
           _breakdown.oppsVoidInSuit = oppsVoid;
 
+          // BIDDER'S PARTNER LEAD: lead suits where opponents are void
+          // (they can't follow, bidder might win with trump control)
+          if(iAmBidderPartner && !isMoon){
+            let allOppsVoid = true;
+            for(let s2 = 0; s2 < gameState.player_count; s2++){
+              if(isSameTeam(s2) || !gameState.active_players.includes(s2)) continue;
+              if(!voidIn[s2].has(ledSuit)){ allOppsVoid = false; break; }
+            }
+            if(allOppsVoid && !opponentsVoidInTrump){
+              // Opponents void in suit but have trump — dangerous for us
+              score -= 10;
+              _breakdown.partnerLeadDanger = -10;
+            } else if(allOppsVoid && opponentsVoidInTrump){
+              // Opponents void everywhere — free trick
+              score += 12;
+              _breakdown.partnerLeadFree = 12;
+            }
+          }
+
           // DEFENSIVE LEAD: When we're on defense, prefer suits where the bidder is void
           // This forces the bidder to trump (wasting trump) or lose the trick
           if(!isBidderTeam && !isMoon){
