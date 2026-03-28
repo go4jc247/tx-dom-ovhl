@@ -2344,7 +2344,7 @@ function updateOffTracker() {
   const maxPip = gs.max_pip;
 
   // Analyze all completed tricks
-  const _otTeamCount = GAME_MODE === 'MOON' ? 3 : 2;
+  const _otTeamCount = (GAME_MODE === 'MOON' || GAME_MODE === 'TN51') ? 3 : 2;
   const allTricks = [];
   for (let team = 0; team < _otTeamCount; team++) {
     for (let ti = 0; ti < (gs.tricks_team[team] || []).length; ti++) {
