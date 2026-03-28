@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v16.3.0 — Phase 9: follow-suit count safety, void bid, handSize fix
+// Version: v16.4.0 — Phase 9b: Moon defense, dump logic, widow swap, competitive bid
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v16.3.0';
+const CACHE_NAME = 'tx-dom-v16.4.0';
 const urlsToCache = [
   './index.html',
   // CSS
