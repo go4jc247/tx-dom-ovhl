@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v16.1.0 — Phase 8: lead scoring, endgame, defense, trump pulling, bidding patterns
+// Version: v16.2.0 — Phase 8b: TN51 UI fixes, Moon endgame, off-tracker, void tracking
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v16.1.0';
+const CACHE_NAME = 'tx-dom-v16.2.0';
 const urlsToCache = [
   './index.html',
   // CSS
