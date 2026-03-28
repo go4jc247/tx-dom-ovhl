@@ -1482,6 +1482,7 @@ function evaluateHandForBid(hand) {
   }
 
   // ── Enhanced doubles/covered-off bidding evaluation ──
+  const handSize = session.game.hand_size;
   if (doubles.length >= 4) {
     // Analyze covered offs: non-double tiles where you hold the double of the higher pip
     const doublePips = new Set(doubles.map(d => d[0]));
@@ -1496,7 +1497,6 @@ function evaluateHandForBid(hand) {
         uncoveredOffs++;
       }
     }
-    const handSize = session.game.hand_size;
 
     // PATTERN A: All doubles (no offs at all) → max bid 2x
     if (doubles.length === handSize) {
@@ -1626,6 +1626,32 @@ function evaluateHandForBid(hand) {
     // 4+ trumps with double but no 2nd → min bid (lacks sequential control for mid)
     if (trumpCount >= 4 && hasDoubleTrump && ntUncoveredOffs <= 1) {
       return { action: "bid", bid: minBid, marks: 1 };
+    }
+  }
+
+  // VOID HAND ESCALATION: if all non-trump non-double tiles are covered offs,
+  // the hand is extremely safe — every tile is a guaranteed winner or trump
+  // This catches hands that slip through the pip loop because trumpCount is low
+  // but the remaining tiles are all doubles or covered by doubles
+  if (doubles.length >= 2) {
+    for (let tp = maxPip; tp >= 0; tp--) {
+      const tTiles = hand.filter(t => t[0] === tp || t[1] === tp);
+      if (tTiles.length < 2) continue;
+      const hasDbl = tTiles.some(t => t[0] === tp && t[1] === tp);
+      if (!hasDbl) continue;
+      // Calculate non-trump tiles
+      const ntTiles = hand.filter(t => t[0] !== tp && t[1] !== tp);
+      // Check if every non-trump tile is a double or covered by a double we hold
+      const ntDblPips = new Set(doubles.filter(d => d[0] !== tp).map(d => d[0]));
+      let allCovered = true;
+      for (const t of ntTiles) {
+        if (t[0] === t[1]) continue; // it's a double — safe
+        const hp = Math.max(t[0], t[1]);
+        if (!ntDblPips.has(hp)) { allCovered = false; break; }
+      }
+      if (allCovered && ntTiles.length > 0) {
+        return { action: "bid", bid: minBid, marks: 1 };
+      }
     }
   }
 
@@ -4644,20 +4670,29 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       // But if the double is already played, no need to preserve it
       const suitInf = suitInfo[ledPip];
       const doubleStillOut = suitInf && !suitInf.winnerPlayed;
-      let bestWinIdx = highIdx, bestWinRank = Infinity, bestWinIsDouble = true;
+      let bestWinIdx = highIdx, bestWinRank = Infinity, bestWinIsDouble = true, bestWinIsCount = true;
       for(const idx of legal){
         const tile = hand[idx];
         if((tile[0] === ledPip || tile[1] === ledPip) && !gameState._is_trump_tile(tile)){
           const r = gameState._suit_rank(tile, ledPip);
           const rank = r[0] * 100 + r[1];
           const isDbl = tile[0] === tile[1];
+          const ps = tile[0] + tile[1];
+          const isCount = (ps === 5 || ps === 10);
           if(rank > winnerRank){
             // Prefer non-doubles to preserve walking doubles (only if double still in play)
-            const preferThis = doubleStillOut
-              ? ((!isDbl && bestWinIsDouble) || (isDbl === bestWinIsDouble && rank < bestWinRank))
-              : (rank < bestWinRank); // double already out: just pick lowest winner
+            // Also prefer non-count tiles to preserve scoring points
+            let preferThis;
+            if(doubleStillOut){
+              preferThis = (!isDbl && bestWinIsDouble)
+                || (isDbl === bestWinIsDouble && !isCount && bestWinIsCount)
+                || (isDbl === bestWinIsDouble && isCount === bestWinIsCount && rank < bestWinRank);
+            } else {
+              preferThis = (!isCount && bestWinIsCount)
+                || (isCount === bestWinIsCount && rank < bestWinRank);
+            }
             if(preferThis){
-              bestWinRank = rank; bestWinIdx = idx; bestWinIsDouble = isDbl;
+              bestWinRank = rank; bestWinIdx = idx; bestWinIsDouble = isDbl; bestWinIsCount = isCount;
             }
           }
         }
@@ -4682,7 +4717,17 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           if(isSameTeam(s) || s === p) continue;
           if(!trick.some(play => Array.isArray(play) && play[0] === s)) _oppsLeft2++;
         }
-        const _safeHere = _oppsLeft2 === 0 || (winnerIsTrump && opponentsVoidInTrump);
+        // Safety: opponents can't beat partner with trump OR higher suit card
+        let _safeHere = _oppsLeft2 === 0;
+        if(!_safeHere && winnerIsTrump && opponentsVoidInTrump) _safeHere = true;
+        if(!_safeHere && !winnerIsTrump && _oppsLeft2 > 0){
+          // Partner won with suit card — check if the winning card is the double (unbeatable in suit)
+          const winnerTile = trick.filter(play => Array.isArray(play) && play[0] === currentWinner)[0];
+          if(winnerTile && winnerTile[1] && winnerTile[1][0] === winnerTile[1][1]){
+            // Partner played the double — only trumping can beat it
+            if(opponentsVoidInTrump || gameState.trump === 'NONE') _safeHere = true;
+          }
+        }
         let countInSuit = -1, countVal2 = 0;
         for(const idx of legal){
           const t = hand[idx];
