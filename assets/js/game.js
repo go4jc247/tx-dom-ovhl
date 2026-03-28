@@ -4722,20 +4722,44 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     // In DOUBLES mode, all doubles are trump — include trump doubles as count hunt candidates
     const countHuntDoubles = trumpMode === 'DOUBLES'
       ? [...nonTrumpDoubles, ...trumpDoubles] : nonTrumpDoubles;
-    if(countHuntActive && countHuntDoubles.length > 0){
-      let bestCountDbl = -1, bestCountScore = -Infinity;
-      for(const idx of countHuntDoubles){
-        const pip = hand[idx][0];
-        const info = suitInfo[pip];
-        if(!info) continue;
-        // Prefer suits with remaining count tiles (we can win the double then walk count)
-        let score = info.countRemaining * 3 + pip;
-        // Check opponent voids — if opponents void and we have trump control, count is safe
-        if(weHaveTrumpControl) score += 10;
-        if(score > bestCountScore){ bestCountScore = score; bestCountDbl = idx; }
+    if(countHuntActive){
+      // First try doubles (guaranteed winners in their suit)
+      if(countHuntDoubles.length > 0){
+        let bestCountDbl = -1, bestCountScore = -Infinity;
+        for(const idx of countHuntDoubles){
+          const pip = hand[idx][0];
+          const info = suitInfo[pip];
+          if(!info) continue;
+          // Prefer suits with remaining count tiles (we can win the double then walk count)
+          let score = info.countRemaining * 3 + pip;
+          // Check opponent voids — if opponents void and we have trump control, count is safe
+          if(weHaveTrumpControl) score += 10;
+          if(score > bestCountScore){ bestCountScore = score; bestCountDbl = idx; }
+        }
+        if(bestCountDbl >= 0 && bestCountScore > 8){
+          return makeResult(bestCountDbl, "Endgame: lead double to capture count (" + pointsNeeded + "pts needed)");
+        }
       }
-      if(bestCountDbl >= 0 && bestCountScore > 5){
-        return makeResult(bestCountDbl, "Endgame: lead double to capture count (" + pointsNeeded + "pts needed)");
+      // Also try guaranteed-winner non-doubles: tiles where we hold the double AND
+      // this is the highest remaining tile in the suit (walker)
+      if(nonTrumpSingles.length > 0 && weHaveTrumpControl){
+        let bestWalkerIdx = -1, bestWalkerScore = -Infinity;
+        for(const idx of nonTrumpSingles){
+          const tile = hand[idx];
+          const pip = Math.max(tile[0], tile[1]);
+          const info = suitInfo[pip];
+          if(!info || !info.winnerPlayed) continue; // double not out = not a guaranteed winner
+          const pipSum = tile[0] + tile[1];
+          const myCount = (pipSum === 5) ? 5 : (pipSum === 10) ? 10 : 0;
+          if(myCount > 0 && info.tilesLeft <= 2){
+            // Count tile in a depleted suit with double already played — guaranteed winner
+            let score = myCount * 3 + (weHaveTrumpControl ? 8 : 0);
+            if(score > bestWalkerScore){ bestWalkerScore = score; bestWalkerIdx = idx; }
+          }
+        }
+        if(bestWalkerIdx >= 0){
+          return makeResult(bestWalkerIdx, "Endgame: walk count tile (double out, suit depleted)");
+        }
       }
     }
 
@@ -7507,7 +7531,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.56.0';  // v17.56.0: 2-trick lookahead tile consumption fix
+const MP_VERSION = 'v17.57.0';  // v17.57.0: count hunt walkers + threshold fix
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables

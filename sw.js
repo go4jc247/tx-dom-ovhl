@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.56.0 — 2-trick lookahead tile consumption fix
+// Version: v17.57.0 — count hunt walkers + threshold fix
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.56.0';
+const CACHE_NAME = 'tx-dom-v17.57.0';
 const urlsToCache = [
   './index.html',
   // CSS
