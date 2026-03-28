@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.69.0 — CRITICAL: isMoon fix in aiChooseTrump, Moon trump selection
+// Version: v17.70.0 — trump pull: P1 productivity, TN51 threshold, Moon canRelax
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.69.0';
+const CACHE_NAME = 'tx-dom-v17.70.0';
 const urlsToCache = [
   './index.html',
   // CSS

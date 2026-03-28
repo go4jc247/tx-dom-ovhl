@@ -3748,7 +3748,10 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   // Bid safe but opponents still have dangerous count? Don't relax yet
   // Moon: no count points, so the count gate doesn't apply
   // Only relax when margin exceeds half the remaining count — keep fighting for count margin
-  const canRelax = bidIsSafe && tricksLeft >= 2 && (isMoon || pointsNeeded < -(totalCountRemaining / 2));
+  // Moon: only relax with 2+ trick margin (every trick = 1 point, keep fighting)
+  const canRelax = bidIsSafe && tricksLeft >= 2 && (
+    isMoon ? (pointsNeeded <= -2) : pointsNeeded < -(totalCountRemaining / 2)
+  );
   // COUNT-POINT ARITHMETIC: in endgame, compute if count tiles in hand are enough to make bid
   // countNeeded = how many count points we need beyond base trick wins
   // If we hold enough count, we need fewer trick wins; if we don't, we need ALL remaining tricks
@@ -4967,7 +4970,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       // P1: Lead trump double — guaranteed win, pulls opponents' trump
       // Prefer non-count doubles first to preserve count for scoring
       // DFM: when active, lead HIGH trump doubles to force opponents to burn their best doubles
-      if(trumpDoubles.length > 0){
+      // Only pull with doubles if 2+ opponent trumps remain — save double for Phase B count capture
+      if(trumpDoubles.length > 0 && trumpTilesRemaining.length >= 2){
         const isDFM = trumpMode === 'DOUBLES' && typeof _dfmActiveThisHand !== 'undefined' && _dfmActiveThisHand;
         let bestDblIdx = trumpDoubles[0], bestDblScore = isDFM ? -Infinity : Infinity;
         for(const idx of trumpDoubles){
@@ -5021,8 +5025,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       // Skip if remaining trumps are only held by partners (don't pull partner trumps)
       // PICK safest trump: avoid count tiles, then prefer low value
       const p3EarlyWindow = trickNum <= 1;
-      // TN51: 6 players = 4 opponents, need more trumps to justify pulling without highest
-      const p3TrumpThreshold = isTN51 ? 5 : 4;
+      // TN51: 6 tiles per hand, so threshold must be reachable. 4 is already ambitious for 6-tile hands.
+      const p3TrumpThreshold = isTN51 ? 4 : 4;
       const p3MidWindow = trickNum === 2 && trumpsInHand.length >= p3TrumpThreshold;
       const p3LateWindow = trickNum === 3 && trumpsInHand.length >= p3TrumpThreshold;
       // Defenders: more conservative — only pull early or when can set bid
@@ -7820,7 +7824,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.69.0';  // v17.69.0: CRITICAL — isMoon undefined in aiChooseTrump, Moon trump selection now works
+const MP_VERSION = 'v17.70.0';  // v17.70.0: trump pull — P1 productivity, TN51 threshold, Moon canRelax
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
