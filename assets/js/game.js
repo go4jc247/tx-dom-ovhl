@@ -2858,8 +2858,10 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     suitInfo[pip] = {
       remaining: suitTiles,
       countRemaining: countRemaining,
-      winnerPlayed: isPlayed(pip, pip),
-      winnerCount: (pip + pip === 5) ? 5 : (pip + pip === 10) ? 10 : 0,
+      // In DOUBLES mode, the double [pip,pip] is trump — it can't win by suit.
+      // Treat the suit as if its "winner" is accounted for (no unbeatable suit card exists).
+      winnerPlayed: (trumpMode === "DOUBLES") ? true : isPlayed(pip, pip),
+      winnerCount: (trumpMode === "DOUBLES") ? 0 : ((pip + pip === 5) ? 5 : (pip + pip === 10) ? 10 : 0),
       tilesLeft: suitTiles.length
     };
   }
