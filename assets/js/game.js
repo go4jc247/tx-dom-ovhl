@@ -13949,8 +13949,9 @@ function aiWidowSwap(seat){
 
   // Evaluate a complete hand's strength for a given trump choice
   function evalHand(h, trump){
+    var isNello = (trump === 'NELLO' || trump === 'NELLO_2');
     var ts = (typeof trump === 'number') ? trump : null;
-    var tm = (trump === 'DOUBLES') ? 'DOUBLES' : (ts !== null ? 'PIP' : 'NONE');
+    var tm = isNello ? 'NELLO' : (trump === 'DOUBLES') ? 'DOUBLES' : (ts !== null ? 'PIP' : 'NONE');
     var score = 0;
     var voidPips = {}; // track pip presence counts
 
@@ -13959,7 +13960,19 @@ function aiWidowSwap(seat){
                  || (tm === 'DOUBLES' && t[0] === t[1]);
       var pipSum = t[0] + t[1];
       var isDouble = t[0] === t[1];
-      var isCount = (pipSum === 5 || pipSum === 10);
+
+      if(isNello){
+        // NELLO: low tiles are strong, high tiles are dangerous
+        // Invert scoring: low pip sum = good, high = bad
+        score += (14 - pipSum); // max pipSum = 12 (6-6), so 14-12=2; min=0 (0-0) → 14
+        // Blanks are excellent (0-x tiles)
+        if(t[0] === 0 || t[1] === 0) score += 8;
+        // Doubles are dangerous in Nello (win their suit when led)
+        if(isDouble) score -= (pipSum >= 6 ? 12 : 4);
+        // Low doubles (0-0, 1-1) are less dangerous
+        if(isDouble && pipSum <= 2) score += 6;
+        continue;
+      }
 
       // Base value
       score += pipSum;
@@ -13988,30 +14001,33 @@ function aiWidowSwap(seat){
       voidPips[t[1]] = (voidPips[t[1]] || 0) + 1;
     }
 
-    // Void bonuses: suits with 0 presence allow trump-in opportunities
-    var maxPip = session.game.max_pip || 6;
-    for(var pip = 0; pip <= maxPip; pip++){
-      if(tm === 'PIP' && pip === ts) continue; // trump suit can't be void bonus
-      if(!voidPips[pip]){
-        score += 4; // void bonus
-        // Extra if suit has count tiles
-        for(var p2 = 0; p2 <= maxPip; p2++){
-          if(p2 === pip) continue;
-          var s = pip + p2;
-          if(s === 5 || s === 10){ score += 3; break; }
+    // Skip void/trump bonuses for NELLO (no trumps, voids are neutral)
+    if(!isNello){
+      // Void bonuses: suits with 0 presence allow trump-in opportunities
+      var maxPip = session.game.max_pip || 6;
+      for(var pip = 0; pip <= maxPip; pip++){
+        if(tm === 'PIP' && pip === ts) continue; // trump suit can't be void bonus
+        if(!voidPips[pip]){
+          score += 4; // void bonus
+          // Extra if suit has count tiles
+          for(var p2 = 0; p2 <= maxPip; p2++){
+            if(p2 === pip) continue;
+            var s = pip + p2;
+            if(s === 5 || s === 10){ score += 3; break; }
+          }
         }
       }
-    }
 
-    // Trump count bonus
-    var trumpCount = 0;
-    for(var t2 of h){
-      var isTr = (tm === 'PIP' && (t2[0] === ts || t2[1] === ts))
-              || (tm === 'DOUBLES' && t2[0] === t2[1]);
-      if(isTr) trumpCount++;
+      // Trump count bonus
+      var trumpCount = 0;
+      for(var t2 of h){
+        var isTr = (tm === 'PIP' && (t2[0] === ts || t2[1] === ts))
+                || (tm === 'DOUBLES' && t2[0] === t2[1]);
+        if(isTr) trumpCount++;
+      }
+      if(trumpCount >= 4) score += 10; // strong trump mass
+      if(trumpCount >= 5) score += 8;
     }
-    if(trumpCount >= 4) score += 10; // strong trump mass
-    if(trumpCount >= 5) score += 8;
 
     return score;
   }
