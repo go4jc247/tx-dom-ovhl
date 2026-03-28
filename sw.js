@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.82.0 — Strategic: bidder suit tracking, trump-for-lead walkers, short-suit probe
+// Version: v17.83.0 — Signal cap alignment, partner void trump-aware, Phase B/C consistency
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.82.0';
+const CACHE_NAME = 'tx-dom-v17.83.0';
 const urlsToCache = [
   './index.html',
   // CSS

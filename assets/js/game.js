@@ -5359,7 +5359,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
 
             // Partner suit signal: prefer suits partner showed strength in
             if(!isMoon && partnerSuitSignal[ledSuit]){
-              const sigCap = (iAmBidderPartner && bidderNeedsMore > 10) ? 25 : 15;
+              const sigCap = (iAmBidderPartner && bidderNeedsMore > 10) ? 25 : 20;
               score += Math.min(partnerSuitSignal[ledSuit], sigCap);
             }
 
@@ -5690,8 +5690,12 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
               // This sets up partner to trump the bidder's play on this suit
               score += 12;
               _breakdown.partnerVoidTrumpIn = 12;
+            } else if(isBidderTeam && partnerHasTrumpStill){
+              // BIDDER TEAM: partner void but has trump — can trump in to help us
+              score -= 5; // mild penalty (still not ideal but partner can contribute)
+              _breakdown.partnerVoidMild = -5;
             } else {
-              // BIDDER TEAM: partner void = bad (opponents can exploit it)
+              // Partner void AND no trump — can't help at all
               score -= 15;
               _breakdown.partnerVoidPenalty = -15;
             }
@@ -7997,7 +8001,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.82.0';  // v17.82.0: bidder suit tracking, trump-for-lead walkers, short-suit probe
+const MP_VERSION = 'v17.83.0';  // v17.83.0: signal cap alignment, partner void trump-aware, Phase B/C consistency
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
