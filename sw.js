@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.36.0 — Count trump protection in dump logic
+// Version: v17.37.0 — Last-in-trick count maximization, count trump protection
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.36.0';
+const CACHE_NAME = 'tx-dom-v17.37.0';
 const urlsToCache = [
   './index.html',
   // CSS

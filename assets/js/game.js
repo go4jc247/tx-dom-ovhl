@@ -5403,16 +5403,27 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       }, 0);
       if(trickCountFollow > 0 || canSetBid){
         // We're last — guaranteed win with count, or we need to set the bid
-        let bestWinIdx2 = highIdx, bestWinRank2 = Infinity;
+        // PREFER winning with a count tile when we need count for our bid
+        // (our winning tile's count goes to our team's capture pile)
+        let bestWinIdx2 = highIdx, bestWinRank2 = Infinity, bestWinCount2 = 0;
+        const wantCount = isBidderTeam && pointsNeeded > 0;
         for(const idx of legal){
           const tile = hand[idx];
           if((tile[0] === ledPip || tile[1] === ledPip) && !gameState._is_trump_tile(tile)){
             const r = gameState._suit_rank(tile, ledPip);
             const rank = r[0] * 100 + r[1];
-            if(rank > winnerRank && rank < bestWinRank2){ bestWinRank2 = rank; bestWinIdx2 = idx; }
+            if(rank <= winnerRank) continue; // can't win
+            const ps = tile[0] + tile[1];
+            const cnt = (ps === 5) ? 5 : (ps === 10) ? 10 : 0;
+            // When we need count: prefer count tiles (they add to trick value)
+            // Otherwise: prefer lowest winning card (conserve strength)
+            const preferThis = wantCount
+              ? (cnt > bestWinCount2 || (cnt === bestWinCount2 && rank < bestWinRank2))
+              : (rank < bestWinRank2);
+            if(preferThis){ bestWinRank2 = rank; bestWinIdx2 = idx; bestWinCount2 = cnt; }
           }
         }
-        return makeResult(bestWinIdx2, "Last in trick: win for count/defense");
+        return makeResult(bestWinIdx2, "Last in trick: win for " + (bestWinCount2 > 0 ? bestWinCount2 + "pts+" : "") + (trickCountFollow > 0 ? trickCountFollow + "pts" : "defense"));
       }
     }
 
@@ -7236,7 +7247,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.36.0';  // v17.36.0: Count trump protection, dump improvements
+const MP_VERSION = 'v17.37.0';  // v17.37.0: Last-in-trick count max, count trump protect
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
