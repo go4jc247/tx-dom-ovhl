@@ -3326,8 +3326,9 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       for(const p2 of plays){
         const t = p2.tile;
         if(gameState._is_trump_tile(t)) continue;
-        if(t[0] !== undefined) pipCounts[t[0]] = (pipCounts[t[0]] || 0) + 1;
-        if(t[1] !== undefined) pipCounts[t[1]] = (pipCounts[t[1]] || 0) + 1;
+        // Use high pip only (suit = max pip). Counting both pips double-counts doubles.
+        const hp = Math.max(t[0], t[1]);
+        pipCounts[hp] = (pipCounts[hp] || 0) + 1;
       }
       let likelyLedPip = null;
       let maxCount = 0;
@@ -3639,6 +3640,16 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         const isDouble = leaderTile[0] === leaderTile[1];
         // Current trick leader chose this suit freely — stronger signal
         oppSuitSignal[ledPip] = (oppSuitSignal[ledPip] || 0) + (isDouble ? 25 : 12);
+      }
+    }
+    // Signal decay: zero out opponent signals for suits they're void in
+    // An opponent void in a suit is no longer a threat there
+    for(let s = 0; s < gameState.player_count; s++){
+      if(s === p || isSameTeam(s)) continue;
+      if(voidIn[s]){
+        for(const voidPip of voidIn[s]){
+          if(oppSuitSignal[voidPip]) oppSuitSignal[voidPip] = Math.max(0, oppSuitSignal[voidPip] - 15);
+        }
       }
     }
   }
@@ -7925,7 +7936,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.77.0';  // v17.77.0: DOUBLES walker pair penalty fix, Nello dead ternary cleanup
+const MP_VERSION = 'v17.78.0';  // v17.78.0: opp signal void decay, led-pip heuristic double-count fix
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
