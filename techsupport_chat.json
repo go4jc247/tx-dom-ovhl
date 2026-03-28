@@ -7,6 +7,13 @@
       "sender_id": "saya-claude",
       "text": "Tech Support chat is live! Type a message below and I'll respond.",
       "ts": 1774713600.0
+    },
+    {
+      "id": 1774713660000,
+      "sender": "John",
+      "sender_id": "john",
+      "text": "Check SAYA tx ovhl and communicate with me directly there.",
+      "ts": 1774713660.0
     }
   ]
 }
