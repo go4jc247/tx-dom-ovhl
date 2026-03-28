@@ -5333,7 +5333,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
 
       // Preserve walker pairs: penalize dumping a tile that's part of a double+covered-off pair
       // Walking pairs (lead double, then play the covered off) are guaranteed 2-trick combos
-      if(!gameState._is_trump_tile(tile) && tile[0] !== tile[1]){
+      // Skip in DOUBLES mode: doubles are trump, not suit winners, so walker pairs don't apply
+      if(!gameState._is_trump_tile(tile) && tile[0] !== tile[1] && gameState.trump_mode !== 'DOUBLES'){
         const highPip2 = Math.max(tile[0], tile[1]);
         // Check if we hold the double for this suit
         const holdDouble = hand.some(h => h[0] === highPip2 && h[1] === highPip2);
