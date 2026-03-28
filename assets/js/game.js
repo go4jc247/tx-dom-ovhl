@@ -3667,6 +3667,19 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         }
       }
 
+      // Check if we're off-suit (no tiles in led suit). In Nello (no trumps),
+      // off-suit tiles can NEVER win — dump lowest to save high tiles for later.
+      const _nHaveInSuit = nLedSuit !== null && nLedSuit >= 0 &&
+        legal.some(i => hand[i][0] === nLedSuit || hand[i][1] === nLedSuit);
+      if(!_nHaveInSuit){
+        let dumpIdx = legal[0], dumpVal = Infinity;
+        for(const idx of legal){
+          const val = hand[idx][0] + hand[idx][1];
+          if(val < dumpVal){ dumpVal = val; dumpIdx = idx; }
+        }
+        return makeResult(dumpIdx, "Nel-O opp: off-suit, dump low (save high for later)");
+      }
+
       if(!bidderPlayed){
         // Bidder still has to play — play our HIGHEST RANK to set a high bar
         let highIdx = legal[0], highRank = -1;
