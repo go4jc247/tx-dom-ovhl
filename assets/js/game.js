@@ -3440,6 +3440,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   // ═══════════════════════════════════════════════════════════════════
   //  ENDGAME AWARENESS — adjust strategy in final tricks
   // ═══════════════════════════════════════════════════════════════════
+  const isPreEndgame = tricksLeft <= 3; // influences count-hunting and conservation earlier
   const isEndgame = tricksLeft <= 2;
   const mustWin = isEndgame && !bidIsSafe; // must win remaining tricks to make bid
   // Bid safe but opponents still have dangerous count? Don't relax yet
@@ -4080,7 +4081,10 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       const p3EarlyWindow = trickNum <= 1;
       const p3MidWindow = trickNum === 2 && trumpsInHand.length >= 4;
       const p3LateWindow = trickNum === 3 && trumpsInHand.length >= 5; // stricter late
-      if(otherTrumps.length >= 2 && trumpsInHand.length >= 3 && (p3EarlyWindow || p3MidWindow || p3LateWindow || mustWin) && !bidIsSafe && !partnersHoldRemainingTrumps){
+      // Defenders: more conservative — only pull early or when can set bid
+      // Bidders: aggressive pulling to gain control
+      const p3RoleOk = isBidderTeam || canSetBid || p3EarlyWindow;
+      if(otherTrumps.length >= 2 && trumpsInHand.length >= 3 && (p3EarlyWindow || p3MidWindow || p3LateWindow || mustWin) && p3RoleOk && !bidIsSafe && !partnersHoldRemainingTrumps){
         let bestIdx = otherTrumps[0], bestScore = -Infinity;
         for(const idx of otherTrumps){
           const tile = hand[idx];
@@ -4160,6 +4164,16 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           const info = suitInfo[pip];
           if(!info) continue;
           let score = 100 + info.countRemaining + pip - (info.tilesLeft * 3);
+          // Walker setup: if we hold a covered off for this double, lead double first
+          // so the off "walks" next trick (guaranteed 2-trick win combo)
+          const hasCoveredOff = hand.some(t => t[0] !== t[1] && Math.max(t[0],t[1]) === pip);
+          if(hasCoveredOff) score += 12;
+          // Depleted-suit bonus: fewer remaining tiles = safer double lead
+          if(info.tilesLeft <= 2) score += 8;
+          // Count-safe: avoid leading count doubles when we might need those points
+          const dblSum = pip + pip;
+          const dblIsCount = (dblSum === 5 || dblSum === 10);
+          if(dblIsCount && isBidderTeam && pointsNeeded > 0) score -= 10;
           if(score > bestScore){ bestScore = score; bestIdx = idx; }
         }
         return makeResult(bestIdx, "Lead: double (trump control, safe win)");
@@ -5041,7 +5055,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   }
 
   // ── ENDGAME COUNT DUMP: if partner is winning in final tricks, throw our best count ──
-  if(tricksLeft <= 2 && partnerWinning && isBidderTeam && pointsNeeded > 0){
+  if(isPreEndgame && partnerWinning && isBidderTeam && pointsNeeded > 0){
     let bestCountIdx = -1, bestCountVal = 0;
     for(const idx of legal){
       const ps = hand[idx][0] + hand[idx][1];
