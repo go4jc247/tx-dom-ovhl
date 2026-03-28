@@ -4153,7 +4153,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       // PICK safest trump: avoid count tiles, then prefer low value
       const p3EarlyWindow = trickNum <= 1;
       const p3MidWindow = trickNum === 2 && trumpsInHand.length >= 4;
-      const p3LateWindow = trickNum === 3 && trumpsInHand.length >= 5; // stricter late
+      const p3LateWindow = trickNum === 3 && trumpsInHand.length >= 4; // relaxed: 5→4 (bidder often has 4 left after 2 pulls)
       // Defenders: more conservative — only pull early or when can set bid
       // Bidders: aggressive pulling to gain control
       const p3RoleOk = isBidderTeam || (canSetBid && !canRelax) || p3EarlyWindow;
@@ -4428,6 +4428,9 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           }
           score -= info.tilesLeft * 2;
           _breakdown.tilesLeftPenalty = -(info.tilesLeft * 2);
+          // Depleted suit bonus: suits with few tiles left are safer to lead (less competition)
+          if(info.tilesLeft <= 2){ score += 10; _breakdown.depletedBonus = 10; }
+          else if(info.tilesLeft <= 4){ score += 5; _breakdown.depletedBonus = 5; }
           // If some opponents are void and might trump, that's dangerous
           if(oppsVoid > 0 && !opponentsVoidInTrump){ score -= oppsVoid * 10; _breakdown.oppVoidTrumpRisk = -(oppsVoid * 10); }
           // If opponents are void in this suit AND void in trump, they can't threaten
@@ -5250,7 +5253,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         const countMult = oppWinning ? 5 : (3 + _oppsStillToPlay);
         // Double penalty if we need count for our bid, OR if opponents need count (deny it)
         const countProtect = (mustWinCountTricks || opponentsNeedCount) ? 2 : 1;
-        const countPenalty = Math.min(myCount * countMult * countProtect, 80); // cap at 80
+        const countCap = opponentsNeedCount ? 120 : 80; // higher cap when denying count to desperate bidder
+        const countPenalty = Math.min(myCount * countMult * countProtect, countCap);
         score -= countPenalty;
         _bd.countPenalty = -countPenalty;
       }
