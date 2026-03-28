@@ -5417,9 +5417,13 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       const _shouldConserve = !isBidderTeam && trickCount === 0 && !isEndgame && !bidderIsClose && !canSetBid
         && !bidderNearMaking
         && (shouldSaveLastTrump || (_trumpRatio <= 0.5 && trumpsInHand.length <= 2));
-      if(_shouldConserve && legalTiles.some(t => !gameState._is_trump_tile(t))){
+      if(_shouldConserve){
         // Low-value trick on defense with scarce trumps — save for count-heavy trick
-        // Fall through to dump logic (only if we have non-trump dump options)
+        // Fall through to dump logic if we have non-trump dump options
+        // If only trumps remain, play lowest trump (forced, but conserve best ones)
+        if(!legalTiles.some(t => !gameState._is_trump_tile(t))){
+          if(anyTrumpIdx >= 0) return makeResult(anyTrumpIdx, "Conserve: forced trump (no non-trump), play lowest");
+        }
       } else if(winTrumpIdx >= 0){
         return makeResult(winTrumpIdx, canSetBid && !isBidderTeam ? "Trump in (setting bid)" : "Trump in to win");
       }
@@ -5449,9 +5453,19 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     if(!isBidderTeam && canSetBid && winTrumpIdx >= 0 && weHaveTrumpControl
       && countElsewhere >= 10 && tricksLeft >= 2
       && !shouldSaveLastTrump && trumpsInHand.length >= 3){
-      // Verify we have non-trump tiles to lead next trick (otherwise sacrifice is pointless)
-      const hasNonTrumpLead = hand.some(t => !gameState._is_trump_tile(t));
-      if(hasNonTrumpLead){
+      // Verify we have non-trump tiles with count potential to lead next trick
+      let hasCountLead = false;
+      for(const t of hand){
+        if(gameState._is_trump_tile(t)) continue;
+        const ps = t[0] + t[1];
+        const ledS = Math.max(t[0], t[1]);
+        const si = suitInfo[ledS];
+        // Good lead: either this tile IS count, or the suit has count remaining
+        if(ps === 5 || ps === 10 || (si && si.countRemaining >= 5)){
+          hasCountLead = true; break;
+        }
+      }
+      if(hasCountLead){
         const sacTile = hand[winTrumpIdx];
         const sacPs = sacTile[0] + sacTile[1];
         const sacIsCount = (sacPs === 5 || sacPs === 10);
@@ -5462,8 +5476,22 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     }
     // Endgame desperation: trump in even if we can't beat existing trump
     // to prevent opponents from scoring count and to use remaining trumps
+    // BUT only if our trump can actually WIN this trick (don't waste losing trumps)
     if(mustWin && anyTrumpIdx >= 0 && !partnerHasTrumpInTrick){
-      return makeResult(anyTrumpIdx, "Endgame: desperate trump in");
+      // Check if we can actually beat what's on the table
+      if(winTrumpIdx >= 0){
+        return makeResult(winTrumpIdx, "Endgame: desperate trump in (can win)");
+      }
+      // Can't win — only play trump if trick has significant count worth contesting
+      const desperateCount = trick.reduce((sum, play) => {
+        if(!Array.isArray(play) || !play[1]) return sum;
+        const ps = play[1][0] + play[1][1];
+        return sum + ((ps === 5) ? 5 : (ps === 10) ? 10 : 0);
+      }, 0);
+      if(desperateCount >= 5){
+        return makeResult(anyTrumpIdx, "Endgame: desperate trump (can't win but contesting count)");
+      }
+      // No count, can't win — fall through to dump instead of wasting trump
     }
     // Can't beat existing trump — fall through to dump
   }
