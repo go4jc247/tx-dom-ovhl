@@ -1759,6 +1759,10 @@ function aiChooseTrump(hand, bidAmount) {
     // than scattered trumps (e.g., 7-7, 7-6, 7-5 >> 7-7, 7-3, 7-0)
     if (hasDouble && hasSecond) score += 15;
     if (hasDouble && hasSecond && hasThird) score += 10;
+    // Gap penalty: scattered trumps (double + gap) are weak because opponents
+    // hold the gap cards and beat our lower trumps
+    if (hasDouble && !hasSecond && trumpTiles.length >= 3) score -= 5;
+    if (hasDouble && hasSecond && !hasThird && trumpTiles.length >= 4) score -= 3;
 
     // Void suit bonus: if choosing this trump leaves us void in other suits,
     // we can trump in when those suits are led
@@ -1794,6 +1798,9 @@ function aiChooseTrump(hand, bidAmount) {
       if (ntDoublePips.has(t[0]) || ntDoublePips.has(t[1])) coveredOffs++;
     }
     score += coveredOffs * 7; // covered offs are safe side tricks (walker pairs)
+    // Uncovered off penalty: non-trump non-double tiles without a covering double are risky
+    const uncoveredOffs = nonTrumpTiles.filter(t => t[0] !== t[1] && !ntDoublePips.has(t[0]) && !ntDoublePips.has(t[1]));
+    score -= uncoveredOffs.length * 4;
 
     // Count tile awareness: penalty if our trump tiles are count tiles
     // (10-count: pip sum = 10; 5-count: pip sum = 5)
