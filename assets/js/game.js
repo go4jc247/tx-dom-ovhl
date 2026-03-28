@@ -2417,6 +2417,7 @@ function updateOffTracker() {
 
   // Re-analyze all tricks (simple approach - recalc from scratch)
   // Reset suspicion to base then re-apply all evidence
+  let _otTrickIndex = 0; // track which trick we're analyzing (for early-game dampening)
   for (const pip in offTracker.suitSuspicion) {
     offTracker.suitSuspicion[pip] = 50;
   }
@@ -2437,6 +2438,7 @@ function updateOffTracker() {
   }
 
   for (const record of orderedTricks) {
+    _otTrickIndex++;
     // Find what was led (first non-null tile played)
     // Unfortunately tricks_team stores by seat, not play order
     // We need to figure out the led suit from the winning team context
@@ -2497,7 +2499,7 @@ function updateOffTracker() {
             // Bidder played a non-double in this suit → INCREASE suspicion
             // This could be the off tile being forced out!
             // Weight early plays less (could be forced follows) vs late plays (more voluntary)
-            const earlyFactor = trickCount <= 2 ? 0.65 : (trickCount <= 4 ? 0.85 : 1.0);
+            const earlyFactor = _otTrickIndex <= 2 ? 0.65 : (_otTrickIndex <= 4 ? 0.85 : 1.0);
             const suspInc = Math.round(25 * earlyFactor);
             if (offTracker.suitSuspicion[pip] !== undefined) {
               offTracker.suitSuspicion[pip] = Math.min(100, offTracker.suitSuspicion[pip] + suspInc);
@@ -3547,6 +3549,21 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   if(trumpTilesRemaining.length === 0 && trumpMode !== "NONE"){
     // All trumps are either played or in our hand — we have full trump control
     opponentsVoidInTrump = true;
+  }
+
+  // PER-OPPONENT TRUMP DEDUCTION: if all opponents except one are confirmed void,
+  // and there are remaining trumps, that one opponent DEFINITELY has them
+  // This helps make better trump-in decisions (know exactly who could over-trump)
+  let knownTrumpHolder = -1;
+  if(trumpTilesRemaining.length > 0 && trumpMode !== "NONE"){
+    let nonVoidOpps = [];
+    for(let s = 0; s < gameState.player_count; s++){
+      if(isSameTeam(s) || !gameState.active_players.includes(s)) continue;
+      if(!trumpVoidConfirmed[s]) nonVoidOpps.push(s);
+    }
+    if(nonVoidOpps.length === 1){
+      knownTrumpHolder = nonVoidOpps[0]; // this opponent holds ALL remaining trumps
+    }
   }
   // NONE mode: no trumps exist — everyone is "void in trump" by definition
   if(trumpMode === "NONE"){
@@ -7461,7 +7478,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.52.0';  // v17.52.0: trump-in over-trump risk, conservation fix, remove losing trump waste
+const MP_VERSION = 'v17.53.0';  // v17.53.0: off-tracker trick index fix, per-opponent trump deduction
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables

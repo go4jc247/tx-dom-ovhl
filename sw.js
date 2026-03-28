@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.52.0 — trump-in over-trump risk, conservation fix
+// Version: v17.53.0 — off-tracker fix, per-opponent trump deduction
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.52.0';
+const CACHE_NAME = 'tx-dom-v17.53.0';
 const urlsToCache = [
   './index.html',
   // CSS
