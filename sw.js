@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.46.0 — multi-gap AI fix
+// Version: v17.47.0 — trump follow security, Moon opp coordination, TN51 lead tuning
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.46.0';
+const CACHE_NAME = 'tx-dom-v17.47.0';
 const urlsToCache = [
   './index.html',
   // CSS

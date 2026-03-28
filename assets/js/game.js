@@ -4172,6 +4172,14 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           if(bidderSeat !== undefined && voidIn[bidderSeat] && voidIn[bidderSeat].has(suitPip)){
             score += 12; // bidder void = they dump, we likely win
           }
+          // Moon coordination: if the OTHER opponent is void in this suit,
+          // leading it means they can dump unwanted tiles while we win
+          for(let s = 0; s < gameState.player_count; s++){
+            if(s === p || s === bidderSeat || !gameState.active_players.includes(s)) continue;
+            if(voidIn[s] && voidIn[s].has(suitPip) && dbl){
+              score += 6; // other opp void + we have double = safe lead
+            }
+          }
 
           // Avoid leading suits where bidder has shown strength
           const info = suitInfo[suitPip];
@@ -4783,8 +4791,10 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       // Skip if remaining trumps are only held by partners (don't pull partner trumps)
       // PICK safest trump: avoid count tiles, then prefer low value
       const p3EarlyWindow = trickNum <= 1;
-      const p3MidWindow = trickNum === 2 && trumpsInHand.length >= 4;
-      const p3LateWindow = trickNum === 3 && trumpsInHand.length >= 4; // relaxed: 5→4 (bidder often has 4 left after 2 pulls)
+      // TN51: 6 players = 4 opponents, need more trumps to justify pulling without highest
+      const p3TrumpThreshold = isTN51 ? 5 : 4;
+      const p3MidWindow = trickNum === 2 && trumpsInHand.length >= p3TrumpThreshold;
+      const p3LateWindow = trickNum === 3 && trumpsInHand.length >= p3TrumpThreshold;
       // Defenders: more conservative — only pull early or when can set bid
       // Bidders: aggressive pulling to gain control
       const p3RoleOk = isBidderTeam || (canSetBid && !canRelax) || p3EarlyWindow;
@@ -5078,8 +5088,10 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           if(voidIn[s].has(pip)) oppsVoidInSuit++;
         }
         // If opponents are void AND still have trump, our double gets trumped
+        // TN51: more opponents (4 vs 2) = higher risk of someone trumping our double
+        const trumpRiskPerOpp = isTN51 ? 12 : 15;
         if(oppsVoidInSuit > 0 && !opponentsVoidInTrump){
-          score -= oppsVoidInSuit * 15; // high penalty: double will lose
+          score -= oppsVoidInSuit * trumpRiskPerOpp; // high penalty: double will lose
           // Extra penalty if this double is a count tile
           const dblSum = pip + pip;
           if(dblSum === 10) score -= 15;
@@ -5907,6 +5919,29 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         return makeResult(winTrumpF, "Trump led: overtake to set bid");
       }
       // Bidder team or count in trick: win it
+      // When count >= 10 and opponents still behind, consider a stronger trump to secure
+      if((isBidderTeam || trickCountF > 0) && !isLastInTrick && trickCountF >= 10){
+        let oppsAfterF = 0;
+        for(let s = 0; s < gameState.player_count; s++){
+          if(isSameTeam(s) || s === p || !gameState.active_players.includes(s)) continue;
+          if(!trick.some(play => Array.isArray(play) && play[0] === s)) oppsAfterF++;
+        }
+        if(oppsAfterF > 0){
+          // Find second-highest winning trump for secure play
+          let secureTrumpFIdx = winTrumpF, secureTrumpFRank = -1;
+          for(const idx of legal){
+            const tile = hand[idx];
+            if(!gameState._is_trump_tile(tile)) continue;
+            const r = getTrumpRankNum(tile);
+            if(r > highestTrickTrumpF && r > secureTrumpFRank){
+              secureTrumpFRank = r; secureTrumpFIdx = idx;
+            }
+          }
+          if(secureTrumpFIdx !== winTrumpF){
+            return makeResult(secureTrumpFIdx, "Trump led: secure trump for " + trickCountF + "pts (opps behind)");
+          }
+        }
+      }
       if(isBidderTeam || trickCountF > 0){
         return makeResult(winTrumpF, "Trump led: lowest winning trump");
       }
@@ -7402,7 +7437,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.46.0';  // v17.46.0: multi-gap AI fix (Nello suit rank, TN51 friendly defender, endgame count protection)
+const MP_VERSION = 'v17.47.0';  // v17.47.0: trump follow security, Moon opp coordination, TN51 lead tuning
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
