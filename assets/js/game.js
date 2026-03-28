@@ -3107,11 +3107,13 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   //  TRUMP CONTROL DETECTION
   // ═══════════════════════════════════════════════════════════════════
   // We have trump control if ALL opponents are void in trump (confirmed or highly likely)
+  // Later in the game, lower the threshold — more tricks played = more evidence
+  const voidThreshold = trickNum >= 4 ? 0.6 : trickNum >= 2 ? 0.7 : 0.8;
   let opponentsVoidInTrump = true;
   for(let s = 0; s < gameState.player_count; s++){
     if(isSameTeam(s)) continue; // skip teammates
     if(!gameState.active_players.includes(s)) continue; // skip inactive
-    if(!trumpVoidConfirmed[s] && trumpVoidLikely[s] < 0.8){
+    if(!trumpVoidConfirmed[s] && trumpVoidLikely[s] < voidThreshold){
       opponentsVoidInTrump = false;
       break;
     }
