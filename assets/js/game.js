@@ -3170,7 +3170,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   // Save last trump UNLESS: we must win (endgame + bid not safe), OR it's the last trick
   const shouldSaveLastTrump = isLastTrump && !mustWin && tricksLeft > 1;
 
-  // Debug: bid safety + last trump
+  // Debug: bid safety + last trump + role + endgame
   if(_dbg.enabled){
     _dbg.bidSafety = {
       currentBid: currentBid,
@@ -3178,7 +3178,21 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       pointsNeeded: pointsNeeded,
       bidIsSafe: bidIsSafe,
       bidIsClose: bidIsClose,
-      tricksLeft: tricksLeft
+      tricksLeft: tricksLeft,
+      isBidderTeam: isBidderTeam,
+      iAmBidder: iAmBidder,
+      iAmBidderPartner: iAmBidderPartner,
+      bidderScore: bidderScore,
+      bidderNeedsMore: bidderNeedsMore,
+      bidderIsClose: bidderIsClose,
+      canSetBid: canSetBid
+    };
+    _dbg.endgame = {
+      isEndgame: isEndgame,
+      mustWin: mustWin,
+      canRelax: canRelax,
+      posInTrick: posInTrick,
+      isLastInTrick: isLastInTrick
     };
     _dbg.lastTrump = {
       isLastTrump: isLastTrump,
