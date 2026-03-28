@@ -4486,7 +4486,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     if(countIdx >= 0 && safeToThrowCount) return makeResult(countIdx, "Partner winning (safe), throw count (" + countVal + "pts)");
     if(countIdx >= 0 && !safeToThrowCount){
       // Opponents still to play — throw count more aggressively if bidder team needs points
-      if(isBidderTeam && !bidIsSafe && countVal === 10){
+      // BUT only throw 10-count if opponents are void in trump (can't overtrump)
+      if(isBidderTeam && !bidIsSafe && countVal === 10 && opponentsVoidInTrump){
         return makeResult(countIdx, "Partner winning (bidder needs pts), throw 10-count");
       }
       if(countVal === 5) return makeResult(countIdx, "Partner winning (risky), throw small count");
