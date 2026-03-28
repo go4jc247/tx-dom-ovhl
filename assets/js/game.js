@@ -3766,7 +3766,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       // Early game (trick 0-1) OR endgame must-win: force opponent trumps
       // Skip if remaining trumps are only held by partners (don't pull partner trumps)
       // PICK safest trump: avoid count tiles, then prefer low value
-      if(otherTrumps.length >= 2 && (trickNum <= 1 || mustWin) && !bidIsSafe && !partnersHoldRemainingTrumps){
+      if(otherTrumps.length >= 2 && trumpsInHand.length >= 3 && (trickNum <= 1 || mustWin) && !bidIsSafe && !partnersHoldRemainingTrumps){
         let bestIdx = otherTrumps[0], bestScore = -Infinity;
         for(const idx of otherTrumps){
           const tile = hand[idx];
@@ -4093,9 +4093,10 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       const alreadyPlayed = trick.some(play => Array.isArray(play) && play[0] === s);
       if(!alreadyPlayed) oppsRemaining++;
     }
-    // Safe to throw count: no opponents left OR partner has trump (can't be beaten by suit)
+    // Safe to throw count: no opponents left OR partner has trump AND opponents can't over-trump
     const partnerHasTrump = trick.some(play => Array.isArray(play) && play[0] !== p && isSameTeam(play[0]) && gameState._is_trump_tile(play[1]));
-    const safeToThrowCount = oppsRemaining === 0 || partnerHasTrump;
+    const oppsMayOvertrumpHere = oppsRemaining > 0 && !opponentsVoidInTrump;
+    const safeToThrowCount = oppsRemaining === 0 || (partnerHasTrump && !oppsMayOvertrumpHere);
 
     let countIdx = -1, countVal = 0, lowIdx = pwCandidates[0], lowVal = Infinity;
     for(const idx of pwCandidates){
@@ -4190,6 +4191,13 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     if(winnerIsTrump){
       // PARTNER TRUMPED: throw count in-suit if partner has this trick
       if(lowIdx >= 0 && partnerWinning){
+        // Check if opponents can still over-trump before throwing count
+        let _oppsLeft = 0;
+        for(let s = 0; s < gameState.player_count; s++){
+          if(isSameTeam(s) || s === p) continue;
+          if(!trick.some(play => Array.isArray(play) && play[0] === s)) _oppsLeft++;
+        }
+        const _safeFromOvertrump = _oppsLeft === 0 || opponentsVoidInTrump;
         let countInSuit3 = -1, countVal3 = 0;
         for(const idx of legal){
           const t = hand[idx];
@@ -4198,7 +4206,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
             if((ps === 5 || ps === 10) && ps > countVal3){ countVal3 = ps; countInSuit3 = idx; }
           }
         }
-        if(countInSuit3 >= 0){
+        if(countInSuit3 >= 0 && (_safeFromOvertrump || countVal3 === 5)){
           return makeResult(countInSuit3, "Partner trumped, throw in-suit count (" + countVal3 + "pts)");
         }
       }
@@ -4240,7 +4248,14 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     }
     if(lowIdx >= 0){
       // PARTNER WINNING ON SUIT: throw count in-suit if partner has this trick
+      // BUT check if opponents can still over-trump (or win with higher suit card)
       if(partnerWinning){
+        let _oppsLeft2 = 0;
+        for(let s = 0; s < gameState.player_count; s++){
+          if(isSameTeam(s) || s === p) continue;
+          if(!trick.some(play => Array.isArray(play) && play[0] === s)) _oppsLeft2++;
+        }
+        const _safeHere = _oppsLeft2 === 0 || (winnerIsTrump && opponentsVoidInTrump);
         let countInSuit = -1, countVal2 = 0;
         for(const idx of legal){
           const t = hand[idx];
@@ -4249,7 +4264,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
             if((ps === 5 || ps === 10) && ps > countVal2){ countVal2 = ps; countInSuit = idx; }
           }
         }
-        if(countInSuit >= 0){
+        if(countInSuit >= 0 && (_safeHere || countVal2 === 5)){
           return makeResult(countInSuit, "Partner winning suit, throw count (" + countVal2 + "pts)");
         }
       }
@@ -4292,17 +4307,26 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       }
     }
 
-    // Find lowest winning trump and lowest trump overall
-    let winTrumpIdx = -1, winTrumpRank = Infinity;
-    let anyTrumpIdx = -1, anyTrumpRank = Infinity;
+    // Find lowest winning trump and lowest trump overall (prefer non-count trumps)
+    let winTrumpIdx = -1, winTrumpRank = Infinity, winTrumpIsCount = true;
+    let anyTrumpIdx = -1, anyTrumpRank = Infinity, anyTrumpIsCount = true;
     const _trumpCandidates = [];
     for(const idx of legal){
       const tile = hand[idx];
       if(gameState._is_trump_tile(tile)){
         const r = getTrumpRankNum(tile);
-        _trumpCandidates.push({ tile: tile[0]+'-'+tile[1], rank: r, canWin: r > highestTrickTrump });
-        if(r < anyTrumpRank){ anyTrumpRank = r; anyTrumpIdx = idx; }
-        if(r > highestTrickTrump && r < winTrumpRank){ winTrumpRank = r; winTrumpIdx = idx; }
+        const ps = tile[0] + tile[1];
+        const isCount = (ps === 5 || ps === 10);
+        _trumpCandidates.push({ tile: tile[0]+'-'+tile[1], rank: r, canWin: r > highestTrickTrump, count: isCount });
+        // Prefer non-count; among same count status, pick lowest rank
+        if((!isCount && anyTrumpIsCount) || (isCount === anyTrumpIsCount && r < anyTrumpRank)){
+          anyTrumpRank = r; anyTrumpIdx = idx; anyTrumpIsCount = isCount;
+        }
+        if(r > highestTrickTrump){
+          if((!isCount && winTrumpIsCount) || (isCount === winTrumpIsCount && r < winTrumpRank)){
+            winTrumpRank = r; winTrumpIdx = idx; winTrumpIsCount = isCount;
+          }
+        }
       }
     }
 
