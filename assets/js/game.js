@@ -2810,9 +2810,16 @@ function detectLayDownHand(gameState, seat) {
   }
 
   // For suit/doubles trump: non-trumps must be walkable
+  // In DOUBLES mode: all doubles are trumps, so check trump array for covering doubles
   const doublesInHand = new Set();
   for (const t of nonTrumps) {
     if (t[0] === t[1]) doublesInHand.add(t[0]);
+  }
+  if (trumpMode === 'DOUBLES') {
+    // In DOUBLES mode, trump doubles can cover off-suit non-double tiles
+    for (const t of trumps) {
+      if (t[0] === t[1]) doublesInHand.add(t[0]);
+    }
   }
 
   const winningNonTrumps = [];
@@ -8084,7 +8091,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.91.0';  // v17.91.0: Strategic context: desperation all modes, bidderIsClose mode-aware, mark deficit urgency
+const MP_VERSION = 'v17.92.0';  // v17.92.0: DOUBLES lay-down fix, strategic context improvements
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
