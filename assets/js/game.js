@@ -2620,6 +2620,10 @@ function detectLayDownHand(gameState, seat) {
     // No trumps but have non-trumps — can only lay down if NO unplayed trumps exist
     if (oppTrumps > 0) return null;
   }
+  // Must have enough trumps to pull all opponent trumps before leading non-trump doubles
+  if (trumps.length > 0 && nonTrumps.length > 0 && trumps.length < oppTrumps) {
+    return null; // opponent has more trump than us — can't guarantee pulling all
+  }
 
   return {
     seat: seat,
