@@ -3853,6 +3853,31 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   }
 
   // ═══════════════════════════════════════════════════════════════════
+  //  BIDDER SUIT TRACKING (for defensive decisions)
+  // ═══════════════════════════════════════════════════════════════════
+  // Count tiles bidder has played in each suit — used by defensive leads to
+  // identify bidder's strong vs weak suits and near-void opportunities.
+  const bidderSuitPlays = {};
+  if(!isMoon && bidderSeat !== undefined && !isBidderTeam){
+    for(let team = 0; team < (gameState.tricks_team || []).length; team++){
+      for(const rec of (gameState.tricks_team[team] || [])){
+        if(!rec || !rec[bidderSeat]) continue;
+        const bt = rec[bidderSeat];
+        if(gameState._is_trump_tile(bt)) continue;
+        const hp = Math.max(bt[0], bt[1]);
+        bidderSuitPlays[hp] = (bidderSuitPlays[hp] || 0) + 1;
+      }
+    }
+    // Current trick: if bidder has played
+    for(const play of trick){
+      if(!Array.isArray(play) || play[0] !== bidderSeat || !play[1]) continue;
+      if(gameState._is_trump_tile(play[1])) continue;
+      const hp = Math.max(play[1][0], play[1][1]);
+      bidderSuitPlays[hp] = (bidderSuitPlays[hp] || 0) + 1;
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
   //  NEL-O LOGIC (v4: opponent-aware strategy)
   // ═══════════════════════════════════════════════════════════════════
   if(isNello){
@@ -5594,6 +5619,12 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
               score += voidUrgency;
               _breakdown.bidderVoidBonus = voidUrgency;
             }
+            // BIDDER SHORT-SUIT PROBE: lead suits where bidder likely has 0-1 tiles left
+            // (forces them to void soon, wasting trump on future leads of this suit)
+            if(!bidderVoidInSuit && info && bidderSuitPlays[ledSuit] >= 1 && info.tilesLeft <= 3){
+              score += 6;
+              _breakdown.bidderShortSuitProbe = 6;
+            }
             // When we can still set the bid, prefer leading count-rich suits
             // where our team can capture points the bidder needs
             if(canSetBid && info){
@@ -6607,6 +6638,20 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           && !gameState._is_trump_tile(leaderTile)){
           // Opponent led their suit double — guaranteed to win in-suit. Must trump to deny.
           return makeResult(winTrumpIdx, "Trump in: opponent led suit double (only way to win)");
+        }
+      }
+
+      // TRUMP-FOR-LEAD: sacrifice trump to gain lead when we hold walking doubles
+      // Gaining the lead lets us walk guaranteed-winner doubles on the next trick
+      if(!isMoon && winTrumpIdx >= 0 && !partnerWinning && trickCount === 0
+        && trumpsInHand.length >= 2 && nonTrumpDoubles.length > 0){
+        const hasWalkerDbl = nonTrumpDoubles.some(idx => {
+          const dPip = hand[idx][0];
+          const dInfo = suitInfo[dPip];
+          return dInfo && (dInfo.countRemaining >= 5 || dInfo.tilesLeft >= 2);
+        });
+        if(hasWalkerDbl){
+          return makeResult(winTrumpIdx, "Trump in for lead: walk double next trick");
         }
       }
 
@@ -7952,7 +7997,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.81.0';  // v17.81.0: initGameMode score reset, TN51 scoreBar DOM efficiency
+const MP_VERSION = 'v17.82.0';  // v17.82.0: bidder suit tracking, trump-for-lead walkers, short-suit probe
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables

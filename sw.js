@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.81.0 — initGameMode reset, TN51 scoreBar efficiency
+// Version: v17.82.0 — Strategic: bidder suit tracking, trump-for-lead walkers, short-suit probe
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.81.0';
+const CACHE_NAME = 'tx-dom-v17.82.0';
 const urlsToCache = [
   './index.html',
   // CSS
