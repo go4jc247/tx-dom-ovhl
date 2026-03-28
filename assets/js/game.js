@@ -4141,16 +4141,18 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       }
       if(canSimulate && oppHands.length > 0){
         let bestIdx2T = legal[0], bestScore2T = -Infinity;
-        // Helper: check if tile A beats tile B when suit is led
+        // Helper: check if tile A (opponent) beats tile B (our lead) when suit is led
         const _beats = (tileA, tileB, ledSuit) => {
           const aIsTrump = gameState._is_trump_tile(tileA);
           const bIsTrump = gameState._is_trump_tile(tileB);
-          if(aIsTrump && !bIsTrump) return true;
-          if(!aIsTrump && bIsTrump) return false;
+          if(aIsTrump && !bIsTrump) return true;  // opponent trumps our non-trump lead
+          if(!aIsTrump && bIsTrump) return false;  // opponent can't beat our trump
           if(aIsTrump && bIsTrump) return getTrumpRankNum(tileA) > getTrumpRankNum(tileB);
-          // Both non-trump: check if B follows suit
-          const bFollows = tileB[0] === ledSuit || tileB[1] === ledSuit;
-          if(!bFollows) return true; // B can't follow, A wins by default
+          // Both non-trump: check if OPPONENT (A) follows the led suit
+          const aFollows = tileA[0] === ledSuit || tileA[1] === ledSuit;
+          if(!aFollows) return false; // opponent can't follow and isn't trump → can't win
+          // Check if opponent has the double of the led suit (always wins)
+          if(tileA[0] === tileA[1] && tileA[0] === ledSuit) return true;
           const aR = gameState._suit_rank(tileA, ledSuit);
           const bR = gameState._suit_rank(tileB, ledSuit);
           return (aR[0] * 100 + aR[1]) > (bR[0] * 100 + bR[1]);

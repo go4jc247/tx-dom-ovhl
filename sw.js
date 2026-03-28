@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.24.0 — Defensive partner void trump-in, context-aware void handling
+// Version: v17.25.0 — Fix 2-trick lookahead suit-following bug
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.24.0';
+const CACHE_NAME = 'tx-dom-v17.25.0';
 const urlsToCache = [
   './index.html',
   // CSS
