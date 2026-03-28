@@ -1799,7 +1799,7 @@ function aiChooseTrump(hand, bidAmount) {
   if (doubles.length >= 3) {
     let doublesScore = 0;
     // Each double is a guaranteed trump trick (ranked by pip value)
-    doublesScore += doubles.length * 15;
+    doublesScore += doubles.length * 18;
     // Bonus for overwhelming trump count
     if (doubles.length >= 5) doublesScore += 12;
     else if (doubles.length >= 4) doublesScore += 6;
@@ -3397,7 +3397,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   // ═══════════════════════════════════════════════════════════════════
   const isEndgame = tricksLeft <= 2;
   const mustWin = isEndgame && !bidIsSafe; // must win remaining tricks to make bid
-  const canRelax = bidIsSafe && tricksLeft >= 2; // bid is safe, play conservatively
+  // Bid safe but opponents still have dangerous count? Don't relax yet
+  const canRelax = bidIsSafe && tricksLeft >= 2 && !(totalCountRemaining >= 10 && pointsNeeded >= -5);
   // COUNT-POINT ARITHMETIC: in endgame, compute if count tiles in hand are enough to make bid
   // countNeeded = how many count points we need beyond base trick wins
   // If we hold enough count, we need fewer trick wins; if we don't, we need ALL remaining tricks
@@ -3931,7 +3932,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     // ── ENDGAME COUNT HUNT: bidder needs count points to make bid ──
     // Trigger: must-win OR when count alone can close the gap (even before endgame)
     const countHuntActive = isBidderTeam && !bidIsDoomed && pointsNeeded > 0
-      && (mustWin || (countNeeded > 0 && tricksLeft <= 3));
+      && (mustWin || (countNeeded > 0 && tricksLeft <= 3)
+        || (countInOurHand >= pointsNeeded && tricksLeft <= 5 && weHaveTrumpControl));
     if(countHuntActive && nonTrumpDoubles.length > 0){
       let bestCountDbl = -1, bestCountScore = -Infinity;
       for(const idx of nonTrumpDoubles){
@@ -4927,8 +4929,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     // Can't beat existing trump — fall through to dump
   }
 
-  // ── LAST TRICK COUNT DUMP: if partner is winning the last trick, throw our best count ──
-  if(tricksLeft <= 1 && partnerWinning && isBidderTeam && !bidIsSafe){
+  // ── ENDGAME COUNT DUMP: if partner is winning in final tricks, throw our best count ──
+  if(tricksLeft <= 2 && partnerWinning && isBidderTeam && pointsNeeded > 0){
     let bestCountIdx = -1, bestCountVal = 0;
     for(const idx of legal){
       const ps = hand[idx][0] + hand[idx][1];
