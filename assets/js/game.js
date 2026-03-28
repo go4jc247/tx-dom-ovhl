@@ -5689,7 +5689,9 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         return sum + ((ps === 5) ? 5 : (ps === 10) ? 10 : 0);
       }, 0);
       // With only 1 opponent behind, winning count-laden tricks is much safer
-      if(trickCount3 >= 5 || canSetBid){
+      // ALSO win zero-count tricks on DEFENSE — denying bidder a mark is valuable
+      const defenseWin3 = !isBidderTeam && canSetBid && !partnerWinning;
+      if(trickCount3 >= 5 || canSetBid || defenseWin3){
         // Find best winning card — prefer count tiles when bidder team needs count
         let bestWin3 = highIdx, bestRank3 = Infinity, bestCount3 = 0;
         const wantCount3 = isBidderTeam && pointsNeeded > 0;
@@ -5784,6 +5786,18 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           const partnerPlayed = trick.some(play => Array.isArray(play) && play[0] === s);
           if(!partnerPlayed){ partnerAfterUs = true; break; }
         }
+        // Check if opponent(s) behind us are void in the led suit AND have trump
+        // If so, they'll trump in — ducking for partner is pointless (opponent over-trumps anyway)
+        let oppBehindVoidWithTrump = false;
+        for(let s = 0; s < gameState.player_count; s++){
+          if(isSameTeam(s) || s === p || !gameState.active_players.includes(s)) continue;
+          const oppPlayed = trick.some(play => Array.isArray(play) && play[0] === s);
+          if(!oppPlayed && ledPip !== null && ledPip >= 0){
+            const oppVoidInLed = voidIn[s] && voidIn[s].has(ledPip);
+            const oppHasTrump = !trumpVoidConfirmed[s];
+            if(oppVoidInLed && oppHasTrump){ oppBehindVoidWithTrump = true; break; }
+          }
+        }
         // Duck if: partner plays after us, the double isn't played (partner might have it),
         // and trick has no count (not worth fighting over)
         const trickCountDuck = trick.reduce((sum, play) => {
@@ -5800,9 +5814,12 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
             if(voidIn[s] && voidIn[s].has(ledPip)){ partnerVoidInLed = true; break; }
           }
         }
-        if(partnerAfterUs && !partnerVoidInLed && info && !info.winnerPlayed && trickCountDuck === 0){
-          // Partner might have the double — duck and let them win
-          if(lowIdx >= 0){
+        // Skip duck if opponent behind will trump in anyway — play to win instead
+        if(partnerAfterUs && !partnerVoidInLed && !oppBehindVoidWithTrump
+          && info && !info.winnerPlayed && trickCountDuck === 0){
+          // Probability check: only duck if suit has few remaining tiles (partner likely has double)
+          const duckProbOk = !info || info.tilesLeft <= 3;
+          if(duckProbOk && lowIdx >= 0){
             return makeResult(lowIdx, "Duck: let partner win (double still out)");
           }
         }
@@ -6058,18 +6075,26 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           if(!trick.some(play => Array.isArray(play) && play[0] === s)) oppsAfterF++;
         }
         if(oppsAfterF > 0){
-          // Find second-highest winning trump for secure play
+          // Find highest winning trump for secure play — prefer non-count trumps
           let secureTrumpFIdx = winTrumpF, secureTrumpFRank = -1;
+          let secureTrumpFNonCount = winTrumpF, secureTrumpFNonCountRank = -1;
           for(const idx of legal){
             const tile = hand[idx];
             if(!gameState._is_trump_tile(tile)) continue;
             const r = getTrumpRankNum(tile);
-            if(r > highestTrickTrumpF && r > secureTrumpFRank){
-              secureTrumpFRank = r; secureTrumpFIdx = idx;
+            if(r > highestTrickTrumpF){
+              const ps = tile[0] + tile[1];
+              const isCount = (ps === 5 || ps === 10);
+              if(r > secureTrumpFRank){ secureTrumpFRank = r; secureTrumpFIdx = idx; }
+              if(!isCount && r > secureTrumpFNonCountRank){
+                secureTrumpFNonCountRank = r; secureTrumpFNonCount = idx;
+              }
             }
           }
-          if(secureTrumpFIdx !== winTrumpF){
-            return makeResult(secureTrumpFIdx, "Trump led: secure trump for " + trickCountF + "pts (opps behind)");
+          // Prefer non-count secure trump; fall back to count if no alternative
+          const bestSecure = (secureTrumpFNonCountRank > highestTrickTrumpF) ? secureTrumpFNonCount : secureTrumpFIdx;
+          if(bestSecure !== winTrumpF){
+            return makeResult(bestSecure, "Trump led: secure trump for " + trickCountF + "pts (opps behind)");
           }
         }
       }
@@ -6297,6 +6322,18 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       // aggressively trump in on count-bearing tricks to grab points and deny extras
       if(bidIsSafe && !isBidderTeam && trickCount >= 5 && winTrumpIdx >= 0 && !partnerWinning){
         return makeResult(winTrumpIdx, "Defend bid-safe: trump in to grab " + trickCount + "pts (deny extras)");
+      }
+
+      // DOUBLE-LED TRUMP URGENCY: when opponent led with the suit double (guaranteed suit winner),
+      // our only chance to take this trick is trumping in. Skip conservation.
+      // This is especially important on defense to deny bidder easy marks.
+      if(!isBidderTeam && winTrumpIdx >= 0 && !partnerWinning && trick.length > 0 && Array.isArray(trick[0])){
+        const [leaderSeat, leaderTile] = trick[0];
+        if(leaderTile && !isSameTeam(leaderSeat) && leaderTile[0] === leaderTile[1]
+          && !gameState._is_trump_tile(leaderTile)){
+          // Opponent led their suit double — guaranteed to win in-suit. Must trump to deny.
+          return makeResult(winTrumpIdx, "Trump in: opponent led suit double (only way to win)");
+        }
       }
 
       // TRUMP RATIO CONSERVATION: on defense, save trumps for higher-value tricks
@@ -7593,7 +7630,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.59.0';  // v17.59.0: partner cooperation suite — signal leader boost, void decay, partner feed, preserve suit
+const MP_VERSION = 'v17.60.0';  // v17.60.0: follow logic overhaul — opp void duck skip, 3rd-seat defense, secure trump, double-led urgency
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables

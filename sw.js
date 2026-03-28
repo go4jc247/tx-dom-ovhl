@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.59.0 — partner cooperation suite: signals, feed, dump preserve
+// Version: v17.60.0 — follow logic: opp void duck, 3rd-seat defense, secure trump, double-led
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.59.0';
+const CACHE_NAME = 'tx-dom-v17.60.0';
 const urlsToCache = [
   './index.html',
   // CSS
