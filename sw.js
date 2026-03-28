@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v15.3.0 — Nello suit rank fix, endgame count dump, bid-safe final trick
+// Version: v16.0.0 — Phase 7: partner coordination, widow rewrite, trump rebalance, bidding fixes
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v15.3.0';
+const CACHE_NAME = 'tx-dom-v16.0.0';
 const urlsToCache = [
   './index.html',
   // CSS
