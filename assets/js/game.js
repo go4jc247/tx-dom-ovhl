@@ -3994,6 +3994,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     }
     {
       // Partner of bidder follow — play low to help bidder avoid winning
+      // Note: bidderWinning rescue is already handled at line 3803 above (catches all non-bidders)
       let lowNDIdx = -1, lowNDVal = Infinity, lowIdx = legal[0], lowVal = Infinity;
       for(const idx of legal){
         const tile = hand[idx], val = tile[0]+tile[1], dbl = tile[0]===tile[1];
@@ -5282,6 +5283,22 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         _breakdown.pipPenalty = -ledSuit;
         score -= Math.floor(pipSum * 0.5);
         _breakdown.sumPenalty = -Math.floor(pipSum * 0.5);
+
+        // ENDGAME DEFENSIVE URGENCY: when bidder is close and few tricks remain,
+        // prioritize winning tricks NOW rather than playing safe
+        if(!isBidderTeam && bidderIsClose && isPreEndgame && !isMoon){
+          // Prefer our strongest leads (high cards in depleted suits where we can win)
+          if(info && info.winnerPlayed && info.tilesLeft <= 3){
+            const urgencyBonus = tricksLeft <= 2 ? 12 : 8;
+            score += urgencyBonus;
+            _breakdown.endgameUrgency = urgencyBonus;
+          }
+          // When we hold the double, it's a guaranteed win — extra valuable in endgame
+          if(tile[0] === tile[1]){
+            score += 10;
+            _breakdown.endgameDoubleBonus = 10;
+          }
+        }
 
         // ── offTracker: Catcher protection (opponent) / Misdirection (partner) ──
         if (offTracker && (offTracker.trumpMode === 'PIP' || offTracker.trumpMode === 'DOUBLES')) {
@@ -7341,7 +7358,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.42.0';  // v17.42.0: Moon widow swap void awareness, endgame count trump
+const MP_VERSION = 'v17.43.0';  // v17.43.0: endgame defensive urgency lead, Nello comment fix
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
