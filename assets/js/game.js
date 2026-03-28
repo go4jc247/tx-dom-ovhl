@@ -3470,39 +3470,34 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   // ═══════════════════════════════════════════════════════════════════
   //  OPPONENT SUIT SIGNAL TRACKING
   // ═══════════════════════════════════════════════════════════════════
-  // Track which suits opponents have LED (chosen freely, not followed).
-  // Leading a suit signals strength — the leader likely holds high cards in it.
+  // Track which suits opponents have shown strength in (played high cards or doubles).
   // Used in lead selection: avoid leading into opponent strength, prefer their weak suits.
+  // NOTE: tricks_team records are indexed by seat, NOT play order — can't identify leader.
+  // Instead, track opponent tile plays: doubles and high cards signal suit strength.
   const oppSuitSignal = {}; // pip → strength score (higher = opponent showed more strength)
   if(!isMoon){ // only for team games
-    // Check completed tricks — the leader of each trick chose that suit freely
+    // Scan completed tricks for opponent strength signals
     for(let team = 0; team < (gameState.tricks_team || []).length; team++){
       for(const record of (gameState.tricks_team[team] || [])){
-        // record[0] is the leader of the trick (first to play)
-        // In tricks_team, the first non-null entry is the trick leader
-        let leaderSeat = -1, leaderTile = null;
         for(let seat = 0; seat < record.length; seat++){
-          if(record[seat]){
-            leaderSeat = seat;
-            leaderTile = record[seat];
-            break;
-          }
+          if(seat === p || isSameTeam(seat)) continue; // only opponents
+          const t = record[seat];
+          if(!t || gameState._is_trump_tile(t)) continue; // skip trump plays
+          const highPip = Math.max(t[0], t[1]);
+          const isDouble = t[0] === t[1];
+          // Doubles = strong signal; high non-doubles = moderate signal
+          const strength = isDouble ? 20 : 5;
+          oppSuitSignal[highPip] = (oppSuitSignal[highPip] || 0) + strength;
         }
-        if(leaderSeat < 0 || isSameTeam(leaderSeat) || leaderSeat === p) continue; // only opponents
-        if(!leaderTile || gameState._is_trump_tile(leaderTile)) continue; // skip trump leads
-        const ledPip = Math.max(leaderTile[0], leaderTile[1]);
-        const isDouble = leaderTile[0] === leaderTile[1];
-        // Leading a suit = strong signal; leading the double = very strong
-        const strength = isDouble ? 25 : 12;
-        oppSuitSignal[ledPip] = (oppSuitSignal[ledPip] || 0) + strength;
       }
     }
-    // Also check who led the current trick (if any plays exist and we're not the leader)
+    // Current trick: check opponent plays (first entry IS reliable — it's in play order)
     if(trick.length > 0 && Array.isArray(trick[0])){
       const [leaderSeat, leaderTile] = trick[0];
       if(leaderSeat !== p && !isSameTeam(leaderSeat) && leaderTile && !gameState._is_trump_tile(leaderTile)){
         const ledPip = Math.max(leaderTile[0], leaderTile[1]);
         const isDouble = leaderTile[0] === leaderTile[1];
+        // Current trick leader chose this suit freely — stronger signal
         oppSuitSignal[ledPip] = (oppSuitSignal[ledPip] || 0) + (isDouble ? 25 : 12);
       }
     }
@@ -14814,6 +14809,8 @@ function aiWidowSwap(seat){
   var swapThreshold;
   if(origTrump === 'NELLO') swapThreshold = 20;
   else if(origTrump === 'DOUBLES') swapThreshold = 10;
+  // Shoot the Moon (bid 7): failing costs 7 points, swap must clearly improve
+  else if(bid >= 7) swapThreshold = 15;
   else swapThreshold = bid >= 6 ? 8 : 5; // raised minimums (was 6/4/3)
   if(bestSwapIdx >= 0 && bestSwapGain > swapThreshold){
     session.swapWidow(bestSwapIdx);
