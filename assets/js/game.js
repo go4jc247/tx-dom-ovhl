@@ -3415,6 +3415,10 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     // All trumps are either played or in our hand — we have full trump control
     opponentsVoidInTrump = true;
   }
+  // NONE mode: no trumps exist — everyone is "void in trump" by definition
+  if(trumpMode === "NONE"){
+    opponentsVoidInTrump = true;
+  }
 
   // Partners have trump = check if any partners still have trump tiles
   let partnersHaveTrump = false;
@@ -22406,12 +22410,14 @@ let currentTrickPlays = [];
 function _tileStr(t){ return t ? `${t[0]}-${t[1]}` : null; }
 function _tilesStr(arr){ return (arr||[]).map(t => _tileStr(t)); }
 function _partnerSeats(seat){
+  if(GAME_MODE === 'MOON') return []; // Moon: individual play, no partners
   if(GAME_MODE === 'TN51'){
     const team = seat % 3;
     return [0,1,2,3,4,5].filter(s => s !== seat && (s % 3) === team);
   }
-  if(seat % 2 === 0) return [0,2,4].filter(s => s !== seat);
-  return [1,3,5].filter(s => s !== seat);
+  // T42: 4 players, teams are 0,2 and 1,3
+  if(seat % 2 === 0) return [0,2].filter(s => s !== seat);
+  return [1,3].filter(s => s !== seat);
 }
 
 function logHandStart(trumpMode, trumpSuit, contract, bid, bidderSeat, hands, dealerSeat, leaderSeat, scoresBeforeHand){
