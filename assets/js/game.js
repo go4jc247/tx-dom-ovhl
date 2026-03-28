@@ -3791,6 +3791,12 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
               score += 15; // bonus: force bidder to trump or discard
               _breakdown.bidderVoidBonus = 15;
             }
+            // When we can still set the bid, prefer leading count-rich suits
+            // where our team can capture points the bidder needs
+            if(canSetBid && info){
+              score += Math.floor(info.countRemaining * 0.8);
+              _breakdown.setBidCountBonus = Math.floor(info.countRemaining * 0.8);
+            }
           }
         }
 
@@ -3893,9 +3899,14 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     }
     if(countIdx >= 0 && safeToThrowCount) return makeResult(countIdx, "Partner winning (safe), throw count (" + countVal + "pts)");
     if(countIdx >= 0 && !safeToThrowCount){
-      // Opponents still to play — only throw small count, save 10-pt tiles
+      // Opponents still to play — throw count more aggressively if bidder team needs points
+      if(isBidderTeam && !bidIsSafe && countVal === 10){
+        return makeResult(countIdx, "Partner winning (bidder needs pts), throw 10-count");
+      }
       if(countVal === 5) return makeResult(countIdx, "Partner winning (risky), throw small count");
     }
+    // On defense: prefer throwing lowest non-count to deny bidder points
+    // On offense (bidder team): throw highest non-count to maximize trick value signal
     return makeResult(lowIdx, "Partner winning, play low");
   }
 
@@ -4151,8 +4162,11 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         score += myCount * 2;
         _bd.countDump = myCount * 2;
       } else {
-        score -= myCount * 3;
-        _bd.countPenalty = -(myCount * 3);
+        // Extra penalty when opponent is winning — we're literally handing them points
+        const oppWinning = !partnerWinning && trick.length > 0;
+        const countPenalty = oppWinning ? myCount * 5 : myCount * 3;
+        score -= countPenalty;
+        _bd.countPenalty = -countPenalty;
       }
 
       // Strategic void: prefer voiding suits with remaining count tiles
