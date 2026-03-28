@@ -6549,7 +6549,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         if(!legalTiles.some(t => !gameState._is_trump_tile(t))){
           if(anyTrumpIdx >= 0) return makeResult(anyTrumpIdx, "Conserve: forced trump (no non-trump), play lowest");
         }
-      } else if(winTrumpIdx >= 0){
+      } else if(winTrumpIdx >= 0 && !partnerWinning){
+        // Don't trump into a trick our partner is already winning
         // SECOND-SEAT COUNT PROTECTION: prefer non-count trump when not last and opponents behind
         if(!isLastInTrick && winTrumpCountVal > 0 && !opponentsVoidInTrump){
           let _ncWinIdx = -1, _ncWinRank = Infinity;
@@ -6592,7 +6593,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         }
       }
     }
-    if(anyTrumpIdx >= 0 && highestTrickTrump < 0){
+    if(anyTrumpIdx >= 0 && highestTrickTrump < 0 && !partnerWinning){
+      // Don't waste trumps when partner is already winning — fall through to dump
       // Same conservation logic for first trump play
       const trickCount = trick.reduce((sum, play) => {
         if(!Array.isArray(play) || !play[1]) return sum;
@@ -6687,6 +6689,14 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
 
   // ── Cannot win: smart dump (suit-voiding + avoid count + save trumps) ──
   {
+    // Count already in this trick — higher existing count makes our count dumps worse
+    let _trickCountValue = 0;
+    for(const play of trick){
+      if(!Array.isArray(play) || !play[1]) continue;
+      const ps = play[1][0] + play[1][1];
+      if(ps === 5) _trickCountValue += 5;
+      else if(ps === 10) _trickCountValue += 10;
+    }
     let bestIdx = legal[0], bestScore = -Infinity;
     const _dumpCandidates = [];
     for(const idx of legal){
@@ -6757,7 +6767,9 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         }
         // More opponents remaining = higher risk of losing count
         // EXTRA protection when we need these count points to make bid
-        const countMult = oppWinning ? 5 : (3 + _oppsStillToPlay);
+        // Higher trick count = worse to dump our count (opponent gets bigger haul)
+        const trickCountBonus = _trickCountValue >= 10 ? 2 : (_trickCountValue >= 5 ? 1 : 0);
+        const countMult = (oppWinning ? 5 : (3 + _oppsStillToPlay)) + trickCountBonus;
         // Double penalty if we need count for our bid, OR if opponents need count (deny it)
         const countProtect = (mustWinCountTricks || opponentsNeedCount) ? 2 : 1;
         // Endgame: count tiles become more precious — scale penalty up
@@ -7851,7 +7863,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.73.0';  // v17.73.0: TN51 Nello relaxed, NT lay-down covered-offs, lay-down hand fix, sustain threshold
+const MP_VERSION = 'v17.74.0';  // v17.74.0: don't trump partner's winning trick, dump count-awareness
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
