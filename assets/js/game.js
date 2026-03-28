@@ -2683,6 +2683,21 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     _dbg.highestRemainingTrumpRank = highestRemainingTrump;
   }
 
+  // Total count points still unplayed (across all suits + trump)
+  let totalCountRemaining = 0;
+  for(const pip of Object.keys(suitInfo)) totalCountRemaining += suitInfo[pip].countRemaining;
+  for(const t of trumpTilesRemaining){
+    const ps = t[0] + t[1];
+    if(ps === 5) totalCountRemaining += 5;
+    else if(ps === 10) totalCountRemaining += 10;
+  }
+  // Also count trump tiles in our hand
+  for(const t of trumpsInHand){
+    const ps = t[0] + t[1];
+    if(ps === 5) totalCountRemaining += 5;
+    else if(ps === 10) totalCountRemaining += 10;
+  }
+
   // ═══════════════════════════════════════════════════════════════════
   //  VOID TRACKING — detect which players are void in which suits
   // ═══════════════════════════════════════════════════════════════════
@@ -3149,6 +3164,9 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   const bidIsSafe = pointsNeeded <= 0;
   const bidIsClose = pointsNeeded > 0 && pointsNeeded <= 10;
   const tricksLeft = totalTricks - trickNum;
+  // Max points remaining = tricksLeft (base 1pt each) + totalCountRemaining (count tiles)
+  const maxPointsLeft = isMoon ? tricksLeft : (tricksLeft + totalCountRemaining);
+  const bidIsDoomed = isBidderTeam && pointsNeeded > maxPointsLeft; // mathematically impossible
   // Defensive awareness: track bidder's progress toward making/failing bid
   const bidderTeamIdx = isMoon ? bidderSeat : (bidderSeat % 2);
   const bidderScore = gameState.team_points[bidderTeamIdx] || 0;
@@ -3185,7 +3203,10 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       bidderScore: bidderScore,
       bidderNeedsMore: bidderNeedsMore,
       bidderIsClose: bidderIsClose,
-      canSetBid: canSetBid
+      canSetBid: canSetBid,
+      totalCountRemaining: totalCountRemaining,
+      maxPointsLeft: maxPointsLeft,
+      bidIsDoomed: bidIsDoomed
     };
     _dbg.endgame = {
       isEndgame: isEndgame,
