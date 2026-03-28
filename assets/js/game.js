@@ -2288,8 +2288,8 @@ function initOffTracker() {
   for (let pip = 0; pip <= maxPip; pip++) {
     // Skip trump suit (bidder won't have offs in trump)
     if (trumpMode === 'PIP' && pip === trumpSuit) continue;
-    if (trumpMode === 'NONE') continue; // No trumps = no off tracking needed (all doubles)
-    if (trumpMode === 'DOUBLES') continue; // Doubles-as-trump = no standard off
+    if (trumpMode === 'NONE') continue; // No trumps = no off tracking needed
+    // DOUBLES: all pips are valid off-suit candidates (no pip is "the trump suit")
     suitSuspicion[pip] = 50; // Start at 50% (neutral)
   }
 
@@ -4531,7 +4531,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         _breakdown.sumPenalty = -Math.floor(pipSum * 0.5);
 
         // ── offTracker: Catcher protection (opponent) / Misdirection (partner) ──
-        if (offTracker && offTracker.trumpMode === 'PIP') {
+        if (offTracker && (offTracker.trumpMode === 'PIP' || offTracker.trumpMode === 'DOUBLES')) {
           const isBidderOpponent = isMoon ? (offTracker.bidderTeam !== p) : (myTeam !== offTracker.bidderTeam);
           const suspicion = getOffSuspicion();
           if (suspicion && suspicion.length > 0) {
@@ -4742,7 +4742,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       }
       // offTracker: When forced to play low, prefer discarding non-catcher tiles
       if(lowIdx >= 0){
-        if(offTracker && offTracker.trumpMode === 'PIP' && (isMoon ? (offTracker.bidderTeam !== p) : (myTeam !== offTracker.bidderTeam))){
+        if(offTracker && (offTracker.trumpMode === 'PIP' || offTracker.trumpMode === 'DOUBLES') && (isMoon ? (offTracker.bidderTeam !== p) : (myTeam !== offTracker.bidderTeam))){
           const suspicion = getOffSuspicion();
           if(suspicion && suspicion.length > 0 && suspicion[0].suspicion >= 40){
             // Find the lowest non-catcher tile in suit
@@ -4846,7 +4846,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       }
       // BIDDER OFF-SUIT DEFUSE: if off-tracker suspects this suit is our "off",
       // win with a HIGHER card to show strength and reduce suspicion
-      if(iAmBidder && offTracker && offTracker.trumpMode === 'PIP'){
+      if(iAmBidder && offTracker && (offTracker.trumpMode === 'PIP' || offTracker.trumpMode === 'DOUBLES')){
         const suspicion = getOffSuspicion();
         if(suspicion && suspicion.length > 0 && suspicion[0].pip === ledPip && suspicion[0].suspicion >= 50){
           // Play highest winning card (not lowest) to signal strength in this suit
@@ -4888,7 +4888,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         }
       }
       // offTracker: When can't win, protect catchers
-      if(offTracker && offTracker.trumpMode === 'PIP' && (isMoon ? (offTracker.bidderTeam !== p) : (myTeam !== offTracker.bidderTeam))){
+      if(offTracker && (offTracker.trumpMode === 'PIP' || offTracker.trumpMode === 'DOUBLES') && (isMoon ? (offTracker.bidderTeam !== p) : (myTeam !== offTracker.bidderTeam))){
         const suspicion = getOffSuspicion();
         if(suspicion && suspicion.length > 0 && suspicion[0].suspicion >= 40){
           let safeLow = lowIdx, safeRank = Infinity;
