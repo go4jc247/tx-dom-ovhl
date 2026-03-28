@@ -2879,9 +2879,10 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       const tileHasSuit = (t[0] === ledPip || t[1] === ledPip);
       const tileIsTrump = gameState._is_trump_tile(t);
       if(!tileHasSuit && !tileIsTrump){
-        // Player is void in led suit AND void in trump
+        // Player is void in led suit — probably void in trump too, but not certain
+        // (they may be strategically saving trump for a bigger trick)
         voidIn[seat].add(ledPip);
-        trumpVoidConfirmed[seat] = true;
+        trumpVoidLikely[seat] = Math.min(1, trumpVoidLikely[seat] + 0.4);
       } else if(!tileHasSuit && tileIsTrump){
         // Player is void in led suit, but has trump
         voidIn[seat].add(ledPip);
@@ -2950,7 +2951,9 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           const isTrump = gameState._is_trump_tile(t);
           if(!hasSuit && !isTrump){
             voidIn[seat].add(likelyLedPip);
-            trumpVoidConfirmed[seat] = true;
+            // Not trumping when off-suit is a SIGNAL but not proof of trump void
+            // Player may be saving trump — increase likelihood but don't confirm
+            trumpVoidLikely[seat] = Math.min(1, trumpVoidLikely[seat] + 0.3);
           } else if(!hasSuit && isTrump){
             voidIn[seat].add(likelyLedPip);
           }
