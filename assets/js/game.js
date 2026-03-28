@@ -3861,6 +3861,28 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       }
     }
 
+    // ── DEFENSIVE TAP: lead any tile into bidder's void to exhaust trump ──
+    // When we have no doubles in the bidder's void suits, lead low non-count singles
+    if(!isBidderTeam && !weHaveTrumpControl && nonTrumpSingles.length > 0 && !isMoon && !canRelax){
+      const bidderVoids = voidIn[bidderSeat] || new Set();
+      if(bidderVoids.size > 0){
+        let bestTapIdx = -1, bestTapScore = -Infinity;
+        for(const idx of nonTrumpSingles){
+          const tile = hand[idx];
+          const pip = Math.max(tile[0], tile[1]);
+          if(!bidderVoids.has(pip)) continue;
+          const pipSum = tile[0] + tile[1];
+          const myCount = (pipSum === 5) ? 5 : (pipSum === 10) ? 10 : 0;
+          // Prefer non-count, low-value tiles (minimize risk)
+          let score = 20 - pipSum - myCount * 5;
+          if(score > bestTapScore){ bestTapScore = score; bestTapIdx = idx; }
+        }
+        if(bestTapIdx >= 0 && bestTapScore >= 0){
+          return makeResult(bestTapIdx, "Defense tap: force bidder trump in void suit");
+        }
+      }
+    }
+
     // ── DEFENDER COUNT CAPTURE: lead doubles in count-rich suits to deny bidder points ──
     // When we can set the bid, lead our doubles in suits with lots of remaining count.
     // Winning the double guarantees the trick, then partner can throw count to us.
