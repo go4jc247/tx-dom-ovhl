@@ -5147,6 +5147,24 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         }
       }
 
+      // COUNT-HIDING: when opponents need count, prefer dumping non-count tiles
+      // This denies them scoring opportunities when they win tricks
+      if(opponentsNeedCount && myCount === 0){
+        score += 6; // bonus for dumping count-free tiles (hides our count)
+        _bd.countHideBonus = 6;
+      }
+
+      // SUIT WIN PROBABILITY: preserve tiles in depleted suits (likely to win later)
+      if(!gameState._is_trump_tile(tile) && tile[0] !== tile[1]){
+        const winPip = Math.max(tile[0], tile[1]);
+        const winInfo = suitInfo[winPip];
+        if(winInfo && winInfo.tilesLeft <= 2 && !winInfo.winnerPlayed){
+          // Few tiles left in suit AND double still unplayed — this tile has value
+          score -= 6;
+          _bd.winProbPenalty = -6;
+        }
+      }
+
       // Preserve walker pairs: penalize dumping a tile that's part of a double+covered-off pair
       // Walking pairs (lead double, then play the covered off) are guaranteed 2-trick combos
       if(!gameState._is_trump_tile(tile) && tile[0] !== tile[1]){
