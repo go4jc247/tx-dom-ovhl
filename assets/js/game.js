@@ -1873,7 +1873,12 @@ function aiChooseTrump(hand, bidAmount) {
       if (lp === hp - 1) doublesScore += 3; // second-highest in suit = strong
       // Covered off: non-double where we hold the double for one of its pips
       // In DOUBLES, leading that double (trump) then this tile gives a near-guaranteed 2-trick combo
-      if (dblPipSet.has(t[0]) || dblPipSet.has(t[1])) doublesScore += 6;
+      if (dblPipSet.has(t[0]) || dblPipSet.has(t[1])) {
+        doublesScore += 6;
+      } else {
+        // Uncovered non-double: risky in DOUBLES — can be lost when suit is led
+        doublesScore -= 4;
+      }
     }
     // Void awareness: count suits we're void in (excluding doubles)
     const ndSuits = new Set();
