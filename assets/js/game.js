@@ -4340,53 +4340,66 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           return (aR[0] * 100 + aR[1]) > (bR[0] * 100 + bR[1]);
         };
         const _tileCount = (t) => { const s = t[0]+t[1]; return s===5?5:s===10?10:0; };
+        // Helper: determine which tile opponent plays against our lead
+        // Opponent plays their BEST tile that beats us, or lowest tile if can't
+        const _oppPlay = (oppTiles, myLead, ledSuit) => {
+          let bestBeatIdx = -1, bestBeatRank = -1;
+          let worstIdx = 0, worstVal = Infinity;
+          for(let ti = 0; ti < oppTiles.length; ti++){
+            const ot = oppTiles[ti];
+            const val = ot[0] + ot[1];
+            if(val < worstVal){ worstVal = val; worstIdx = ti; }
+            if(_beats(ot, myLead, ledSuit)){
+              const rank = gameState._is_trump_tile(ot) ? getTrumpRankNum(ot) + 10000 : val;
+              if(rank > bestBeatRank){ bestBeatRank = rank; bestBeatIdx = ti; }
+            }
+          }
+          return bestBeatIdx >= 0 ? bestBeatIdx : worstIdx; // play best winner, else lowest
+        };
+
         for(const idx of legal){
           const myTile1 = hand[idx];
           const myTile2 = hand[idx === legal[0] ? legal[1] : legal[0]];
           const ledSuit1 = myTile1[0]===myTile1[1] ? (trumpMode==='DOUBLES'?-1:myTile1[0]) : Math.max(myTile1[0],myTile1[1]);
-          // Simulate trick 1: does our lead win?
+
+          // Simulate trick 1: determine which tile each opponent plays
           let trick1Win = true;
+          const oppRemainingTiles = []; // track what each opponent has left for trick 2
           for(const opp of oppHands){
-            // Opponent plays best tile to beat us (or lowest if can't)
-            for(const ot of opp.tiles){
-              if(_beats(ot, myTile1, ledSuit1)){ trick1Win = false; break; }
-            }
-            if(!trick1Win) break;
+            const playIdx = _oppPlay(opp.tiles, myTile1, ledSuit1);
+            if(_beats(opp.tiles[playIdx], myTile1, ledSuit1)) trick1Win = false;
+            // Opponent's remaining tile for trick 2 is the OTHER one
+            oppRemainingTiles.push({seat: opp.seat, tile: opp.tiles[1 - playIdx]});
           }
-          // Score: winning trick 1 is valuable; count captured matters
+
           let score = trick1Win ? 100 : 0;
-          score += trick1Win ? _tileCount(myTile1) : -_tileCount(myTile1) * 2; // losing count = worse
-          // Trick 2: if we won trick 1, we lead tile 2
+          score += trick1Win ? _tileCount(myTile1) : -_tileCount(myTile1) * 2;
+
           if(trick1Win){
+            // We lead trick 2 with myTile2
             const ledSuit2 = myTile2[0]===myTile2[1] ? (trumpMode==='DOUBLES'?-1:myTile2[0]) : Math.max(myTile2[0],myTile2[1]);
             let trick2Win = true;
-            for(const opp of oppHands){
-              for(const ot of opp.tiles){
-                if(_beats(ot, myTile2, ledSuit2)){ trick2Win = false; break; }
-              }
-              if(!trick2Win) break;
+            for(const rem of oppRemainingTiles){
+              if(_beats(rem.tile, myTile2, ledSuit2)){ trick2Win = false; break; }
             }
             score += trick2Win ? 100 : 0;
             score += trick2Win ? _tileCount(myTile2) : -_tileCount(myTile2) * 2;
           } else {
-            // We lose trick 1 — opponent leads trick 2
-            // Check if our tile2 can beat any of opponent's remaining tiles when THEY lead
-            // Pessimistic: assume opponent leads their BEST tile against us
-            let canWinTrick2 = false;
-            for(const opp of oppHands){
-              for(const ot of opp.tiles){
-                const oppLedSuit = ot[0]===ot[1] ? (trumpMode==='DOUBLES'?-1:ot[0]) : Math.max(ot[0],ot[1]);
-                if(_beats(myTile2, ot, oppLedSuit)){
-                  canWinTrick2 = true; // we can beat at least one of their leads
-                }
+            // We lost trick 1 — opponent leads trick 2
+            // Pessimistic: assume opponent leads their BEST remaining tile against our tile2
+            let canWinTrick2 = true; // assume we win unless someone beats us
+            for(const rem of oppRemainingTiles){
+              const oppLedSuit = rem.tile[0]===rem.tile[1] ? (trumpMode==='DOUBLES'?-1:rem.tile[0]) : Math.max(rem.tile[0],rem.tile[1]);
+              // Opponent leads their remaining tile — can we beat it?
+              if(!_beats(myTile2, rem.tile, oppLedSuit)){
+                canWinTrick2 = false; // we can't beat this opponent's lead
               }
             }
-            // If we can win trick 2 when opponent leads, factor that in
             if(canWinTrick2){
-              score += 50; // partial credit for winning trick 2
-              score += _tileCount(myTile2); // count we capture
+              score += 50;
+              score += _tileCount(myTile2);
             } else {
-              score -= _tileCount(myTile2) * 2; // we'll lose both tiles' count
+              score -= _tileCount(myTile2) * 2;
             }
           }
           if(score > bestScore2T){ bestScore2T = score; bestIdx2T = idx; }
@@ -7494,7 +7507,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.55.0';  // v17.55.0: critical endgame bug fixes (partner-as-opponent, mustWin, count pot)
+const MP_VERSION = 'v17.56.0';  // v17.56.0: 2-trick lookahead tile consumption fix
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
