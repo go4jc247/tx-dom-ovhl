@@ -5152,7 +5152,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         for(const idx of trumpDoubles){
           const pip = hand[idx][0];
           const pipSum = pip + pip;
-          const count = (pipSum === 5) ? 5 : (pipSum === 10) ? 10 : 0;
+          const count = isMoon ? 0 : ((pipSum === 5) ? 5 : (pipSum === 10) ? 10 : 0);
           if(isDFM){
             // DFM: lead HIGH doubles to strip opponents' high doubles (suit controllers)
             // Still avoid count unless it's the only option
@@ -5180,7 +5180,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         for(const idx of pullableTrumps){
           const tile = hand[idx];
           const pipSum = tile[0] + tile[1];
-          const isCount = (pipSum === 5 || pipSum === 10);
+          const isCount = !isMoon && (pipSum === 5 || pipSum === 10);
           let score;
           if(needCountUrgently && isCount){
             // Endgame urgency: count trumps become PREFERRED (guaranteed count capture)
@@ -5212,7 +5212,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         for(const idx of pullableTrumps){
           const tile = hand[idx];
           const pipSum = tile[0] + tile[1];
-          const isCount = (pipSum === 5 || pipSum === 10);
+          const isCount = !isMoon && (pipSum === 5 || pipSum === 10);
           let score = -pipSum + (isCount ? (pipSum === 10 ? -100 : -50) : 0);
           if(score > bestScore){ bestScore = score; bestIdx = idx; }
         }
@@ -5236,7 +5236,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           for(const idx of pullableTrumps){
             const tile = hand[idx];
             const pipSum = tile[0] + tile[1];
-            const isCount = (pipSum === 5 || pipSum === 10);
+            const isCount = !isMoon && (pipSum === 5 || pipSum === 10);
             let score = -pipSum + (isCount ? (pipSum === 10 ? -100 : -50) : 0);
             if(score > exhaustScore){ exhaustScore = score; exhaustIdx = idx; }
           }
@@ -5258,7 +5258,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         for(const idx of pullableTrumps){
           const r = getTrumpRankNum(hand[idx]);
           const ps = hand[idx][0] + hand[idx][1];
-          const isCount = (ps === 5 || ps === 10);
+          const isCount = !isMoon && (ps === 5 || ps === 10);
           // Prefer non-count trumps; among same count status, pick lowest rank
           if((!isCount && lowIsCount) || (isCount === lowIsCount && r < lowR)){
             lowR = r; lowIdx = idx; lowIsCount = isCount;
@@ -5375,7 +5375,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           // Bidder team should PREFER count doubles when points are needed (guaranteed count win)
           // Defenders should avoid giving away count on doubles they lead
           const dblSum = pip + pip;
-          const dblIsCount = (dblSum === 5 || dblSum === 10);
+          const dblIsCount = !isMoon && (dblSum === 5 || dblSum === 10);
           if(dblIsCount){
             if(isBidderTeam && pointsNeeded > 0){
               // Trump control = safe to lead count double for guaranteed capture
@@ -5400,7 +5400,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         for(const idx of nonTrumpSingles){
           const tile = hand[idx];
           const pipSum = tile[0] + tile[1];
-          const myCount = (pipSum === 5) ? 5 : (pipSum === 10) ? 10 : 0;
+          const myCount = isMoon ? 0 : ((pipSum === 5) ? 5 : (pipSum === 10) ? 10 : 0);
           const ledSuit = Math.max(tile[0], tile[1]);
           const info = suitInfo[ledSuit];
           let score = 0;
@@ -5509,7 +5509,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         for(const idx of pullableTrumps){
           const t = hand[idx];
           const ps = t[0] + t[1];
-          const isCount = (ps === 5 || ps === 10);
+          const isCount = !isMoon && (ps === 5 || ps === 10);
           // Non-count trumps preferred; among same count status, pick lowest
           const sc = (isCount ? 100 : 0) + ps;
           if(sc < lowScore){ lowScore = sc; lowIdx = idx; }
@@ -5588,7 +5588,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       for(const idx of nonTrumpSingles){
         const tile = hand[idx];
         const pipSum = tile[0] + tile[1];
-        const myCount = (pipSum === 5) ? 5 : (pipSum === 10) ? 10 : 0;
+        const myCount = isMoon ? 0 : ((pipSum === 5) ? 5 : (pipSum === 10) ? 10 : 0);
         const ledSuit = Math.max(tile[0], tile[1]);
         const info = suitInfo[ledSuit];
         let score = 0;
@@ -8071,7 +8071,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.86.0';  // v17.86.0: Critical walker check fix, Moon count contamination cleanup
+const MP_VERSION = 'v17.87.0';  // v17.87.0: Comprehensive Moon count-tile cleanup across all lead phases
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables

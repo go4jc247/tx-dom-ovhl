@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.86.0 — Critical walker check fix, Moon count contamination cleanup
+// Version: v17.87.0 — Comprehensive Moon count-tile cleanup across all lead phases
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.86.0';
+const CACHE_NAME = 'tx-dom-v17.87.0';
 const urlsToCache = [
   './index.html',
   // CSS
