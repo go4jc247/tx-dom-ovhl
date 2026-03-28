@@ -3544,7 +3544,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         for(const idx of legal){
           const tile = hand[idx];
           const isDbl = tile[0] === tile[1];
-          let sc = tile[0] + tile[1] + (isDbl ? 20 : 0); // doubles are most dangerous in Nello
+          let sc = tile[0] + tile[1] + (isDbl ? 5 : 0); // doubles slightly more dangerous (win their suit), pip sum is primary
           if(sc > dumpScore){ dumpScore = sc; dumpIdx = idx; }
         }
         return makeResult(dumpIdx, "Nel-O bidder: off-suit dump dangerous tile");
@@ -3601,8 +3601,14 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         let lowIdx = legal[0], lowRank = Infinity;
         for(const idx of legal){
           const tile = hand[idx];
-          const val = tile[0]+tile[1];
-          if(val < lowRank){ lowRank = val; lowIdx = idx; }
+          if(nLedSuit !== null && nLedSuit >= 0){
+            const r = gameState._suit_rank(tile, nLedSuit);
+            const rank = r[0] * 100 + r[1];
+            if(rank < lowRank){ lowRank = rank; lowIdx = idx; }
+          } else {
+            const val = tile[0]+tile[1];
+            if(val < lowRank){ lowRank = val; lowIdx = idx; }
+          }
         }
         return makeResult(lowIdx, "Nel-O opp: bidder losing, play low (save high)");
       }
