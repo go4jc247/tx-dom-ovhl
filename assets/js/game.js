@@ -2782,6 +2782,15 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     else if(ps === 10) totalCountRemaining += 10;
   }
 
+  // Count points held in our hand vs. available elsewhere
+  let countInOurHand = 0;
+  for(const t of hand){
+    const ps = t[0] + t[1];
+    if(ps === 5) countInOurHand += 5;
+    else if(ps === 10) countInOurHand += 10;
+  }
+  const countElsewhere = totalCountRemaining - countInOurHand; // count held by others or in play
+
   // ═══════════════════════════════════════════════════════════════════
   //  VOID TRACKING — detect which players are void in which suits
   // ═══════════════════════════════════════════════════════════════════
@@ -3949,9 +3958,10 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
               }
             }
 
-            // Penalty for leading count — harsher if double still in play
-            if(!info.winnerPlayed) score -= myCount * 3;
-            else score -= myCount * 2;
+            // Count penalty reduced under trump control — opponents can't trump our count
+            // Only penalize if double still in play (opponent with double could beat us)
+            if(!info.winnerPlayed) score -= myCount * 2;
+            else score -= Math.floor(myCount * 0.5); // very safe with trump control + double out
 
             // Prefer lower tiles (let partner play higher)
             score -= pipSum;
@@ -4021,6 +4031,13 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           score -= 50;
           _breakdown.noInfo = -50;
         } else {
+          // Check opponent voids FIRST so we can use it in count penalty calculation
+          let oppsVoid = 0;
+          for(let s = 0; s < gameState.player_count; s++){
+            if(isSameTeam(s) || !gameState.active_players.includes(s)) continue;
+            if(voidIn[s].has(ledSuit)) oppsVoid++;
+          }
+
           if(!info.winnerPlayed){
             score -= 30;
             score -= info.winnerCount * 2;
@@ -4030,8 +4047,11 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
             score += 10;
             _breakdown.doubleOut = +10;
           }
-          score -= myCount * 3;
-          _breakdown.myCountPenalty = -(myCount * 3);
+          // Without trump control, count tiles are very exposed — opponents can trump in
+          // Harsher penalty when opponents are void (will trump our count)
+          const countPenMult = (oppsVoid > 0 && !opponentsVoidInTrump) ? 5 : 3;
+          score -= myCount * countPenMult;
+          _breakdown.myCountPenalty = -(myCount * countPenMult);
           if(!info.winnerPlayed){
             score -= info.countRemaining;
             _breakdown.suitCountRisk = -(info.countRemaining);
@@ -4041,13 +4061,6 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           }
           score -= info.tilesLeft * 2;
           _breakdown.tilesLeftPenalty = -(info.tilesLeft * 2);
-
-          // NEW: Check if opponents are void in this suit (they'll have to play off-suit or trump)
-          let oppsVoid = 0;
-          for(let s = 0; s < gameState.player_count; s++){
-            if(isSameTeam(s) || !gameState.active_players.includes(s)) continue;
-            if(voidIn[s].has(ledSuit)) oppsVoid++;
-          }
           // If some opponents are void and might trump, that's dangerous
           if(oppsVoid > 0 && !opponentsVoidInTrump){ score -= oppsVoid * 10; _breakdown.oppVoidTrumpRisk = -(oppsVoid * 10); }
           // If opponents are void in this suit AND void in trump, they can't threaten
@@ -4588,6 +4601,11 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       // LAST-IN-TRICK ADVANTAGE: perfect information — always trump count-heavy opponent tricks
       if(isLastInTrick && !partnerWinning && trickCount >= 5){
         return makeResult(winTrumpIdx, "Last in trick: trump to steal " + trickCount + "pts");
+      }
+      // COUNT-DRIVEN URGENCY: on offense, always trump in when we need count points to make bid
+      // Even on 0-count tricks, winning trick = 1 point closer to bid
+      if(isBidderTeam && pointsNeeded > 0 && tricksLeft <= pointsNeeded + 1){
+        return makeResult(winTrumpIdx, "Trump in: need " + pointsNeeded + "pts, can't afford to lose tricks");
       }
       // TRUMP RATIO CONSERVATION: on defense, save trumps for higher-value tricks
       // When trumps are scarce relative to remaining tricks, don't waste on 0-count tricks

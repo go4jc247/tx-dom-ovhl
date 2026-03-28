@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v14.7.0 — Phase 5+: trump-led follow, position bidding, outbid sustainability
+// Version: v14.8.0 — Phase 5+: count strategy, Nello tracking, defender capture, walker dump
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v14.7.0';
+const CACHE_NAME = 'tx-dom-v14.8.0';
 const urlsToCache = [
   './index.html',
   // CSS
