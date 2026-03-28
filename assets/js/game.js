@@ -4512,9 +4512,9 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       }
     }
     if(highIdx >= 0 && highRank > winnerRank){
-      // DEFENSIVE DUCK: on defense, if partner plays after us and likely has a higher card,
+      // DUCK: if partner plays after us and likely has the double (higher card),
       // duck to let partner win (they can then lead a strategic suit)
-      if(!isBidderTeam && !isMoon && !isLastInTrick && !canSetBid){
+      if(!isMoon && !isLastInTrick && !canSetBid){
         let partnerAfterUs = false;
         for(let s = 0; s < gameState.player_count; s++){
           if(!isSameTeam(s) || s === p) continue;
@@ -4538,6 +4538,9 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       }
 
       // Play the LOWEST card that still wins (preserve doubles for walking later)
+      // But if the double is already played, no need to preserve it
+      const suitInf = suitInfo[ledPip];
+      const doubleStillOut = suitInf && !suitInf.winnerPlayed;
       let bestWinIdx = highIdx, bestWinRank = Infinity, bestWinIsDouble = true;
       for(const idx of legal){
         const tile = hand[idx];
@@ -4546,8 +4549,11 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           const rank = r[0] * 100 + r[1];
           const isDbl = tile[0] === tile[1];
           if(rank > winnerRank){
-            // Prefer non-doubles to preserve walking doubles
-            if((!isDbl && bestWinIsDouble) || (isDbl === bestWinIsDouble && rank < bestWinRank)){
+            // Prefer non-doubles to preserve walking doubles (only if double still in play)
+            const preferThis = doubleStillOut
+              ? ((!isDbl && bestWinIsDouble) || (isDbl === bestWinIsDouble && rank < bestWinRank))
+              : (rank < bestWinRank); // double already out: just pick lowest winner
+            if(preferThis){
               bestWinRank = rank; bestWinIdx = idx; bestWinIsDouble = isDbl;
             }
           }
