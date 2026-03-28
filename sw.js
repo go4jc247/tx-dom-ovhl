@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v14.6.0 — Phase 5 final: trump ratio, walker voids, off-tracker tiers, endgame hunt
+// Version: v14.7.0 — Phase 5+: trump-led follow, position bidding, outbid sustainability
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v14.6.0';
+const CACHE_NAME = 'tx-dom-v14.7.0';
 const urlsToCache = [
   './index.html',
   // CSS
