@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.70.0 — trump pull: P1 productivity, TN51 threshold, Moon canRelax
+// Version: v17.72.0 — TN51 Team 3 score display: 27+ locations fixed, moonScoreBar repurposed
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.70.0';
+const CACHE_NAME = 'tx-dom-v17.72.0';
 const urlsToCache = [
   './index.html',
   // CSS

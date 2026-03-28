@@ -2178,12 +2178,14 @@ function acceptLayDown() {
   // Update scores and show hand end
   team1Score = gs.team_points[0];
   team2Score = gs.team_points[1];
+  team3Score = gs.team_points[2] || 0;
   updateScoreDisplay();
 
   // Check if the hand/game should end
   if (session.maybe_finish_hand()) {
     team1Marks = session.team_marks[0];
     team2Marks = session.team_marks[1];
+    team3Marks = session.team_marks[2] || 0;
     updateScoreDisplay();
     logEvent('HAND_END', { status: session.status });
     autoSave();
@@ -2193,6 +2195,7 @@ function acceptLayDown() {
     // (all tiles are gone, so hand must end)
     team1Marks = session.team_marks[0];
     team2Marks = session.team_marks[1];
+    team3Marks = session.team_marks[2] || 0;
     updateScoreDisplay();
     logEvent('HAND_END', { status: session.status, layDown: true });
     autoSave();
@@ -7824,7 +7827,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.70.0';  // v17.70.0: trump pull — P1 productivity, TN51 threshold, Moon canRelax
+const MP_VERSION = 'v17.72.0';  // v17.72.0: TN51 Team 3 score display — 27+ locations fixed, moonScoreBar repurposed
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
@@ -9222,6 +9225,7 @@ async function mpHandleDeal(move) {
   playedThisTrick = [];
   team1TricksWon = 0;
   team2TricksWon = 0;
+  team3TricksWon = 0;
   moonPlayerTricksWon = [0, 0, 0];
   zIndexCounter = 100;
   isAnimating = false;
@@ -9316,8 +9320,10 @@ async function mpHandleDeal(move) {
   } else {
     team1Score = session.game.team_points[0];
     team2Score = session.game.team_points[1];
+    team3Score = session.game.team_points[2] || 0;
     team1Marks = session.team_marks[0];
     team2Marks = session.team_marks[1];
+    team3Marks = session.team_marks[2] || 0;
   }
   updateScoreDisplay();
 
@@ -9810,8 +9816,10 @@ async function mpHandlePlay(move) {
       setStatus(session.status);
       team1Score = session.game.team_points[0];
       team2Score = session.game.team_points[1];
+      team3Score = session.game.team_points[2] || 0;
       team1Marks = session.team_marks[0];
       team2Marks = session.team_marks[1];
+      team3Marks = session.team_marks[2] || 0;
       updateScoreDisplay();
       logEvent('HAND_END', { status: session.status });
       setTimeout(() => mpShowHandEnd(), 800);
@@ -10065,8 +10073,10 @@ async function mpHandlePlayIntent(move) {
       setStatus(session.status);
       team1Score = session.game.team_points[0];
       team2Score = session.game.team_points[1];
+      team3Score = session.game.team_points[2] || 0;
       team1Marks = session.team_marks[0];
       team2Marks = session.team_marks[1];
+      team3Marks = session.team_marks[2] || 0;
       updateScoreDisplay();
       logEvent('HAND_END', { status: session.status });
       setTimeout(() => mpShowHandEnd(), 800);
@@ -10174,6 +10184,7 @@ async function mpHandlePlayConfirmed(move) {
       session.game.team_points = move.teamPoints;
       team1Score = move.teamPoints[0];
       team2Score = move.teamPoints[1];
+      team3Score = move.teamPoints[2] || 0;
     }
 
     await new Promise(r => setTimeout(r, 800));
@@ -10201,8 +10212,10 @@ async function mpHandlePlayConfirmed(move) {
       setStatus(session.status);
       team1Score = session.game.team_points[0];
       team2Score = session.game.team_points[1];
+      team3Score = session.game.team_points[2] || 0;
       team1Marks = session.team_marks[0];
       team2Marks = session.team_marks[1];
+      team3Marks = session.team_marks[2] || 0;
       updateScoreDisplay();
       logEvent('HAND_END', { status: session.status });
       // V10_121g: Show hand end popup for guests (includes game end check)
@@ -10857,8 +10870,10 @@ async function mpHandleCallDoubleIntent(move) {
         setStatus(session.status);
         team1Score = session.game.team_points[0];
         team2Score = session.game.team_points[1];
+        team3Score = session.game.team_points[2] || 0;
         team1Marks = session.team_marks[0];
         team2Marks = session.team_marks[1];
+        team3Marks = session.team_marks[2] || 0;
         updateScoreDisplay();
         logEvent('HAND_END', { status: session.status });
         setTimeout(() => mpShowHandEnd(), 800);
@@ -11354,6 +11369,7 @@ function _mpHandleStateSyncInternal(move) {
   playedThisTrick = [];
   team1TricksWon = move.team1TricksWon || 0;
   team2TricksWon = move.team2TricksWon || 0;
+  team3TricksWon = move.team3TricksWon || 0;
   if (move.moonPlayerTricksWon) {
     moonPlayerTricksWon = move.moonPlayerTricksWon.slice();
   }
@@ -11494,8 +11510,10 @@ function _mpHandleStateSyncInternal(move) {
   if (GAME_MODE !== 'MOON') {
     team1Score = session.game.team_points[0];
     team2Score = session.game.team_points[1];
+    team3Score = session.game.team_points[2] || 0;
     team1Marks = session.team_marks[0];
     team2Marks = session.team_marks[1];
+    team3Marks = session.team_marks[2] || 0;
   }
   updateScoreDisplay();
   positionPlayerIndicators();
@@ -11794,8 +11812,10 @@ async function mpPlayAITurn(seat) {
       setStatus(session.status);
       team1Score = session.game.team_points[0];
       team2Score = session.game.team_points[1];
+      team3Score = session.game.team_points[2] || 0;
       team1Marks = session.team_marks[0];
       team2Marks = session.team_marks[1];
+      team3Marks = session.team_marks[2] || 0;
       updateScoreDisplay();
       logEvent('HAND_END', { status: session.status });
       setTimeout(() => mpShowHandEnd(), 800);
@@ -12048,6 +12068,7 @@ function mpObserverHandleDeal(move) {
   playedThisTrick = [];
   team1TricksWon = 0;
   team2TricksWon = 0;
+  team3TricksWon = 0;
   moonPlayerTricksWon = [0, 0, 0];
   zIndexCounter = 100;
   isAnimating = false;
@@ -12094,8 +12115,10 @@ function mpObserverHandleDeal(move) {
   } else {
     team1Score = session.game.team_points[0];
     team2Score = session.game.team_points[1];
+    team3Score = session.game.team_points[2] || 0;
     team1Marks = session.team_marks[0];
     team2Marks = session.team_marks[1];
+    team3Marks = session.team_marks[2] || 0;
   }
   updateScoreDisplay();
 
@@ -12192,8 +12215,10 @@ async function mpObserverHandlePlay(move) {
       if (GAME_MODE !== 'MOON') {
         team1Score = session.game.team_points[0];
         team2Score = session.game.team_points[1];
+        team3Score = session.game.team_points[2] || 0;
         team1Marks = session.team_marks[0];
         team2Marks = session.team_marks[1];
+        team3Marks = session.team_marks[2] || 0;
       }
       updateScoreDisplay();
       isAnimating = false;
@@ -12370,6 +12395,7 @@ function mpObserverHandleStateSync(move) {
   playedThisTrick = [];
   team1TricksWon = move.team1TricksWon || 0;
   team2TricksWon = move.team2TricksWon || 0;
+  team3TricksWon = move.team3TricksWon || 0;
   if (move.moonPlayerTricksWon) moonPlayerTricksWon = move.moonPlayerTricksWon.slice();
   zIndexCounter = 100;
   isAnimating = false;
@@ -12437,8 +12463,10 @@ function mpObserverHandleStateSync(move) {
   if (GAME_MODE !== 'MOON') {
     team1Score = session.game.team_points[0];
     team2Score = session.game.team_points[1];
+    team3Score = session.game.team_points[2] || 0;
     team1Marks = session.team_marks[0];
     team2Marks = session.team_marks[1];
+    team3Marks = session.team_marks[2] || 0;
   }
   updateScoreDisplay();
   positionPlayerIndicators();
@@ -12670,9 +12698,11 @@ function mpSaveHostState() {
       })),
       team1TricksWon: team1TricksWon,
       team2TricksWon: team2TricksWon,
+      team3TricksWon: team3TricksWon,
       moonPlayerTricksWon: moonPlayerTricksWon,
       team1Score: team1Score,
       team2Score: team2Score,
+      team3Score: team3Score,
       // House rules
       callForDoubleEnabled: callForDoubleEnabled,
       callForDoubleActive: callForDoubleActive,
@@ -12813,12 +12843,15 @@ function mpResumeFromSavedState(savedState) {
   playedThisTrick = [];
   team1TricksWon = savedState.team1TricksWon || 0;
   team2TricksWon = savedState.team2TricksWon || 0;
+  team3TricksWon = savedState.team3TricksWon || 0;
   moonPlayerTricksWon = savedState.moonPlayerTricksWon || [0, 0, 0];
   if (GAME_MODE !== 'MOON') {
     team1Score = savedState.team1Score || snap.team_points[0] || 0;
     team2Score = savedState.team2Score || snap.team_points[1] || 0;
+    team3Score = savedState.team3Score || snap.team_points[2] || 0;
     team1Marks = session.team_marks[0];
     team2Marks = session.team_marks[1];
+    team3Marks = session.team_marks[2] || 0;
   }
 
   // Restore house rules
@@ -12950,6 +12983,7 @@ function mpSendGameState(targetSeat) {
     bidMarks: session.bid_marks,
     team1TricksWon: team1TricksWon,
     team2TricksWon: team2TricksWon,
+    team3TricksWon: team3TricksWon,
     leader: session.game.leader,
     nelloDoublesSuit: session.game.nello_doubles_suit,
     forceDoubleTrump: session.game.force_double_trump,
@@ -15303,14 +15337,17 @@ function _redrawAllDominoSprites(){
 // Scoring state
 let team1Score = 0;
 let team2Score = 0;
+let team3Score = 0;
 let team1Marks = 0;
 let team2Marks = 0;
+let team3Marks = 0;
 
 // Track trick wins by team for trick history layout
 // team1TricksWon = number of tricks won by team 1 this hand
 // team2TricksWon = number of tricks won by team 2 this hand
 let team1TricksWon = 0;
 let team2TricksWon = 0;
+let team3TricksWon = 0;
 // Moon: per-player trick count (index = player seat)
 let moonPlayerTricksWon = [0, 0, 0];
 
@@ -15460,6 +15497,56 @@ function updateScoreDisplay(){
           else bEl.textContent = '-';
         }
       }
+    }
+    var t1p = document.getElementById('team1Pill');
+    var t2p = document.getElementById('team2Pill');
+    var mp = document.getElementById('marksPill');
+    if(t1p) t1p.style.display = 'none';
+    if(t2p) t2p.style.display = 'none';
+    if(mp) mp.style.display = 'none';
+    return;
+  }
+  if(GAME_MODE === 'TN51'){
+    // TN51: Use moonScoreBar repurposed for 3 teams
+    var tn51Bar = document.getElementById('moonScoreBar');
+    if(tn51Bar){
+      tn51Bar.style.display = 'flex';
+      // Update labels for TN51 (Team 1/2/3 instead of P1/P2/P3, Marks instead of Bid)
+      var cols = tn51Bar.children;
+      var tn51Labels = ['Team 1','Team 2','Team 3'];
+      for(var ci=0;ci<3;ci++){
+        if(!cols[ci]) continue;
+        var lbl=cols[ci].querySelector('div');
+        if(lbl) lbl.textContent=tn51Labels[ci];
+        // Change "Bid:" to "Marks:" in the info line
+        var infoDiv=cols[ci].querySelectorAll('div')[2];
+        if(infoDiv){
+          var bidSpan=infoDiv.querySelector('[id^="moonP"][id$="Bid"]');
+          var trkSpan=infoDiv.querySelector('[id^="moonP"][id$="Tricks"]');
+          if(bidSpan && trkSpan) infoDiv.innerHTML='Marks: <span id="'+bidSpan.id+'">'+team1Marks+'</span> | Tricks: <span id="'+trkSpan.id+'">0</span>';
+        }
+      }
+      // Score (points this hand)
+      var t1s = document.getElementById('moonP1Score');
+      if(t1s) t1s.textContent = team1Score;
+      var t2s = document.getElementById('moonP2Score');
+      if(t2s) t2s.textContent = team2Score;
+      var t3s = document.getElementById('moonP3Score');
+      if(t3s) t3s.textContent = team3Score;
+      // Marks (game-level score)
+      var t1b = document.getElementById('moonP1Bid');
+      var t2b = document.getElementById('moonP2Bid');
+      var t3b = document.getElementById('moonP3Bid');
+      if(t1b) t1b.textContent = team1Marks;
+      if(t2b) t2b.textContent = team2Marks;
+      if(t3b) t3b.textContent = team3Marks;
+      // Tricks won this hand
+      var t1t = document.getElementById('moonP1Tricks');
+      var t2t = document.getElementById('moonP2Tricks');
+      var t3t = document.getElementById('moonP3Tricks');
+      if(t1t) t1t.textContent = team1TricksWon;
+      if(t2t) t2t.textContent = team2TricksWon;
+      if(t3t) t3t.textContent = team3TricksWon;
     }
     var t1p = document.getElementById('team1Pill');
     var t2p = document.getElementById('team2Pill');
@@ -17287,6 +17374,7 @@ async function mpHandlePickPhase(move) {
   playedThisTrick = [];
   team1TricksWon = 0;
   team2TricksWon = 0;
+  team3TricksWon = 0;
   moonPlayerTricksWon = [0, 0, 0];
   zIndexCounter = 100;
   isAnimating = false;
@@ -17345,8 +17433,10 @@ async function mpHandlePickPhase(move) {
   if (GAME_MODE !== 'MOON') {
     team1Score = session.game.team_points ? session.game.team_points[0] : 0;
     team2Score = session.game.team_points ? session.game.team_points[1] : 0;
+    team3Score = session.game.team_points ? (session.game.team_points[2] || 0) : 0;
     team1Marks = session.team_marks[0];
     team2Marks = session.team_marks[1];
+    team3Marks = session.team_marks[2] || 0;
   }
   updateScoreDisplay();
 
@@ -18250,9 +18340,10 @@ async function collectToHistory(){
     teamTrickIndex = moonPlayerTricksWon[winningTeam] || 0;
     moonPlayerTricksWon[winningTeam]++;
   } else {
-    teamTrickIndex = winningTeam === 0 ? team1TricksWon : team2TricksWon;
+    teamTrickIndex = winningTeam === 0 ? team1TricksWon : (winningTeam === 1 ? team2TricksWon : team3TricksWon);
     if(winningTeam === 0) team1TricksWon++;
-    else team2TricksWon++;
+    else if(winningTeam === 1) team2TricksWon++;
+    else if(winningTeam === 2) team3TricksWon++;
   }
 
   console.log(`Trick won by ${GAME_MODE === 'MOON' ? 'P' + (winningTeam+1) : 'Team ' + (winningTeam+1)} (seat ${winnerSeat}), trick #${teamTrickIndex + 1}`);
@@ -18300,6 +18391,7 @@ async function collectToHistory(){
   // Update the scores from the game engine
   team1Score = session.game.team_points[0];
   team2Score = session.game.team_points[1];
+  team3Score = session.game.team_points[2] || 0;
   updateScoreDisplay();
 
   // Log trick end with points scored this trick
@@ -18642,8 +18734,10 @@ async function handlePlayer1Click(spriteSlotIndexOrElement){
       setStatus(session.status);
       team1Score = session.game.team_points[0];
       team2Score = session.game.team_points[1];
+      team3Score = session.game.team_points[2] || 0;
       team1Marks = session.team_marks[0];
       team2Marks = session.team_marks[1];
+      team3Marks = session.team_marks[2] || 0;
       updateScoreDisplay();
       logEvent('HAND_END', { status: session.status });
       autoSave();
@@ -19946,8 +20040,10 @@ function renderAll(){
   // Update score display
   team1Score = session.game.team_points[0];
   team2Score = session.game.team_points[1];
+  team3Score = session.game.team_points[2] || 0;
   team1Marks = session.team_marks[0];
   team2Marks = session.team_marks[1];
+  team3Marks = session.team_marks[2] || 0;
   updateScoreDisplay();
 
   // Sync sprites with game state
@@ -20109,8 +20205,10 @@ async function ppAIPlayLoop() {
           setStatus(session.status);
           team1Score = session.game.team_points[0];
           team2Score = session.game.team_points[1];
+          team3Score = session.game.team_points[2] || 0;
           team1Marks = session.team_marks[0];
           team2Marks = session.team_marks[1];
+          team3Marks = session.team_marks[2] || 0;
           updateScoreDisplay();
           logEvent('HAND_END', { status: session.status });
           autoSave();
@@ -20271,8 +20369,10 @@ async function resumeAfterCallDouble(){
         setStatus(session.status);
         team1Score = session.game.team_points[0];
         team2Score = session.game.team_points[1];
+        team3Score = session.game.team_points[2] || 0;
         team1Marks = session.team_marks[0];
         team2Marks = session.team_marks[1];
+        team3Marks = session.team_marks[2] || 0;
         updateScoreDisplay();
         logEvent('HAND_END', { status: session.status });
         autoSave();
@@ -20581,8 +20681,10 @@ function confirmTrumpSelection(){
   // Update scores
   team1Score = session.game.team_points[0];
   team2Score = session.game.team_points[1];
+  team3Score = session.game.team_points[2] || 0;
   team1Marks = session.team_marks[0];
   team2Marks = session.team_marks[1];
+  team3Marks = session.team_marks[2] || 0;
   updateScoreDisplay();
 
   // Update status
@@ -20764,8 +20866,10 @@ async function aiPlayTurn(){
         // Update scores IMMEDIATELY so they display before the button appears
         team1Score = session.game.team_points[0];
         team2Score = session.game.team_points[1];
+        team3Score = session.game.team_points[2] || 0;
         team1Marks = session.team_marks[0];
         team2Marks = session.team_marks[1];
+        team3Marks = session.team_marks[2] || 0;
         updateScoreDisplay();
         logEvent('HAND_END', { status: session.status });
         autoSave();
@@ -20855,6 +20959,7 @@ async function startNewHand(){
   playedThisTrick = [];
   team1TricksWon = 0;
   team2TricksWon = 0;
+  team3TricksWon = 0;
   moonPlayerTricksWon = [0, 0, 0];
   zIndexCounter = 100;
   isAnimating = false;
@@ -20954,8 +21059,10 @@ async function startNewHand(){
 
   team1Score = session.game.team_points[0];
   team2Score = session.game.team_points[1];
+  team3Score = session.game.team_points[2] || 0;
   team1Marks = session.team_marks[0];
   team2Marks = session.team_marks[1];
+  team3Marks = session.team_marks[2] || 0;
   updateScoreDisplay();
 
   // V12.10.4: Show widow sprite for Moon replay
@@ -21025,6 +21132,7 @@ async function mpHostDeal() {
   playedThisTrick = [];
   team1TricksWon = 0;
   team2TricksWon = 0;
+  team3TricksWon = 0;
   moonPlayerTricksWon = [0, 0, 0];
   zIndexCounter = 100;
   isAnimating = false;
@@ -21111,8 +21219,10 @@ async function mpHostDeal() {
   if (GAME_MODE !== 'MOON') {
     team1Score = session.game.team_points[0];
     team2Score = session.game.team_points[1];
+    team3Score = session.game.team_points[2] || 0;
     team1Marks = session.team_marks[0];
     team2Marks = session.team_marks[1];
+    team3Marks = session.team_marks[2] || 0;
   }
   updateScoreDisplay();
 
@@ -21913,9 +22023,24 @@ function showRoundEndSummary(){
     resultText = 'Round Over';
   }
 
-  // Build round-end score columns — Moon shows 3 players, others show 2 teams
+  // Build round-end score columns — Moon/TN51 shows 3 players/teams, others show 2 teams
   let _roundPointsCols, _roundMarksCols;
-  if (GAME_MODE === 'MOON') {
+  if (GAME_MODE === 'TN51') {
+    const t3p = session.game.team_points[2] || 0;
+    const t3m = session.team_marks[2] || 0;
+    _roundPointsCols = `
+          <div style="text-align:center;"><div style="font-size:10px;opacity:0.8;">Team 1</div><div style="font-size:20px;font-weight:bold;color:#fff;">${t1p}</div></div>
+          <div style="width:1px;background:rgba(255,255,255,0.2);"></div>
+          <div style="text-align:center;"><div style="font-size:10px;opacity:0.8;">Team 2</div><div style="font-size:20px;font-weight:bold;color:#fff;">${t2p}</div></div>
+          <div style="width:1px;background:rgba(255,255,255,0.2);"></div>
+          <div style="text-align:center;"><div style="font-size:10px;opacity:0.8;">Team 3</div><div style="font-size:20px;font-weight:bold;color:#fff;">${t3p}</div></div>`;
+    _roundMarksCols = `
+            <div style="font-size:16px;font-weight:bold;color:#93c5fd;">${t1m}</div>
+            <div style="font-size:12px;opacity:0.5;align-self:center;">-</div>
+            <div style="font-size:16px;font-weight:bold;color:#fca5a5;">${t2m}</div>
+            <div style="font-size:12px;opacity:0.5;align-self:center;">-</div>
+            <div style="font-size:16px;font-weight:bold;color:#fbbf24;">${t3m}</div>`;
+  } else if (GAME_MODE === 'MOON') {
     const t3p = session.game.team_points[2] || 0;
     const t3m = session.team_marks[2] || 0;
     _roundPointsCols = `
@@ -22755,11 +22880,14 @@ function saveGameState(){
       session: session.snapshot(),
       team1TricksWon,
       team2TricksWon,
+      team3TricksWon,
       currentTrick,
       team1Score,
       team2Score,
+      team3Score,
       team1Marks: session.team_marks[0],
       team2Marks: session.team_marks[1],
+      team3Marks: session.team_marks[2] || 0,
       sprites: sprites.map((seatSprites, seatIdx) =>
         seatSprites ? seatSprites.map((s, idx) => s ? { tile: s.tile, slot: idx } : null) : []
       )
@@ -22817,10 +22945,12 @@ function resumeGameFromSave(){
 
     team1TricksWon = saved.team1TricksWon || 0;
     team2TricksWon = saved.team2TricksWon || 0;
+    team3TricksWon = saved.team3TricksWon || 0;
     moonPlayerTricksWon = saved.moonPlayerTricksWon || [0, 0, 0];
     currentTrick = saved.currentTrick || 0;
     team1Score = saved.team1Score || 0;
     team2Score = saved.team2Score || 0;
+    team3Score = saved.team3Score || 0;
 
     // Recreate sprites using makeSprite (consistent with startNewHand)
     createPlaceholders();
@@ -22855,6 +22985,7 @@ function resumeGameFromSave(){
 
     team1Marks = session.team_marks[0];
     team2Marks = session.team_marks[1];
+    team3Marks = session.team_marks[2] || 0;
     updateScoreDisplay();
     updateTrumpDisplay();
     renderAll();
@@ -23088,6 +23219,7 @@ function replayHand(index){
   playedThisTrick = [];
   team1TricksWon = 0;
   team2TricksWon = 0;
+  team3TricksWon = 0;
   moonPlayerTricksWon = [0, 0, 0];
   zIndexCounter = 100;
   isAnimating = false;
@@ -23223,8 +23355,10 @@ function replayHand(index){
 
   team1Score = session.game.team_points[0];
   team2Score = session.game.team_points[1];
+  team3Score = session.game.team_points[2] || 0;
   team1Marks = session.team_marks[0];
   team2Marks = session.team_marks[1];
+  team3Marks = session.team_marks[2] || 0;
   updateScoreDisplay();
 
   // V12.10.4: Show widow sprite for Moon replay
@@ -23540,6 +23674,7 @@ function startCustomHand(){
   playedThisTrick = [];
   team1TricksWon = 0;
   team2TricksWon = 0;
+  team3TricksWon = 0;
   moonPlayerTricksWon = [0, 0, 0];
   zIndexCounter = 100;
   isAnimating = false;
@@ -23627,6 +23762,7 @@ function startCustomHand(){
 
   team1Score = session.game.team_points[0];
   team2Score = session.game.team_points[1];
+  team3Score = session.game.team_points[2] || 0;
   updateScoreDisplay();
 
   initBiddingRound();
@@ -24121,7 +24257,7 @@ function logTrickEnd(winnerSeat, points){
     if(debugRec && debugRec.debugInfo){
       const d = debugRec.debugInfo;
       trickEndState = {
-        teamScores: [session.game.team_points[0], session.game.team_points[1]],
+        teamScores: [session.game.team_points[0], session.game.team_points[1], session.game.team_points[2] || 0],
         voidTracking: d.voidTracking || {},
         trumpControl: d.weHaveTrumpControl || false,
         opponentsVoidInTrump: d.opponentsVoidInTrump || false,
