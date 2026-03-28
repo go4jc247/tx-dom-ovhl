@@ -3449,7 +3449,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   const isEndgame = isMoon ? (tricksLeft <= 3) : (tricksLeft <= 2);
   const mustWin = isEndgame && !bidIsSafe; // must win remaining tricks to make bid
   // Bid safe but opponents still have dangerous count? Don't relax yet
-  const canRelax = bidIsSafe && tricksLeft >= 2 && !(totalCountRemaining >= 10 && pointsNeeded >= -5);
+  // Moon: no count points, so the count gate doesn't apply
+  const canRelax = bidIsSafe && tricksLeft >= 2 && (isMoon || !(totalCountRemaining >= 10 && pointsNeeded >= -5));
   // COUNT-POINT ARITHMETIC: in endgame, compute if count tiles in hand are enough to make bid
   // countNeeded = how many count points we need beyond base trick wins
   // If we hold enough count, we need fewer trick wins; if we don't, we need ALL remaining tricks
@@ -4033,7 +4034,21 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     // When bid is mathematically impossible, stop wasting trumps on pulling.
     // Switch to leading safest non-trump to minimize opponent score gains.
     if(bidIsDoomed && isBidderTeam){
-      // Lead low non-trumps to minimize damage — skip ALL trump pulling
+      // Lead doubles first — guaranteed trick win, minimizes opponent score gains
+      if(nonTrumpDoubles.length > 0){
+        let bestDbl = nonTrumpDoubles[0], bestDblScore = -Infinity;
+        for(const idx of nonTrumpDoubles){
+          const pip = hand[idx][0];
+          const info = suitInfo[pip];
+          const dblSum = pip + pip;
+          const dblCount = (dblSum === 5) ? 5 : (dblSum === 10) ? 10 : 0;
+          // Prefer non-count doubles; then doubles with more remaining tiles (pull more tiles)
+          let score = -dblCount * 3 + (info ? info.tilesLeft : 0);
+          if(score > bestDblScore){ bestDblScore = score; bestDbl = idx; }
+        }
+        return makeResult(bestDbl, "Bid doomed: damage control (double lead)");
+      }
+      // No doubles — lead low non-trumps to minimize count exposure
       if(nonTrumpSingles.length > 0){
         let safestIdx = nonTrumpSingles[0], safestScore = Infinity;
         for(const idx of nonTrumpSingles){
@@ -4044,9 +4059,6 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           if(score < safestScore){ safestScore = score; safestIdx = idx; }
         }
         return makeResult(safestIdx, "Bid doomed: damage control (safe lead)");
-      }
-      if(nonTrumpDoubles.length > 0){
-        return makeResult(nonTrumpDoubles[0], "Bid doomed: damage control (double lead)");
       }
       // Only trumps left — lead lowest
       if(otherTrumps.length > 0){
@@ -4189,8 +4201,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           let score = 100 + info.countRemaining + pip - (info.tilesLeft * 3);
           // Walker setup: if we hold a covered off for this double, lead double first
           // so the off "walks" next trick (guaranteed 2-trick win combo)
-          const hasCoveredOff = hand.some(t => t[0] !== t[1] && Math.max(t[0],t[1]) === pip);
-          if(hasCoveredOff) score += 12;
+          const hasCoveredOff = hand.some(t => t[0] !== t[1] && (t[0] === pip || t[1] === pip));
+          if(hasCoveredOff) score += 20;
           // Depleted-suit bonus: fewer remaining tiles = safer double lead
           if(info.tilesLeft <= 2) score += 8;
           // Count-safe: avoid leading count doubles when we might need those points
