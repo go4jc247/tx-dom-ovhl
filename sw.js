@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v15.1.0 — Phase 6: TN51 3-team fix (all team calculations use team_of())
+// Version: v15.2.0 — Phase 6+: TN51 bid scaling, AI play refinements (walker, trump conservation, off-tracker)
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v15.1.0';
+const CACHE_NAME = 'tx-dom-v15.2.0';
 const urlsToCache = [
   './index.html',
   // CSS

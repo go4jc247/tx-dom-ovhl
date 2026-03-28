@@ -1528,7 +1528,9 @@ function evaluateHandForBid(hand) {
     }
 
     // PATTERN D: 4+ doubles with at most 1 uncovered off → mid bid
-    if (doubles.length >= 4 && uncoveredOffs <= 1) {
+    // TN51 (6-tile hands): 3+ doubles is proportionally as strong
+    const doublesForMid = handSize <= 6 ? 3 : 4;
+    if (doubles.length >= doublesForMid && uncoveredOffs <= 1) {
       return { action: "bid", bid: midBid, marks: 1 };
     }
 
@@ -1587,19 +1589,22 @@ function evaluateHandForBid(hand) {
       return { action: "bid", bid: midBid, marks: 1 };
     }
     if (trumpCount >= 3 && hasDoubleTrump && hasSecondTrump && doubles.length >= 1) {
-      return { action: "bid", bid: minBid, marks: 1 };
+      // TN51: 3 trumps in 6-tile hand = 50% trump — bid higher
+      const bid = handSize <= 6 ? midBid : minBid;
+      return { action: "bid", bid: bid, marks: 1 };
     }
 
-    // NEW: 3 top trumps (double + 2nd + 3rd) even without other doubles → min bid
-    // Having the top 3 trumps gives strong control even without side doubles
+    // 3 top trumps (double + 2nd + 3rd) even without other doubles → min bid
     if (trumpCount >= 3 && hasDoubleTrump && hasSecondTrump && hasThirdTrump) {
-      return { action: "bid", bid: minBid, marks: 1 };
+      const bid = handSize <= 6 ? midBid : minBid;
+      return { action: "bid", bid: bid, marks: 1 };
     }
 
-    // NEW: 4+ trumps with double but no 2nd → still worth a min bid
-    // Having 4 in a suit with the double gives enough trump mass
+    // 4+ trumps with double but no 2nd → still worth a min bid
     if (trumpCount >= 4 && hasDoubleTrump && ntUncoveredOffs <= 1) {
-      return { action: "bid", bid: minBid, marks: 1 };
+      // TN51: 4 trumps = 67% of hand — very strong
+      const bid = handSize <= 6 ? midBid : minBid;
+      return { action: "bid", bid: bid, marks: 1 };
     }
   }
 
@@ -2321,8 +2326,11 @@ function updateOffTracker() {
           } else {
             // Bidder played a non-double in this suit → INCREASE suspicion
             // This could be the off tile being forced out!
+            // Weight early plays less (could be forced follows) vs late plays (more voluntary)
+            const earlyFactor = trickCount <= 2 ? 0.5 : (trickCount <= 4 ? 0.75 : 1.0);
+            const suspInc = Math.round(25 * earlyFactor);
             if (offTracker.suitSuspicion[pip] !== undefined) {
-              offTracker.suitSuspicion[pip] = Math.min(100, offTracker.suitSuspicion[pip] + 25);
+              offTracker.suitSuspicion[pip] = Math.min(100, offTracker.suitSuspicion[pip] + suspInc);
             }
           }
         }
@@ -4150,10 +4158,17 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           }
 
           if(!info.winnerPlayed){
-            score -= 30;
-            score -= info.winnerCount * 2;
-            _breakdown.doubleNotOut = -30;
-            _breakdown.doubleCountPenalty = -(info.winnerCount * 2);
+            // Check if WE hold this double — if so it's safe (walker pair)
+            const weHoldThisDouble = hand.some(h => h[0] === ledSuit && h[1] === ledSuit);
+            if(weHoldThisDouble){
+              score += 8; // We can walk this suit safely
+              _breakdown.walkerBonus = 8;
+            } else {
+              score -= 30;
+              score -= info.winnerCount * 2;
+              _breakdown.doubleNotOut = -30;
+              _breakdown.doubleCountPenalty = -(info.winnerCount * 2);
+            }
           } else {
             score += 10;
             _breakdown.doubleOut = +10;
@@ -4749,13 +4764,17 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       }
       // COUNT-DRIVEN URGENCY: on offense, always trump in when we need count points to make bid
       // Even on 0-count tricks, winning trick = 1 point closer to bid
-      if(isBidderTeam && pointsNeeded > 0 && tricksLeft <= pointsNeeded + 1){
+      // But don't waste trump if partner is already winning this trick
+      if(isBidderTeam && pointsNeeded > 0 && tricksLeft <= pointsNeeded + 1 && !partnerWinning){
         return makeResult(winTrumpIdx, "Trump in: need " + pointsNeeded + "pts, can't afford to lose tricks");
       }
       // TRUMP RATIO CONSERVATION: on defense, save trumps for higher-value tricks
       // When trumps are scarce relative to remaining tricks, don't waste on 0-count tricks
       const _trumpRatio = tricksLeft > 0 ? trumpsInHand.length / tricksLeft : 1;
+      // Don't conserve if bidder is close to making — we need every trick to defend
+      const bidderNearMaking = bidderNeedsMore <= tricksLeft + 5;
       const _shouldConserve = !isBidderTeam && trickCount === 0 && !isEndgame && !bidderIsClose && !canSetBid
+        && !bidderNearMaking
         && (shouldSaveLastTrump || (_trumpRatio <= 0.5 && trumpsInHand.length <= 2));
       if(_shouldConserve){
         // Low-value trick on defense with scarce trumps — save for count-heavy trick
@@ -4876,8 +4895,10 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         const lowPip2 = Math.min(tile[0], tile[1]);
         const isCoveredOff = holdDouble && lowPip2 === highPip2 - 1;
         if(isCoveredOff){
-          score -= 18; // strong penalty — this is half of a guaranteed 2-trick combo
-          _bd.walkerPenalty = -18;
+          // Scale penalty by remaining tricks — breaking a walker pair matters less in endgame
+          const walkerPenalty = tricksLeft <= 3 ? -9 : (tricksLeft <= 5 ? -14 : -18);
+          score += walkerPenalty;
+          _bd.walkerPenalty = walkerPenalty;
         }
       }
 
