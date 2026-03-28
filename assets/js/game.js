@@ -4443,12 +4443,26 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
             score += 10;
             _breakdown.doubleOut = +10;
           }
-          // Without trump control, count tiles are very exposed — opponents can trump in
-          // Harsher penalty when opponents are void (will trump our count)
-          const countPenMult = (oppsVoid > 0 && !opponentsVoidInTrump) ? Math.min(5, 3 + oppsVoid * 2) : 3;
-          score -= myCount * countPenMult;
-          _breakdown.myCountPenalty = -(myCount * countPenMult);
-          if(!info.winnerPlayed){
+          // Count tile scoring: context-dependent
+          // When bidder team is actively hunting count, count tiles are ASSETS not liabilities
+          if(countHuntActive && myCount > 0 && weHaveTrumpControl){
+            // Count hunt: bonus for leading count we can win (trump control = safe)
+            const huntBonus = myCount * 2;
+            score += huntBonus;
+            _breakdown.countHuntBonus = huntBonus;
+          } else {
+            // Without trump control, count tiles are very exposed — opponents can trump in
+            // Harsher penalty when opponents are void (will trump our count)
+            const countPenMult = (oppsVoid > 0 && !opponentsVoidInTrump) ? Math.min(5, 3 + oppsVoid * 2) : 3;
+            score -= myCount * countPenMult;
+            _breakdown.myCountPenalty = -(myCount * countPenMult);
+          }
+          if(countHuntActive && info.countRemaining > 0){
+            // Count hunt: suits with remaining count are targets, not risks
+            const huntSuitBonus = Math.floor(info.countRemaining * 1.5);
+            score += huntSuitBonus;
+            _breakdown.countHuntSuitBonus = huntSuitBonus;
+          } else if(!info.winnerPlayed){
             score -= info.countRemaining;
             _breakdown.suitCountRisk = -(info.countRemaining);
           } else {
