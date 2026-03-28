@@ -1838,12 +1838,17 @@ function aiChooseTrump(hand, bidAmount) {
     if (doubles.length >= 5) doublesScore += 12;
     else if (doubles.length >= 4) doublesScore += 6;
     // In DOUBLES mode, non-double tiles have no suit double to protect them
-    // Penalty for exposed count tiles in non-trump hands
+    // BUT high non-doubles (like 7-6, 6-5) are effectively the top of their suit
+    // since all doubles are trump — they WIN their suit when led
     const nonDoubles = hand.filter(t => t[0] !== t[1]);
     for (const t of nonDoubles) {
       const sum = t[0] + t[1];
       if (sum === 10) doublesScore -= 3;
       else if (sum === 5) doublesScore -= 2;
+      // High non-doubles are suit winners in DOUBLES mode (double is trump, not in suit)
+      const hp = Math.max(t[0], t[1]);
+      const lp = Math.min(t[0], t[1]);
+      if (lp === hp - 1) doublesScore += 3; // second-highest in suit = strong
     }
     // Void awareness: count suits we're void in (excluding doubles)
     const ndSuits = new Set();
