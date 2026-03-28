@@ -3642,7 +3642,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   // ═══════════════════════════════════════════════════════════════════
   const isPreEndgame = isMoon ? (tricksLeft <= 4) : (tricksLeft <= 3);
   const isEndgame = isMoon ? (tricksLeft <= 3) : (tricksLeft <= 2);
-  const mustWin = isEndgame && !bidIsSafe; // must win remaining tricks to make bid
+  // Must win: either in endgame with bid unsafe, OR we need as many tricks as remain
+  const mustWin = (isEndgame && !bidIsSafe) || (!bidIsSafe && isBidderTeam && pointsNeeded >= tricksLeft);
   // Bid safe but opponents still have dangerous count? Don't relax yet
   // Moon: no count points, so the count gate doesn't apply
   const canRelax = bidIsSafe && tricksLeft >= 2 && (isMoon || !(totalCountRemaining >= 10 && pointsNeeded >= -5));
@@ -4243,9 +4244,10 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     } else if(tricksLeft <= 1){
       // Reconstruct opponent hands: each active opponent holds exactly 1 tile
       // (all other tiles have been played or are in our hand)
-      const oppTiles = []; // {seat, tile}
+      const oppTiles = []; // {seat, tile} — only opponents, NOT partners
       for(let s = 0; s < gameState.player_count; s++){
         if(s === p || !gameState.active_players.includes(s)) continue;
+        if(isSameTeam(s)) continue; // partner winning = us winning, skip
         const oh = gameState.hands[s];
         if(oh && oh.length === 1) oppTiles.push({seat: s, tile: oh[0]});
       }
@@ -4284,11 +4286,17 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
 
           const myPipSum = myTile[0] + myTile[1];
           const myCount = (myPipSum === 5) ? 5 : (myPipSum === 10) ? 10 : 0;
+          // Sum count from ALL tiles in the trick (including opponents' tiles we'd capture)
+          let trickPotCount = myCount;
+          for(const opp of oppTiles){
+            const ops = opp.tile[0] + opp.tile[1];
+            if(ops === 5 || ops === 10) trickPotCount += (ops === 5 ? 5 : 10);
+          }
           // Score: winning is paramount, then maximize count captured
           let score = iWin ? 1000 : 0;
-          if(iWin && isBidderTeam) score += myCount; // our count stays with us
+          if(iWin) score += trickPotCount; // capture all count in the trick pot
           if(!iWin && !isBidderTeam) score += 500; // defense: losing is fine if we deny bidder
-          if(!iWin) score -= myCount * 3; // don't give away count to opponents
+          if(!iWin) score -= myCount * 3; // don't give away our count to opponents
 
           if(score > bestLeadScore){ bestLeadScore = score; bestLeadIdx = idx; }
         }
@@ -4304,10 +4312,11 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     // Try each lead option: simulate who wins trick 1, then who wins trick 2.
     // Choose the lead that maximizes our team's total wins + count captured.
     if(tricksLeft === 2 && legal.length === 2){
-      const oppHands = []; // {seat, tiles: [tile1, tile2]}
+      const oppHands = []; // {seat, tiles: [tile1, tile2]} — only opponents, NOT partners
       let canSimulate = true;
       for(let s = 0; s < gameState.player_count; s++){
         if(s === p || !gameState.active_players.includes(s)) continue;
+        if(isSameTeam(s)) continue; // partner winning = us winning
         const oh = gameState.hands[s];
         if(oh && oh.length === 2) oppHands.push({seat: s, tiles: [oh[0], oh[1]]});
         else canSimulate = false;
@@ -7485,7 +7494,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.54.0';  // v17.54.0: knownTrumpHolder integration in over-trump risk check
+const MP_VERSION = 'v17.55.0';  // v17.55.0: critical endgame bug fixes (partner-as-opponent, mustWin, count pot)
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables

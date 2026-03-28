@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.54.0 — knownTrumpHolder integration
+// Version: v17.55.0 — critical endgame bug fixes
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.54.0';
+const CACHE_NAME = 'tx-dom-v17.55.0';
 const urlsToCache = [
   './index.html',
   // CSS
