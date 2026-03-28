@@ -2352,7 +2352,7 @@ function updateOffTracker() {
             // Bidder played a non-double in this suit → INCREASE suspicion
             // This could be the off tile being forced out!
             // Weight early plays less (could be forced follows) vs late plays (more voluntary)
-            const earlyFactor = trickCount <= 2 ? 0.5 : (trickCount <= 4 ? 0.75 : 1.0);
+            const earlyFactor = trickCount <= 2 ? 0.65 : (trickCount <= 4 ? 0.85 : 1.0);
             const suspInc = Math.round(25 * earlyFactor);
             if (offTracker.suitSuspicion[pip] !== undefined) {
               offTracker.suitSuspicion[pip] = Math.min(100, offTracker.suitSuspicion[pip] + suspInc);
@@ -2392,7 +2392,13 @@ function updateOffTracker() {
         if (bp[0] === pip && bp[1] === pip) { bidderPlayedIt = true; break; }
       }
       if (!bidderPlayedIt) {
-        offTracker.suitSuspicion[pip] = Math.max(0, offTracker.suitSuspicion[pip] - 10);
+        // Scale penalty by how many times bidder played in this suit (more plays = less likely off)
+        let bidderSuitPlays = 0;
+        for (const bp of offTracker.bidderPlays) {
+          if (bp[0] === pip || bp[1] === pip) bidderSuitPlays++;
+        }
+        const penalty = 10 + bidderSuitPlays * 5; // deeper reduction with more commitment
+        offTracker.suitSuspicion[pip] = Math.max(0, offTracker.suitSuspicion[pip] - penalty);
       }
     }
   }
@@ -13893,11 +13899,14 @@ function aiWidowSwap(seat){
     var newTrump = aiChooseTrump(postSwapHand, bid);
     var newScore = evalHand(postSwapHand, newTrump);
     var gain = newScore - origScore;
+    // Penalty for changing trump strategy (risky to shift mid-hand)
+    if(newTrump !== origTrump) gain -= 3;
     if(gain > bestSwapGain){ bestSwapGain = gain; bestSwapIdx = i; }
   }
 
-  // Only swap if gain exceeds threshold (avoid marginal swaps)
-  if(bestSwapIdx >= 0 && bestSwapGain > 3){
+  // Dynamic threshold: higher bids require bigger improvement to justify swap risk
+  var swapThreshold = bid >= 6 ? 6 : (bid >= 5 ? 4 : 3);
+  if(bestSwapIdx >= 0 && bestSwapGain > swapThreshold){
     session.swapWidow(bestSwapIdx);
   } else {
     session.skipWidow();
