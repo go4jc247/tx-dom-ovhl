@@ -4021,6 +4021,15 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           // Bonus for suits with fewer tiles (more likely to force repeated trumping)
           if(tapInfo && tapInfo.tilesLeft <= 2) score += 8;
           else if(tapInfo && tapInfo.tilesLeft <= 4) score += 4;
+          // Void-creation bonus: if playing this tile voids us in a suit, we gain trump-in potential
+          if(trumpsInHand.length > 0){
+            let cntP0 = 0, cntP1 = 0;
+            for(const h of hand){
+              if(h[0] === pip0 || h[1] === pip0) cntP0++;
+              if(h[0] === pip1 || h[1] === pip1) cntP1++;
+            }
+            if(cntP0 <= 1 || cntP1 <= 1) score += 6; // near-voiding bonus
+          }
           if(score > bestTapScore){ bestTapScore = score; bestTapIdx = idx; }
         }
         if(bestTapIdx >= 0 && bestTapScore >= 0){
@@ -4348,14 +4357,18 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         return makeResult(bestIdx, "Lead: partner-in-lead (trump control)");
       }
 
-      // Only trumps left — lead lowest trump
+      // Only trumps left — lead safest trump (non-count first, then lowest)
       if(pullableTrumps.length > 0){
-        let lowIdx = pullableTrumps[0], lowVal = Infinity;
+        let lowIdx = pullableTrumps[0], lowScore = Infinity;
         for(const idx of pullableTrumps){
-          const val = hand[idx][0]+hand[idx][1];
-          if(val < lowVal){ lowVal = val; lowIdx = idx; }
+          const t = hand[idx];
+          const ps = t[0] + t[1];
+          const isCount = (ps === 5 || ps === 10);
+          // Non-count trumps preferred; among same count status, pick lowest
+          const sc = (isCount ? 100 : 0) + ps;
+          if(sc < lowScore){ lowScore = sc; lowIdx = idx; }
         }
-        return makeResult(lowIdx, "Lead: low trump (only trumps left)");
+        return makeResult(lowIdx, "Lead: safe trump (only trumps left)");
       }
       if(trumpDoubles.length > 0){
         // Pick lowest non-count trump double
@@ -4598,14 +4611,17 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       return makeResult(bestIdx, "Lead: safest non-trump");
     }
 
-    // Last resort: lead trump (even without highest)
+    // Last resort: lead trump (even without highest) — avoid count trumps
     if(pullableTrumps.length > 0){
-      let lowIdx = pullableTrumps[0], lowVal = Infinity;
+      let lowIdx = pullableTrumps[0], lowScore = Infinity;
       for(const idx of pullableTrumps){
-        const val = hand[idx][0]+hand[idx][1];
-        if(val < lowVal){ lowVal = val; lowIdx = idx; }
+        const t = hand[idx];
+        const ps = t[0] + t[1];
+        const isCount = (ps === 5 || ps === 10);
+        const sc = (isCount ? 100 : 0) + ps;
+        if(sc < lowScore){ lowScore = sc; lowIdx = idx; }
       }
-      return makeResult(lowIdx, "Lead: low trump (no safe option)");
+      return makeResult(lowIdx, "Lead: safe trump (no safe option)");
     }
 
     return makeResult(legal[0], "Lead: fallback");
