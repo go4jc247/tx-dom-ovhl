@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.25.0 — Fix 2-trick lookahead suit-following bug
+// Version: v17.26.0 — Enhanced 2-trick lookahead, Nello late-game lead
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.25.0';
+const CACHE_NAME = 'tx-dom-v17.26.0';
 const urlsToCache = [
   './index.html',
   // CSS

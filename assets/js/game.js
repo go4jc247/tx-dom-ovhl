@@ -3759,6 +3759,16 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           const mySuitCount = hand.filter(t => Math.max(t[0],t[1]) === suitPip || Math.min(t[0],t[1]) === suitPip).length;
           if(mySuitCount === 1 && tricksLeft > 2) score -= 5;
 
+          // LATE GAME: with few tricks left, prioritize suits where bidder is NOT void
+          // (void bidder can safely discard, non-void bidder must follow and risks winning)
+          if(tricksLeft <= 3 && bidderSeat !== undefined){
+            if(voidIn[bidderSeat] && voidIn[bidderSeat].has(suitPip)){
+              score -= 30; // bidder void = they safely dump, useless lead
+            } else {
+              score += 10; // bidder must follow = pressure to win
+            }
+          }
+
           if(score > bestScore){ bestScore = score; bestIdx = idx; }
         }
         return makeResult(bestIdx, "Nel-O opp: lead high to trap bidder");
@@ -4173,7 +4183,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           }
           // Score: winning trick 1 is valuable; count captured matters
           let score = trick1Win ? 100 : 0;
-          score += trick1Win ? _tileCount(myTile1) : -_tileCount(myTile1);
+          score += trick1Win ? _tileCount(myTile1) : -_tileCount(myTile1) * 2; // losing count = worse
           // Trick 2: if we won trick 1, we lead tile 2
           if(trick1Win){
             const ledSuit2 = myTile2[0]===myTile2[1] ? (trumpMode==='DOUBLES'?-1:myTile2[0]) : Math.max(myTile2[0],myTile2[1]);
@@ -4185,7 +4195,27 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
               if(!trick2Win) break;
             }
             score += trick2Win ? 100 : 0;
-            score += trick2Win ? _tileCount(myTile2) : -_tileCount(myTile2);
+            score += trick2Win ? _tileCount(myTile2) : -_tileCount(myTile2) * 2;
+          } else {
+            // We lose trick 1 — opponent leads trick 2
+            // Check if our tile2 can beat any of opponent's remaining tiles when THEY lead
+            // Pessimistic: assume opponent leads their BEST tile against us
+            let canWinTrick2 = false;
+            for(const opp of oppHands){
+              for(const ot of opp.tiles){
+                const oppLedSuit = ot[0]===ot[1] ? (trumpMode==='DOUBLES'?-1:ot[0]) : Math.max(ot[0],ot[1]);
+                if(_beats(myTile2, ot, oppLedSuit)){
+                  canWinTrick2 = true; // we can beat at least one of their leads
+                }
+              }
+            }
+            // If we can win trick 2 when opponent leads, factor that in
+            if(canWinTrick2){
+              score += 50; // partial credit for winning trick 2
+              score += _tileCount(myTile2); // count we capture
+            } else {
+              score -= _tileCount(myTile2) * 2; // we'll lose both tiles' count
+            }
           }
           if(score > bestScore2T){ bestScore2T = score; bestIdx2T = idx; }
         }
