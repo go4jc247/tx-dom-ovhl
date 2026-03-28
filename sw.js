@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.48.0 — endgame count protection
+// Version: v17.49.0 — TN51 bidding caution & Nello threshold adjustments
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.48.0';
+const CACHE_NAME = 'tx-dom-v17.49.0';
 const urlsToCache = [
   './index.html',
   // CSS

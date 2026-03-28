@@ -1525,7 +1525,9 @@ function evaluateHandForBid(hand) {
         maxSmallPip = Math.max(maxSmallPip, Math.max(a, b));
       }
     }
-    if (has01 && maxSmallPip <= 2 && maxDoublePip <= 1) {
+    // TN51: stricter requirements — 3 opponents means more suit coverage, harder to duck
+    const nelloSmallPipLimit = (GAME_MODE === 'TN51') ? 1 : 2;
+    if (has01 && maxSmallPip <= nelloSmallPipLimit && maxDoublePip <= 1) {
       return { action: "bid", bid: maxBid, marks: 1 };
     }
   }
@@ -1665,18 +1667,21 @@ function evaluateHandForBid(hand) {
       return { action: "bid", bid: minBid, marks: 1 };
     }
     if (trumpCount >= 3 && hasDoubleTrump && hasSecondTrump && doubles.length >= 1) {
-      // TN51: 3 trumps in 6-tile hand = 50% trump — bid higher
-      const bid = handSize <= 6 ? midBid : minBid;
+      // TN51: 3 trumps in 6-tile hand = 50% trump — but 4 opponents is risky
+      // Only bid mid if we also have a side double for coverage
+      const bid = (handSize <= 6 && nonTrumpDoubles.length >= 1) ? midBid : minBid;
       return { action: "bid", bid: bid, marks: 1 };
     }
 
     // 3 top trumps (double + 2nd + 3rd) even without other doubles → min bid
     if (trumpCount >= 3 && hasDoubleTrump && hasSecondTrump && hasThirdTrump) {
-      const bid = handSize <= 6 ? midBid : minBid;
+      // TN51: strong trump sequence but risky without side doubles against 4 opponents
+      const bid = (handSize <= 6 && nonTrumpDoubles.length >= 1) ? midBid : minBid;
       return { action: "bid", bid: bid, marks: 1 };
     }
 
     // 4+ trumps with double but no 2nd → min bid (lacks sequential control for mid)
+    // TN51: extra cautious — without 2nd trump, 4 opponents can disrupt more easily
     if (trumpCount >= 4 && hasDoubleTrump && ntUncoveredOffs <= 1) {
       return { action: "bid", bid: minBid, marks: 1 };
     }
@@ -7445,7 +7450,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.48.0';  // v17.48.0: endgame count protection (lead, follow, dump, trump-led)
+const MP_VERSION = 'v17.49.0';  // v17.49.0: TN51 bidding caution & Nello threshold adjustments
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
@@ -18802,7 +18807,8 @@ function processAIBidWithEval(seat, evaluation) {
       const hasDouble = trumpTiles.some(t => t[0] === pip && t[1] === pip);
       const hasSecond = trumpTiles.some(t =>
         t[0] !== t[1] && ((t[0] === pip && t[1] === pip - 1) || (t[0] === pip - 1 && t[1] === pip)));
-      const sustainThreshold = (GAME_MODE === 'TN51') ? 3 : 4;
+      // TN51 has 4 opponents (vs 2 in T42) — need same trump strength to sustain outbid
+      const sustainThreshold = 4;
       if (trumpTiles.length >= sustainThreshold && hasDouble && hasSecond) { canSustain = true; break; }
     }
     if (canSustain && biddingState.highBid < maxBidForMode) {
