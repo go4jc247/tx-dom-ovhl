@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.2.0 — Phase 12: NT scoring, Moon opponents, widow swap, mustWin, sacrifice guards
+// Version: v17.4.0 — Phase 12: DOUBLES fix, walker detection, Moon opponents, sacrifice guards
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.2.0';
+const CACHE_NAME = 'tx-dom-v17.4.0';
 const urlsToCache = [
   './index.html',
   // CSS
