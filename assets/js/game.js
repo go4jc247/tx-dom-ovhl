@@ -2970,6 +2970,16 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     if(ps === 5) totalCountRemaining += 5;
     else if(ps === 10) totalCountRemaining += 10;
   }
+  // Add count from current trick tiles (on the table, not yet awarded)
+  // These are in playedSet so excluded from suitInfo, but the points are still "in play"
+  for(const play of trick){
+    if(!Array.isArray(play)) continue;
+    const t = play[1];
+    if(!t) continue;
+    const ps = t[0] + t[1];
+    if(ps === 5) totalCountRemaining += 5;
+    else if(ps === 10) totalCountRemaining += 10;
+  }
 
   // Count points held in our hand vs. available elsewhere
   let countInOurHand = 0;
@@ -4215,16 +4225,25 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
 
       // P1: Lead trump double — guaranteed win, pulls opponents' trump
       // Prefer non-count doubles first to preserve count for scoring
+      // DFM: when active, lead HIGH trump doubles to force opponents to burn their best doubles
       if(trumpDoubles.length > 0){
-        let bestDblIdx = trumpDoubles[0], bestDblScore = Infinity;
+        const isDFM = trumpMode === 'DOUBLES' && typeof _dfmActiveThisHand !== 'undefined' && _dfmActiveThisHand;
+        let bestDblIdx = trumpDoubles[0], bestDblScore = isDFM ? -Infinity : Infinity;
         for(const idx of trumpDoubles){
           const pip = hand[idx][0];
           const pipSum = pip + pip;
           const count = (pipSum === 5) ? 5 : (pipSum === 10) ? 10 : 0;
-          const score = count * 10 + pip; // low score = lead first (non-count, low pip)
-          if(score < bestDblScore){ bestDblScore = score; bestDblIdx = idx; }
+          if(isDFM){
+            // DFM: lead HIGH doubles to strip opponents' high doubles (suit controllers)
+            // Still avoid count unless it's the only option
+            let score = pip * 10 - count * 15;
+            if(score > bestDblScore){ bestDblScore = score; bestDblIdx = idx; }
+          } else {
+            const score = count * 10 + pip; // low score = lead first (non-count, low pip)
+            if(score < bestDblScore){ bestDblScore = score; bestDblIdx = idx; }
+          }
         }
-        return makeResult(bestDblIdx, "Lead: trump double (low-value first)");
+        return makeResult(bestDblIdx, isDFM ? "Lead: trump double (DFM — high to strip opps)" : "Lead: trump double (low-value first)");
       }
 
       // P2: Lead trump IF we have the highest remaining
