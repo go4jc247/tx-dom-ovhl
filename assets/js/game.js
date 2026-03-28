@@ -3642,7 +3642,18 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
                     break;
                   }
                 }
-                if (isWalker) score += 200; // huge bonus if off is guaranteed walker
+                if (isWalker) {
+                  score += 200; // huge bonus if off is guaranteed walker
+                } else {
+                  // Even if unplayed tiles exist, if all opponents are void in this suit
+                  // the off will still walk (only partner might have it, and they won't beat us)
+                  let allOppsVoidInSuit = true;
+                  for(let s = 0; s < gameState.player_count; s++){
+                    if(isSameTeam(s) || s === p || !gameState.active_players.includes(s)) continue;
+                    if(!voidIn[s].has(offHighPip)){ allOppsVoidInSuit = false; break; }
+                  }
+                  if(allOppsVoidInSuit && opponentsVoidInTrump) score += 150; // opponents can't follow or trump
+                }
               }
             }
             if (score > bestCoverScore) { bestCoverScore = score; bestCoverIdx = dIdx; }
@@ -4307,6 +4318,20 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           }
           return makeResult(safeLow, "Cannot win suit, play low (protect catchers)");
         }
+      }
+      // Defensive count avoidance: when opponent is winning and we can't beat, play lowest non-count
+      if(!partnerWinning && legal.length > 1){
+        let bestLowIdx = lowIdx, bestLowScore = Infinity;
+        for(const idx of legal){
+          const t = hand[idx];
+          if((t[0] === ledPip || t[1] === ledPip) && !gameState._is_trump_tile(t)){
+            const ps = t[0] + t[1];
+            const isCount = (ps === 5 || ps === 10);
+            const sc = ps + (isCount ? 100 : 0); // heavily penalize count tiles
+            if(sc < bestLowScore){ bestLowScore = sc; bestLowIdx = idx; }
+          }
+        }
+        return makeResult(bestLowIdx, "Cannot win suit, play low (avoid count)");
       }
       return makeResult(lowIdx, "Cannot win suit, play low");
     }
