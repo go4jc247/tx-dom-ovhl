@@ -4438,9 +4438,16 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         score += myCount * 2;
         _bd.countDump = myCount * 2;
       } else {
-        // Extra penalty when opponent is winning — we're literally handing them points
+        // Extra penalty when opponent is winning — scale with opponents yet to play
         const oppWinning = !partnerWinning && trick.length > 0;
-        const countPenalty = oppWinning ? myCount * 5 : myCount * 3;
+        let _oppsStillToPlay = 0;
+        for(let s = 0; s < gameState.player_count; s++){
+          if(isSameTeam(s) || s === p) continue;
+          if(!trick.some(play => Array.isArray(play) && play[0] === s)) _oppsStillToPlay++;
+        }
+        // More opponents remaining = higher risk of losing count
+        const countMult = oppWinning ? 5 : (3 + _oppsStillToPlay);
+        const countPenalty = myCount * countMult;
         score -= countPenalty;
         _bd.countPenalty = -countPenalty;
       }
@@ -4466,8 +4473,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         const highPip = Math.max(tile[0], tile[1]);
         const info2 = suitInfo[highPip];
         if(info2 && info2.winnerPlayed){
-          score += 5; // this tile's double is gone — it's expendable
-          _bd.deadTileBonus = 5;
+          score += 10; // this tile's double is gone — it's expendable
+          _bd.deadTileBonus = 10;
         }
       }
 
