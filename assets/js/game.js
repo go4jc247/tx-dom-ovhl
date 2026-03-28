@@ -4401,7 +4401,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
 
           // DEFENSIVE LEAD: When we're on defense, prefer suits where the bidder is void
           // This forces the bidder to trump (wasting trump) or lose the trick
-          if(!isBidderTeam && !isMoon){
+          if(!isBidderTeam){
             const bidderVoidInSuit = voidIn[bidderSeat] && voidIn[bidderSeat].has(ledSuit);
             if(bidderVoidInSuit){
               // Scale bonus by urgency — more valuable as bidder approaches making bid
@@ -5056,7 +5056,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     // DEFENSIVE SACRIFICE: on defense with trump control, trump 0-count tricks to get the lead
     // This lets us lead into count-rich suits on the next trick
     // Only sacrifice non-count trumps and verify we have count-rich lead options
-    if(!isBidderTeam && canSetBid && !isMoon && winTrumpIdx >= 0 && weHaveTrumpControl
+    if(!isBidderTeam && canSetBid && winTrumpIdx >= 0 && weHaveTrumpControl
       && countElsewhere >= 10 && tricksLeft >= 2){
       const sacTile = hand[winTrumpIdx];
       const sacPs = sacTile[0] + sacTile[1];
