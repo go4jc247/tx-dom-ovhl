@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.60.0 — follow logic: opp void duck, 3rd-seat defense, secure trump, double-led
+// Version: v17.61.0 — bidding: Moon order, count awareness, TN51 Nello, early-pos fix
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.60.0';
+const CACHE_NAME = 'tx-dom-v17.61.0';
 const urlsToCache = [
   './index.html',
   // CSS

@@ -1481,13 +1481,13 @@ function evaluateHandForBid(hand) {
       if (trumpTiles.length >= 5) {
         return { action: "bid", bid: 5, marks: 1 };
       }
+      // 4 trumps with double + 2nd + 3rd + sides covered → bid 6 (check BEFORE bid-5)
+      if (trumpTiles.length >= 4 && hasSecond && hasThird && ntUncovered === 0) {
+        return { action: "bid", bid: 6, marks: 1 };
+      }
       // 4 trumps with double + 2nd + other doubles → bid 5
       if (trumpTiles.length >= 4 && hasSecond && ntDoubles.length >= 2) {
         return { action: "bid", bid: 5, marks: 1 };
-      }
-      // 4 trumps with double + 2nd + 3rd + sides covered → bid 6
-      if (trumpTiles.length >= 4 && hasSecond && hasThird && ntUncovered === 0) {
-        return { action: "bid", bid: 6, marks: 1 };
       }
       // 4 trumps with double + 2nd + 1 side double → bid 4 (solid but not spectacular)
       if (trumpTiles.length >= 4 && hasSecond && ntDoubles.length >= 1) {
@@ -1525,9 +1525,11 @@ function evaluateHandForBid(hand) {
         maxSmallPip = Math.max(maxSmallPip, Math.max(a, b));
       }
     }
-    // TN51: stricter requirements — 3 opponents means more suit coverage, harder to duck
+    // TN51: much stricter — 4 opponents means every suit covered, very hard to duck
+    // Require 5+ blanks (of 6 tiles) or no doubles at all for TN51
     const nelloSmallPipLimit = (GAME_MODE === 'TN51') ? 1 : 2;
-    if (has01 && maxSmallPip <= nelloSmallPipLimit && maxDoublePip <= 1) {
+    const nelloBlanksOk = (GAME_MODE === 'TN51') ? (blanks.length >= 5 || maxDoublePip === 0) : true;
+    if (has01 && maxSmallPip <= nelloSmallPipLimit && maxDoublePip <= 1 && nelloBlanksOk) {
       return { action: "bid", bid: maxBid, marks: 1 };
     }
   }
@@ -1625,11 +1627,18 @@ function evaluateHandForBid(hand) {
     const ntNonDoubles = hand.filter(t => t[0] !== t[1] && t[0] !== trumpPip && t[1] !== trumpPip);
     let ntCoveredOffs = 0;
     let ntUncoveredOffs = 0;
+    let ntUncovered10Count = 0; // exposed 10-count tiles (very dangerous to lose)
     for (const t of ntNonDoubles) {
       const highPip = Math.max(t[0], t[1]);
       if (doublePips.has(highPip)) ntCoveredOffs++;
-      else ntUncoveredOffs++;
+      else {
+        ntUncoveredOffs++;
+        if (t[0] + t[1] === 10) ntUncovered10Count++;
+      }
     }
+    // Count-tile exposure penalty: treat each uncovered 10-count as an extra uncovered off
+    // This makes the AI more cautious with hands that have exposed high-value tiles
+    const ntEffectiveUncovered = ntUncoveredOffs + ntUncovered10Count;
 
     // SUPER TRUMP: 6+ trumps with double = overwhelming trump count, always max bid
     if (trumpCount >= 6 && hasDoubleTrump) {
@@ -1656,14 +1665,17 @@ function evaluateHandForBid(hand) {
       return { action: "bid", bid: maxBid, marks: 1 };
     }
     if (trumpCount >= 4 && nonTrumpDoubles.length >= 2 && hasDoubleTrump) {
-      return { action: "bid", bid: midBid, marks: 1 };
+      // Downgrade to minBid if uncovered offs include 10-count tiles
+      const bid4ntd2 = ntUncovered10Count > 0 ? minBid : midBid;
+      return { action: "bid", bid: bid4ntd2, marks: 1 };
     }
     // 2-3 trumps (double) + 2+ side doubles + no uncovered offs → min bid
     if (trumpCount >= 2 && hasDoubleTrump && nonTrumpDoubles.length >= 2 && ntUncoveredOffs === 0) {
       return { action: "bid", bid: minBid, marks: 1 };
     }
     // 2+ trumps (double + 2nd) + 1 side double + at most 1 uncovered off → min bid
-    if (trumpCount >= 2 && hasDoubleTrump && hasSecondTrump && nonTrumpDoubles.length >= 1 && ntUncoveredOffs <= 1) {
+    // But if the uncovered off is a 10-count tile, too risky — pass
+    if (trumpCount >= 2 && hasDoubleTrump && hasSecondTrump && nonTrumpDoubles.length >= 1 && ntUncoveredOffs <= 1 && ntUncovered10Count === 0) {
       return { action: "bid", bid: minBid, marks: 1 };
     }
     if (trumpCount >= 3 && hasDoubleTrump && hasSecondTrump && doubles.length >= 1) {
@@ -1682,7 +1694,8 @@ function evaluateHandForBid(hand) {
 
     // 4+ trumps with double but no 2nd → min bid (lacks sequential control for mid)
     // TN51: extra cautious — without 2nd trump, 4 opponents can disrupt more easily
-    if (trumpCount >= 4 && hasDoubleTrump && ntUncoveredOffs <= 1) {
+    // Skip if uncovered off is a 10-count tile (too risky to lose)
+    if (trumpCount >= 4 && hasDoubleTrump && ntUncoveredOffs <= 1 && ntUncovered10Count === 0) {
       return { action: "bid", bid: minBid, marks: 1 };
     }
 
@@ -7630,7 +7643,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.60.0';  // v17.60.0: follow logic overhaul — opp void duck skip, 3rd-seat defense, secure trump, double-led urgency
+const MP_VERSION = 'v17.61.0';  // v17.61.0: bidding overhaul — Moon bid order fix, count-tile awareness, TN51 Nello, Moon early-pos
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
@@ -18926,7 +18939,8 @@ function processAIBid(seat) {
   if (evaluation.action === "bid" && biddingState.bidderOrder) {
     const myIdx = biddingState.bidderOrder.indexOf(seat);
     const totalBidders = biddingState.bidderOrder.length;
-    const isEarlyBidder = myIdx <= 1 && totalBidders >= 4; // first 2 of 4+ bidders
+    // Moon has only 3 players — early-position suppression is too aggressive (forces rescue bids)
+    const isEarlyBidder = GAME_MODE !== 'MOON' && myIdx <= 1 && totalBidders >= 4; // first 2 of 4+ bidders
     const minBid = GAME_MODE === 'MOON' ? 4 : (GAME_MODE === 'T42' ? 30 : 34);
     const midBid = GAME_MODE === 'MOON' ? 5 : (GAME_MODE === 'T42' ? 36 : 39);
     if (isEarlyBidder && evaluation.bid <= minBid && (evaluation.marks || 1) === 1) {
