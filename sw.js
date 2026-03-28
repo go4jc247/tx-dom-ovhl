@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v16.4.0 — Phase 9b: Moon defense, dump logic, widow swap, competitive bid
+// Version: v16.5.0 — Phase 10: covered-offs, Moon Nello, trump pull, conservation
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v16.4.0';
+const CACHE_NAME = 'tx-dom-v16.5.0';
 const urlsToCache = [
   './index.html',
   // CSS
