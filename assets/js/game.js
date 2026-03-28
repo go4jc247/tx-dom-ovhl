@@ -5172,7 +5172,9 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           } else {
             // Without trump control, count tiles are very exposed — opponents can trump in
             // Harsher penalty when opponents are void (will trump our count)
-            const countPenMult = (oppsVoid > 0 && !opponentsVoidInTrump) ? Math.min(5, 3 + oppsVoid * 2) : 3;
+            // Endgame: even harsher — losing a count tile in last 2-3 tricks is devastating
+            const endgameLeadMult = isEndgame ? (tricksLeft <= 2 ? 3 : 2) : 1;
+            const countPenMult = ((oppsVoid > 0 && !opponentsVoidInTrump) ? Math.min(5, 3 + oppsVoid * 2) : 3) * endgameLeadMult;
             score -= myCount * countPenMult;
             _breakdown.myCountPenalty = -(myCount * countPenMult);
           }
@@ -5917,6 +5919,12 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       // On defense trying to set bid: overtake (unless defender already winning above)
       if(canSetBid && !isBidderTeam){
         return makeResult(winTrumpF, "Trump led: overtake to set bid");
+      }
+      // Endgame count protection: if our winning trump is a count tile,
+      // the trick has zero count, and we're in endgame, save the count trump
+      // (winning a 0-count trick with a 10-count trump is a bad trade)
+      if(isEndgame && winCountValF >= 10 && trickCountF === 0 && !isBidderTeam && lowTrumpF >= 0 && lowTrumpF !== winTrumpF){
+        return makeResult(lowTrumpF, "Trump led: endgame — protect " + winCountValF + "-count trump (0-count trick)");
       }
       // Bidder team or count in trick: win it
       // When count >= 10 and opponents still behind, consider a stronger trump to secure
@@ -7437,7 +7445,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.47.0';  // v17.47.0: trump follow security, Moon opp coordination, TN51 lead tuning
+const MP_VERSION = 'v17.48.0';  // v17.48.0: endgame count protection (lead, follow, dump, trump-led)
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
