@@ -1458,7 +1458,7 @@ function evaluateHandForBid(hand) {
       const ntOffs = hand.filter(t => t[0] !== t[1] && t[0] !== pip && t[1] !== pip);
       const ntUncovered = ntOffs.filter(t => !ntDblPips.has(t[0]) && !ntDblPips.has(t[1])).length;
       // Shoot the Moon (bid 7): very strong hand required
-      // RISK: failing a 7-bid subtracts 7 from your score — extremely punishing
+      // RISK: failing a 7-bid subtracts 21 from your score — extremely punishing
       // When score is negative, require EXTRA strength (failing = deeper hole)
       // Need 6+ trumps with top 2, or 5 trumps with ALL sides locked down
       if (trumpTiles.length >= 6 && hasSecond && (!_moonScoreNegative || trumpTiles.length >= 7)) {
@@ -1470,46 +1470,53 @@ function evaluateHandForBid(hand) {
         return { action: "bid", bid: 7, marks: 2 };
       }
       // 5 trumps with 2nd but weaker coverage: bid 6 instead of 7 (safer)
+      // When negative score: downgrade to 5 (failing a 6-bid costs -6, can't afford deeper hole)
       if (trumpTiles.length >= 5 && hasSecond && ntUncovered === 0 && ntDoubles.length >= 1) {
-        return { action: "bid", bid: 6, marks: 1 };
+        return { action: "bid", bid: _moonScoreNegative ? 5 : 6, marks: 1 };
       }
       // Bid 6: 5+ trumps with double + 2nd
+      // When negative: downgrade to 5
       if (trumpTiles.length >= 5 && hasSecond) {
-        return { action: "bid", bid: 6, marks: 1 };
+        return { action: "bid", bid: _moonScoreNegative ? 5 : 6, marks: 1 };
       }
       // Bid 5: 5+ trumps with double (no 2nd)
+      // When negative: downgrade to 4 (play it safe)
       if (trumpTiles.length >= 5) {
-        return { action: "bid", bid: 5, marks: 1 };
+        return { action: "bid", bid: _moonScoreNegative ? 4 : 5, marks: 1 };
       }
       // 4 trumps with double + 2nd + 3rd + sides covered → bid 6 (check BEFORE bid-5)
+      // When negative: downgrade to 5
       if (trumpTiles.length >= 4 && hasSecond && hasThird && ntUncovered === 0) {
-        return { action: "bid", bid: 6, marks: 1 };
+        return { action: "bid", bid: _moonScoreNegative ? 5 : 6, marks: 1 };
       }
       // 4 trumps with double + 2nd + other doubles → bid 5
+      // When negative: downgrade to 4
       if (trumpTiles.length >= 4 && hasSecond && ntDoubles.length >= 2) {
-        return { action: "bid", bid: 5, marks: 1 };
+        return { action: "bid", bid: _moonScoreNegative ? 4 : 5, marks: 1 };
       }
       // 4 trumps with double + 2nd + 1 side double → bid 4 (solid but not spectacular)
-      if (trumpTiles.length >= 4 && hasSecond && ntDoubles.length >= 1) {
+      // When negative: skip this bid (too risky when behind)
+      if (trumpTiles.length >= 4 && hasSecond && ntDoubles.length >= 1 && !_moonScoreNegative) {
         return { action: "bid", bid: 4, marks: 1 };
       }
       // 3 trumps with double + 2nd + 3rd + 2 side doubles → bid 5 (tight but strong)
+      // When negative: downgrade to 4
       if (trumpTiles.length >= 3 && hasSecond && hasThird && ntDoubles.length >= 2) {
-        return { action: "bid", bid: 5, marks: 1 };
+        return { action: "bid", bid: _moonScoreNegative ? 4 : 5, marks: 1 };
       }
     }
     // Moon: 7+ doubles → Shoot the Moon with doubles trump (very safe)
-    // 6 doubles: bid 6 not 7 — losing even 1 trick with a 7-bid costs 7 points
+    // 6 doubles: bid 6 not 7 — losing even 1 trick with a 7-bid costs 21 points
     // When negative: require 8+ doubles for STM (extra cautious)
     if (doubles.length >= 7 && !_moonScoreNegative) return { action: "bid", bid: 7, marks: 2 };
     if (doubles.length >= 8) return { action: "bid", bid: 7, marks: 2 }; // 8+ always safe
-    // Moon: 5-6 doubles → bid 6
-    if (doubles.length >= 5) return { action: "bid", bid: 6, marks: 1 };
+    // Moon: 5-6 doubles → bid 6 (when negative: downgrade to 5)
+    if (doubles.length >= 5) return { action: "bid", bid: _moonScoreNegative ? 5 : 6, marks: 1 };
     if (doubles.length >= 4) {
       const dblPips = new Set(doubles.map(d => d[0]));
       const moonCovered = hand.filter(t => t[0] !== t[1] && dblPips.has(Math.max(t[0], t[1]))).length;
-      if (moonCovered >= 2) return { action: "bid", bid: 5, marks: 1 };
-      return { action: "bid", bid: 4, marks: 1 };
+      if (moonCovered >= 2) return { action: "bid", bid: _moonScoreNegative ? 4 : 5, marks: 1 };
+      return { action: "bid", bid: _moonScoreNegative ? 3 : 4, marks: 1 };
     }
   }
 
@@ -4523,14 +4530,16 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     // Try each lead option: simulate who wins trick 1, then who wins trick 2.
     // Choose the lead that maximizes our team's total wins + count captured.
     if(tricksLeft === 2 && legal.length === 2){
-      const oppHands = []; // {seat, tiles: [tile1, tile2]} — only opponents, NOT partners
+      const oppHands = []; // {seat, tiles: [tile1, tile2]} — opponents
+      const partnerHands = []; // {seat, tiles: [tile1, tile2]} — partners (team wins count)
       let canSimulate = true;
       for(let s = 0; s < gameState.player_count; s++){
         if(s === p || !gameState.active_players.includes(s)) continue;
-        if(isSameTeam(s)) continue; // partner winning = us winning
         const oh = gameState.hands[s];
-        if(oh && oh.length === 2) oppHands.push({seat: s, tiles: [oh[0], oh[1]]});
-        else canSimulate = false;
+        if(oh && oh.length === 2){
+          if(isSameTeam(s)) partnerHands.push({seat: s, tiles: [oh[0], oh[1]]});
+          else oppHands.push({seat: s, tiles: [oh[0], oh[1]]});
+        } else canSimulate = false;
       }
       if(canSimulate && oppHands.length > 0){
         let bestIdx2T = legal[0], bestScore2T = -Infinity;
@@ -4576,43 +4585,68 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           return bestBeatIdx >= 0 ? bestBeatIdx : worstIdx;
         };
 
+        // Helper: determine trick winner among all plays (returns {seat, tile})
+        const _trickWinner = (leadSeat, leadTile, plays, ledSuit) => {
+          let winner = {seat: leadSeat, tile: leadTile};
+          for(const play of plays){
+            if(_beats(play.tile, winner.tile, ledSuit)) winner = play;
+          }
+          return winner;
+        };
+
         for(const idx of legal){
           const myTile1 = hand[idx];
           const myTile2 = hand[idx === legal[0] ? legal[1] : legal[0]];
           const ledSuit1 = myTile1[0]===myTile1[1] ? (trumpMode==='DOUBLES'?-1:myTile1[0]) : Math.max(myTile1[0],myTile1[1]);
 
-          // Simulate trick 1: determine which tile each opponent plays
-          let trick1Win = true;
-          const oppRemainingTiles = []; // track what each opponent has left for trick 2
+          // Simulate trick 1: determine which tile each player plays
+          const allPlays1 = [];
+          const oppRemainingTiles = []; // opponents' remaining tiles for trick 2
+          const partnerRemainingTiles = []; // partners' remaining tiles for trick 2
           for(const opp of oppHands){
             const playIdx = _oppPlay(opp.tiles, myTile1, ledSuit1);
-            if(_beats(opp.tiles[playIdx], myTile1, ledSuit1)) trick1Win = false;
-            // Opponent's remaining tile for trick 2 is the OTHER one
+            allPlays1.push({seat: opp.seat, tile: opp.tiles[playIdx]});
             oppRemainingTiles.push({seat: opp.seat, tile: opp.tiles[1 - playIdx]});
           }
+          // Partners play cooperatively: play tile that DOESN'T beat our lead (save strength)
+          // unless no opponent beats us — then play lowest
+          for(const ptr of partnerHands){
+            // Partner dumps low to save strong tile for trick 2
+            const dumpIdx = (ptr.tiles[0][0] + ptr.tiles[0][1]) <= (ptr.tiles[1][0] + ptr.tiles[1][1]) ? 0 : 1;
+            allPlays1.push({seat: ptr.seat, tile: ptr.tiles[dumpIdx]});
+            partnerRemainingTiles.push({seat: ptr.seat, tile: ptr.tiles[1 - dumpIdx]});
+          }
+          const winner1 = _trickWinner(p, myTile1, allPlays1, ledSuit1);
+          const trick1TeamWin = winner1.seat === p || isSameTeam(winner1.seat);
 
-          let score = trick1Win ? 100 : 0;
-          score += trick1Win ? _tileCount(myTile1) : -_tileCount(myTile1) * 2;
+          let score = trick1TeamWin ? 100 : 0;
+          score += trick1TeamWin ? _tileCount(myTile1) : -_tileCount(myTile1) * 2;
 
-          if(trick1Win){
-            // We lead trick 2 with myTile2
+          if(trick1TeamWin){
+            // Our team leads trick 2 — we lead with myTile2
             const ledSuit2 = myTile2[0]===myTile2[1] ? (trumpMode==='DOUBLES'?-1:myTile2[0]) : Math.max(myTile2[0],myTile2[1]);
-            let trick2Win = true;
+            const allPlays2 = [];
             for(const rem of oppRemainingTiles){
-              if(_beats(rem.tile, myTile2, ledSuit2)){ trick2Win = false; break; }
+              allPlays2.push({seat: rem.seat, tile: rem.tile});
             }
-            score += trick2Win ? 100 : 0;
-            score += trick2Win ? _tileCount(myTile2) : -_tileCount(myTile2) * 2;
+            for(const rem of partnerRemainingTiles){
+              allPlays2.push({seat: rem.seat, tile: rem.tile});
+            }
+            const winner2 = _trickWinner(p, myTile2, allPlays2, ledSuit2);
+            const trick2TeamWin = winner2.seat === p || isSameTeam(winner2.seat);
+            score += trick2TeamWin ? 100 : 0;
+            score += trick2TeamWin ? _tileCount(myTile2) : -_tileCount(myTile2) * 2;
           } else {
-            // We lost trick 1 — opponent leads trick 2
-            // Pessimistic: assume opponent leads their BEST remaining tile against our tile2
-            let canWinTrick2 = true; // assume we win unless someone beats us
+            // Opponent won trick 1 — opponent leads trick 2
+            // Pessimistic: assume strongest opponent tile leads
+            let canWinTrick2 = false;
+            // Check if WE or a PARTNER can beat each opponent's remaining tile
             for(const rem of oppRemainingTiles){
               const oppLedSuit = rem.tile[0]===rem.tile[1] ? (trumpMode==='DOUBLES'?-1:rem.tile[0]) : Math.max(rem.tile[0],rem.tile[1]);
-              // Opponent leads their remaining tile — can we beat it?
-              if(!_beats(myTile2, rem.tile, oppLedSuit)){
-                canWinTrick2 = false; // we can't beat this opponent's lead
-              }
+              const allDefense = [{seat: p, tile: myTile2}];
+              for(const prem of partnerRemainingTiles) allDefense.push({seat: prem.seat, tile: prem.tile});
+              const w = _trickWinner(rem.seat, rem.tile, allDefense, oppLedSuit);
+              if(w.seat === p || isSameTeam(w.seat)){ canWinTrick2 = true; }
             }
             if(canWinTrick2){
               score += 50;
@@ -8035,7 +8069,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.84.0';  // v17.84.0: NT bid evaluation, doubles count exposure, TN51 midBid proportional fix
+const MP_VERSION = 'v17.85.0';  // v17.85.0: Moon STM risk-aware bidding, 2-trick lookahead partner awareness, TN51 outbid gap tightened
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
@@ -19530,7 +19564,8 @@ function processAIBidWithEval(seat, evaluation) {
       // Adjust up to highBid + 1 (but only if within reasonable range of our natural bid)
       const gap = biddingState.highBid - bidAmount;
       // Strong hands (marks >= 2) can stretch further
-      const maxGap = evalMarks >= 2 ? 3 : 2;
+      // TN51: tighter gap — 5 opponents make stretched bids riskier
+      const maxGap = GAME_MODE === 'TN51' ? (evalMarks >= 2 ? 2 : 1) : (evalMarks >= 2 ? 3 : 2);
       if (gap <= maxGap) {
         bidAmount = biddingState.highBid + 1; // outbid by minimum increment
       }

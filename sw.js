@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.84.0 — Bidding: NT evaluation path, doubles count exposure, TN51 midBid
+// Version: v17.85.0 — Moon STM risk-aware bidding, 2-trick lookahead partner awareness
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.84.0';
+const CACHE_NAME = 'tx-dom-v17.85.0';
 const urlsToCache = [
   './index.html',
   // CSS
