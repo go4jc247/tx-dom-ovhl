@@ -3716,6 +3716,25 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       }
     }
 
+    // ── ENDGAME COUNT HUNT: bidder must win and needs count ──
+    // When must-win and still need count points, prefer leading suits with remaining count
+    if(mustWin && isBidderTeam && !bidIsDoomed && pointsNeeded > 0 && nonTrumpDoubles.length > 0){
+      let bestCountDbl = -1, bestCountScore = -Infinity;
+      for(const idx of nonTrumpDoubles){
+        const pip = hand[idx][0];
+        const info = suitInfo[pip];
+        if(!info) continue;
+        // Prefer suits with remaining count tiles (we can win the double then walk count)
+        let score = info.countRemaining * 3 + pip;
+        // Check opponent voids — if opponents void and we have trump control, count is safe
+        if(weHaveTrumpControl) score += 10;
+        if(score > bestCountScore){ bestCountScore = score; bestCountDbl = idx; }
+      }
+      if(bestCountDbl >= 0 && bestCountScore > 5){
+        return makeResult(bestCountDbl, "Endgame: lead double to capture count (" + pointsNeeded + "pts needed)");
+      }
+    }
+
     // ── BID IS DOOMED: damage control mode ──
     // When bid is mathematically impossible, stop wasting trumps on pulling.
     // Switch to leading safest non-trump to minimize opponent score gains.
