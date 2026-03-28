@@ -4924,7 +4924,15 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
 
     // Can we beat the current winner?
     if(winTrumpF >= 0){
-      // On defense trying to set bid: always overtake
+      // Check if current winner is already a defender (not on bidder's team)
+      // In TN51 (3 teams), another defender winning = bidder losing, no need to overtake
+      const winnerIsDefender = trickWinnerSeatF >= 0 && !isSameTeam(trickWinnerSeatF)
+        && (isMoon || (bidderTeamIdx !== undefined && (isTN51 ? (trickWinnerSeatF % 3) !== bidderTeamIdx : (trickWinnerSeatF % 2) !== bidderTeamIdx)));
+      if(winnerIsDefender && !isBidderTeam && trickCountF === 0){
+        // Another defender already winning this no-count trick — save our trump
+        if(lowTrumpF >= 0) return makeResult(lowTrumpF, "Trump led: defender winning, save trump");
+      }
+      // On defense trying to set bid: overtake (unless defender already winning above)
       if(canSetBid && !isBidderTeam){
         return makeResult(winTrumpF, "Trump led: overtake to set bid");
       }
@@ -4952,6 +4960,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   const canTrump = legalTiles.some(t => gameState._is_trump_tile(t));
   if(canTrump){
     let highestTrickTrump = -1;
+    let trickTrumpWinnerSeat = -1;
     let opponentHasTrumpInTrick = false;
     let partnerHasTrumpInTrick = false;
     for(const play of trick){
@@ -4959,7 +4968,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       const [seat, t] = play;
       if(t && gameState._is_trump_tile(t)){
         const r = getTrumpRankNum(t);
-        if(r > highestTrickTrump) highestTrickTrump = r;
+        if(r > highestTrickTrump){ highestTrickTrump = r; trickTrumpWinnerSeat = seat; }
         if(!isSameTeam(seat)) opponentHasTrumpInTrick = true;
         else if(seat !== p) partnerHasTrumpInTrick = true;
       }
@@ -5036,6 +5045,22 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         if(v < safeLowVal){ safeLowVal = v; safeLowIdx = idx; }
       }
       return makeResult(safeLowIdx, "Bid safe in final trick: play lowest");
+    }
+
+    // TN51 3-TEAM: if another defender already trumped and is winning, save our trump
+    // Both defender teams want to set the bidder — no need to fight each other
+    if(winTrumpIdx >= 0 && !isBidderTeam && trickTrumpWinnerSeat >= 0 && !isSameTeam(trickTrumpWinnerSeat)){
+      const winnerOnBidderTeam = isMoon ? (trickTrumpWinnerSeat === bidderSeat)
+        : (isTN51 ? (trickTrumpWinnerSeat % 3) === bidderTeamIdx : (trickTrumpWinnerSeat % 2) === bidderTeamIdx);
+      if(!winnerOnBidderTeam){
+        // Another defender is winning with trump — don't waste ours
+        let _defLowIdx = legal[0], _defLowVal = Infinity;
+        for(const idx of legal){
+          const v = hand[idx][0] + hand[idx][1];
+          if(v < _defLowVal){ _defLowVal = v; _defLowIdx = idx; }
+        }
+        return makeResult(_defLowIdx, "Defender already winning — save trump, dump low");
+      }
     }
 
     if(winTrumpIdx >= 0){
