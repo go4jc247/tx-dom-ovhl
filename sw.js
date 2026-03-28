@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.6.0 — Nello fix, trump count avoidance, DOUBLES uncovered penalty
+// Version: v17.7.0 — Nello doubles-led, DOUBLES suitInfo/covered-off, NONE trump, active players
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.6.0';
+const CACHE_NAME = 'tx-dom-v17.7.0';
 const urlsToCache = [
   './index.html',
   // CSS
