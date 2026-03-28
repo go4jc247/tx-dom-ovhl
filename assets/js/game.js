@@ -1418,7 +1418,7 @@ function evaluateHandForBid(hand) {
   const blanks = [];
   const maxBid = GAME_MODE === 'MOON' ? 7 : (GAME_MODE === 'T42' ? 42 : 51);
   const minBid = GAME_MODE === 'MOON' ? 4 : (GAME_MODE === 'T42' ? 30 : 34);
-  const midBid = GAME_MODE === 'MOON' ? 4 : (GAME_MODE === 'T42' ? 36 : 39);
+  const midBid = GAME_MODE === 'MOON' ? 5 : (GAME_MODE === 'T42' ? 36 : 39);
   const maxPip = session.game.max_pip;
 
   for (const tile of hand) {
