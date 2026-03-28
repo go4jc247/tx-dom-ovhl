@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.12.0 — partner overbid fix, walker sequencing, defensive trump, dump count
+// Version: v17.13.0 — defender count capture fix, tiered endgame safety, Nello dump
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.12.0';
+const CACHE_NAME = 'tx-dom-v17.13.0';
 const urlsToCache = [
   './index.html',
   // CSS
