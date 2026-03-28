@@ -2922,15 +2922,24 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     _dbg.highestRemainingTrumpRank = highestRemainingTrump;
   }
 
-  // Total count points still unplayed (across all suits + trump)
+  // Total count points still in play (all hands + current trick, excludes completed tricks)
+  // suitInfo.countRemaining excludes our hand (marked as "played" in playedSet),
+  // so we add back our non-trump count. Trump count handled separately below.
   let totalCountRemaining = 0;
   for(const pip of Object.keys(suitInfo)) totalCountRemaining += suitInfo[pip].countRemaining;
+  // Add non-trump count from our hand (suitInfo excluded these)
+  for(const t of hand){
+    if(gameState._is_trump_tile(t)) continue; // trump handled below
+    const ps = t[0] + t[1];
+    if(ps === 5) totalCountRemaining += 5;
+    else if(ps === 10) totalCountRemaining += 10;
+  }
+  // Add trump count (remaining elsewhere + in our hand)
   for(const t of trumpTilesRemaining){
     const ps = t[0] + t[1];
     if(ps === 5) totalCountRemaining += 5;
     else if(ps === 10) totalCountRemaining += 10;
   }
-  // Also count trump tiles in our hand
   for(const t of trumpsInHand){
     const ps = t[0] + t[1];
     if(ps === 5) totalCountRemaining += 5;
