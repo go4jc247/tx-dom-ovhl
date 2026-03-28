@@ -1456,7 +1456,12 @@ function evaluateHandForBid(hand) {
     }
     // Moon: 4+ doubles → strong Nello-style or doubles-trump hand
     if (doubles.length >= 5) return { action: "bid", bid: 6, marks: 1 };
-    if (doubles.length >= 4) return { action: "bid", bid: 4, marks: 1 };
+    if (doubles.length >= 4) {
+      const dblPips = new Set(doubles.map(d => d[0]));
+      const moonCovered = hand.filter(t => t[0] !== t[1] && dblPips.has(Math.max(t[0], t[1]))).length;
+      if (moonCovered >= 2) return { action: "bid", bid: 5, marks: 1 };
+      return { action: "bid", bid: 4, marks: 1 };
+    }
   }
 
   if (GAME_MODE !== 'T42' && blanks.length >= 4) {
@@ -1538,6 +1543,20 @@ function evaluateHandForBid(hand) {
     return { action: "bid", bid: minBid, marks: 1 };
   }
 
+  // 2-3 doubles with many covered offs (no uncovered) → strong enough for min bid
+  if (doubles.length >= 2) {
+    const doublePips2 = new Set(doubles.map(d => d[0]));
+    const nonDoubles2 = hand.filter(t => t[0] !== t[1]);
+    let coveredOffs2 = 0, uncoveredOffs2 = 0;
+    for (const t of nonDoubles2) {
+      if (doublePips2.has(Math.max(t[0], t[1]))) coveredOffs2++;
+      else uncoveredOffs2++;
+    }
+    if (coveredOffs2 >= 3 && uncoveredOffs2 === 0) {
+      return { action: "bid", bid: minBid, marks: 1 };
+    }
+  }
+
   for (let trumpPip = maxPip; trumpPip >= 0; trumpPip--) {
     const trumpTiles = hand.filter(t => t[0] === trumpPip || t[1] === trumpPip);
     const trumpCount = trumpTiles.length;
@@ -1587,6 +1606,10 @@ function evaluateHandForBid(hand) {
     }
     if (trumpCount >= 4 && nonTrumpDoubles.length >= 2 && hasDoubleTrump) {
       return { action: "bid", bid: midBid, marks: 1 };
+    }
+    // 2-3 trumps (double) + 2+ side doubles + no uncovered offs → min bid
+    if (trumpCount >= 2 && hasDoubleTrump && nonTrumpDoubles.length >= 2 && ntUncoveredOffs === 0) {
+      return { action: "bid", bid: minBid, marks: 1 };
     }
     if (trumpCount >= 3 && hasDoubleTrump && hasSecondTrump && doubles.length >= 1) {
       // TN51: 3 trumps in 6-tile hand = 50% trump — bid higher
@@ -4549,7 +4572,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     if(highIdx >= 0 && highRank > winnerRank){
       // DUCK: if partner plays after us and likely has the double (higher card),
       // duck to let partner win (they can then lead a strategic suit)
-      if(!isMoon && !isLastInTrick && !canSetBid){
+      if(!isMoon && !isLastInTrick && !canSetBid && !winnerIsTrump){
         let partnerAfterUs = false;
         for(let s = 0; s < gameState.player_count; s++){
           if(!isSameTeam(s) || s === p) continue;
@@ -4936,8 +4959,10 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         if(h[0] === pB || h[1] === pB) cntB++;
       }
       const minCnt = Math.min(cntA, cntB);
-      if(minCnt <= 1){ score += 15; _bd.voidBonus = 15; }
-      else if(minCnt <= 2){ score += 8; _bd.voidBonus = 8; }
+      // Void bonus reduced when we have no trumps (can't exploit the void)
+      const voidMult = trumpsInHand.length > 0 ? 1.0 : 0.4;
+      if(minCnt <= 1){ const vb = Math.round(15 * voidMult); score += vb; _bd.voidBonus = vb; }
+      else if(minCnt <= 2){ const vb = Math.round(8 * voidMult); score += vb; _bd.voidBonus = vb; }
       _bd.suitCounts = cntA+'|'+cntB;
 
       // When partner is winning, prefer throwing count (it's free points for our team)
@@ -4963,7 +4988,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         // EXTRA protection when we need these count points to make bid
         const countMult = oppWinning ? 5 : (3 + _oppsStillToPlay);
         const countProtect = mustWinCountTricks ? 2 : 1; // double penalty if we need count to bid
-        const countPenalty = myCount * countMult * countProtect;
+        const countPenalty = Math.min(myCount * countMult * countProtect, 80); // cap at 80
         score -= countPenalty;
         _bd.countPenalty = -countPenalty;
       }
@@ -5002,7 +5027,10 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         const holdDouble = hand.some(h => h[0] === highPip2 && h[1] === highPip2);
         // Check if this tile is the covered off (second highest = pip, pip-1)
         const lowPip2 = Math.min(tile[0], tile[1]);
-        const isCoveredOff = holdDouble && lowPip2 === highPip2 - 1;
+        // Only penalize if the double hasn't been played (walker pair still viable)
+        const suitInfW = suitInfo[highPip2];
+        const doubleStillViable = !suitInfW || !suitInfW.winnerPlayed;
+        const isCoveredOff = holdDouble && lowPip2 === highPip2 - 1 && doubleStillViable;
         if(isCoveredOff){
           // Scale penalty by remaining tricks — breaking a walker pair matters less in endgame
           const walkerPenalty = tricksLeft <= 3 ? -9 : (tricksLeft <= 5 ? -14 : -18);
