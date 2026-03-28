@@ -3373,8 +3373,19 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
 
       if(iAmOpponent){
         // OPPONENT leading against Nello bidder: strategic lead
-        // Lead HIGH tiles in suits where the bidder must follow
-        // Doubles are great — they control the suit and force bidder to follow
+        // Track bidder's demonstrated suits from completed tricks — suits with more bidder
+        // tiles are targets (bidder has more cards to follow with, more chances to be forced high)
+        const bidderSuitStrength = {};
+        for(const rec of (gameState.tricks_team || []).flat()){
+          if(!rec) continue;
+          for(let seat = 0; seat < rec.length; seat++){
+            if(seat !== bidderSeat || !rec[seat]) continue;
+            const bt = rec[seat];
+            const hp = Math.max(bt[0], bt[1]);
+            bidderSuitStrength[hp] = (bidderSuitStrength[hp] || 0) + 1;
+          }
+        }
+
         let bestIdx = legal[0], bestScore = -Infinity;
         for(const idx of legal){
           const tile = hand[idx], val = tile[0]+tile[1], dbl = tile[0]===tile[1];
@@ -3386,8 +3397,11 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           // Prefer high-value tiles (more likely to force bidder to win)
           score += val * 2;
 
-          // If bidder is void in this suit, don't lead it
+          // Bonus for suits where bidder has demonstrated presence (more tiles = more follow pressure)
           const suitPip = Math.max(tile[0], tile[1]);
+          if(bidderSuitStrength[suitPip]) score += bidderSuitStrength[suitPip] * 8;
+
+          // If bidder is void in this suit, don't lead it
           if(bidderSeat !== undefined && voidIn[bidderSeat] && voidIn[bidderSeat].has(suitPip)){
             score -= 50;
           }
@@ -3713,6 +3727,28 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         if(bestDefIdx >= 0){
           return makeResult(bestDefIdx, "Defense: double in bidder's void (force trump waste)");
         }
+      }
+    }
+
+    // ── DEFENDER COUNT CAPTURE: lead doubles in count-rich suits to deny bidder points ──
+    // When we can set the bid, lead our doubles in suits with lots of remaining count.
+    // Winning the double guarantees the trick, then partner can throw count to us.
+    if(!isBidderTeam && canSetBid && !isMoon && nonTrumpDoubles.length > 0){
+      let bestCapIdx = -1, bestCapScore = -Infinity;
+      for(const idx of nonTrumpDoubles){
+        const pip = hand[idx][0];
+        const info = suitInfo[pip];
+        if(!info || info.countRemaining <= 0) continue;
+        const pipSum = hand[idx][0] + hand[idx][1];
+        const myCount = (pipSum === 5) ? 5 : (pipSum === 10) ? 10 : 0;
+        // Score: count remaining in suit + own count value + bonus if bidder is void (can't capture)
+        let score = info.countRemaining * 2 + myCount;
+        const bidderVoidHere = voidIn[bidderSeat] && voidIn[bidderSeat].has(pip);
+        if(bidderVoidHere) score += 10; // bidder can't follow, must trump or lose
+        if(score > bestCapScore){ bestCapScore = score; bestCapIdx = idx; }
+      }
+      if(bestCapIdx >= 0 && bestCapScore >= 10){
+        return makeResult(bestCapIdx, "Defense: lead double to capture count (setting bid)");
       }
     }
 
@@ -4656,6 +4692,21 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         if(info2 && info2.winnerPlayed){
           score += 10; // this tile's double is gone — it's expendable
           _bd.deadTileBonus = 10;
+        }
+      }
+
+      // Preserve walker pairs: penalize dumping a tile that's part of a double+covered-off pair
+      // Walking pairs (lead double, then play the covered off) are guaranteed 2-trick combos
+      if(!gameState._is_trump_tile(tile) && tile[0] !== tile[1]){
+        const highPip2 = Math.max(tile[0], tile[1]);
+        // Check if we hold the double for this suit
+        const holdDouble = hand.some(h => h[0] === highPip2 && h[1] === highPip2);
+        // Check if this tile is the covered off (second highest = pip, pip-1)
+        const lowPip2 = Math.min(tile[0], tile[1]);
+        const isCoveredOff = holdDouble && lowPip2 === highPip2 - 1;
+        if(isCoveredOff){
+          score -= 18; // strong penalty — this is half of a guaranteed 2-trick combo
+          _bd.walkerPenalty = -18;
         }
       }
 
@@ -16727,6 +16778,7 @@ function processAIBid(seat) {
 }
 
 function processAIBidWithEval(seat, evaluation) {
+  const hand = session.game.hands[seat] || [];
   const evalMarks = evaluation.marks || 1;
   const maxBid = GAME_MODE === 'MOON' ? 7 : (GAME_MODE === 'T42' ? 42 : 51);
   let bidMarks = evalMarks;
