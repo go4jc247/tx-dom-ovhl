@@ -2512,6 +2512,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   const isOpponent = (seat) => seat !== p && !isSameTeam(seat);
   const trickNum = gameState.trick_number; // 0-indexed: how many tricks completed so far
   const totalTricks = gameState.hand_size || 6;
+  const posInTrick = trick.length; // 0 = leading, 1 = 2nd, etc.
+  const isLastInTrick = posInTrick === gameState.player_count - 1;
 
   // ── Led suit via game engine ──
   let ledPip = null;
@@ -3439,6 +3441,32 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
             if (val < lowVal) { lowVal = val; lowIdx = idx; }
           }
           return makeResult(lowIdx, "Lead: covered-off strategy — uncovered off (risky)");
+        }
+      }
+    }
+
+    // ── DEFENSIVE LEAD: force bidder to waste trump on low-value tricks ──
+    // When on defense, instead of leading our own trumps (which bidder beats),
+    // lead suits where the bidder is void — forces them to trump low-count tricks
+    if(!isBidderTeam && !weHaveTrumpControl && nonTrumpDoubles.length > 0 && !isMoon){
+      const bidderVoids = voidIn[bidderSeat] || new Set();
+      if(bidderVoids.size > 0){
+        // Find a non-trump double in a suit the bidder is void in
+        let bestDefIdx = -1, bestDefScore = -Infinity;
+        for(const idx of nonTrumpDoubles){
+          const pip = hand[idx][0];
+          if(bidderVoids.has(pip)){
+            const info = suitInfo[pip];
+            // Prefer doubles with low count (don't risk giving count to bidder's trump)
+            const pipSum = hand[idx][0] + hand[idx][1];
+            const myCount = (pipSum === 5) ? 5 : (pipSum === 10) ? 10 : 0;
+            let score = 50 - myCount * 3;
+            if(info && info.tilesLeft <= 2) score += 10; // fewer tiles = less risk
+            if(score > bestDefScore){ bestDefScore = score; bestDefIdx = idx; }
+          }
+        }
+        if(bestDefIdx >= 0){
+          return makeResult(bestDefIdx, "Defense: double in bidder's void (force trump waste)");
         }
       }
     }
