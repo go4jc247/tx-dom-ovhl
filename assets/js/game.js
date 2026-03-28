@@ -1621,16 +1621,20 @@ function aiChooseTrump(hand, bidAmount) {
     if (a === 0 || b === 0) blanks.push(tile);
   }
 
-  // V10_111: AI can only pick Nello at trump selection if nelloDeclareMode is OFF
-  if (!nelloDeclareMode && GAME_MODE !== 'T42' && bidAmount >= 51 && blanks.length >= 4) {
+  // Nello detection: AI calls Nello when hand is mostly low tiles
+  // Only available when nelloDeclareMode is OFF (otherwise declared during bidding)
+  if (!nelloDeclareMode && GAME_MODE !== 'T42' && bidAmount >= 51) {
+    // Count tiles that are "low" (both pips <= 3)
+    const lowTiles = hand.filter(t => t[0] <= 3 && t[1] <= 3);
+    // Count tiles with a blank (0-x)
     const has01 = blanks.some(t => (t[0] === 0 && t[1] === 1) || (t[0] === 1 && t[1] === 0));
-    let maxSmallPip = 0, maxDoublePip = 0;
-    for (const tile of hand) {
-      const [a, b] = tile;
-      if (a === b) maxDoublePip = Math.max(maxDoublePip, a);
-      else if (a === 0 || b === 0) maxSmallPip = Math.max(maxSmallPip, Math.max(a, b));
+    // Strong Nello: 4+ blanks, has 0-1, all tiles low
+    if (blanks.length >= 4 && has01 && lowTiles.length >= hand.length - 1) {
+      return "NELLO";
     }
-    if (has01 && maxSmallPip <= 2 && maxDoublePip <= 1) {
+    // Moderate Nello: 3+ blanks, has 0-1, most tiles low, no high doubles
+    const highDoubles = doubles.filter(d => d[0] >= 4);
+    if (blanks.length >= 3 && has01 && lowTiles.length >= hand.length - 2 && highDoubles.length === 0) {
       return "NELLO";
     }
   }
@@ -1695,7 +1699,7 @@ function aiChooseTrump(hand, bidAmount) {
       const hasDoubleSuit = hand.some(t => t[0] === s && t[1] === s);
       if (!hasSuit && !hasDoubleSuit) voidSuits++;
     }
-    score += voidSuits * 5; // each void suit = opportunity to trump in
+    score += voidSuits * 7; // each void suit = opportunity to trump in
 
     // Non-trump doubles bonus: each non-trump double is a guaranteed trick win
     // (the double always wins its suit unless trumped)
@@ -1711,7 +1715,7 @@ function aiChooseTrump(hand, bidAmount) {
       const highPip = Math.max(t[0], t[1]);
       if (ntDoublePips.has(highPip)) coveredOffs++;
     }
-    score += coveredOffs * 4; // covered offs are safe side tricks
+    score += coveredOffs * 7; // covered offs are safe side tricks (walker pairs)
 
     // Count tile awareness: penalty if our trump tiles are count tiles
     // (10-count: pip sum = 10; 5-count: pip sum = 5)
@@ -1764,8 +1768,8 @@ function aiChooseTrump(hand, bidAmount) {
       if (sum === 10) ntScore -= 4;
       else if (sum === 5) ntScore -= 2;
     }
-    // Threshold: NT must clearly beat best pip suit (NT is riskier overall)
-    if (ntScore > bestScore + 5) {
+    // Threshold: NT must beat best pip suit (NT is riskier with no trump protection)
+    if (ntScore > bestScore + 3) {
       return "NONE";
     }
   }
