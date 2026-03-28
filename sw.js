@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.22.0 — Nello AI improvements, Moon score-aware bidding, 2-trick lookahead
+// Version: v17.23.0 — Moon dump strategy, bid-safe trump conservation
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.22.0';
+const CACHE_NAME = 'tx-dom-v17.23.0';
 const urlsToCache = [
   './index.html',
   // CSS

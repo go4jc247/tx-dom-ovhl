@@ -5687,14 +5687,32 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       return makeResult(lowIdx, "Partner trumped, play low");
     }
 
-    // BID-SAFE FINAL TRICK: no need to risk anything — play lowest
-    if(bidIsSafe && tricksLeft <= 1 && isBidderTeam){
-      let safeLowIdx = legal[0], safeLowVal = Infinity;
-      for(const idx of legal){
-        const v = hand[idx][0] + hand[idx][1];
-        if(v < safeLowVal){ safeLowVal = v; safeLowIdx = idx; }
+    // BID-SAFE TRUMP CONSERVATION: when bid is already made, don't waste trump on 0-count tricks
+    // Only trump in if: trick has count, or it's the final trick
+    if(bidIsSafe && isBidderTeam && canRelax){
+      const trickCountSafe = trick.reduce((sum, play) => {
+        if(!Array.isArray(play) || !play[1]) return sum;
+        const ps = play[1][0] + play[1][1];
+        return sum + ((ps === 5) ? 5 : (ps === 10) ? 10 : 0);
+      }, 0);
+      if(trickCountSafe === 0 && tricksLeft > 1){
+        // No count, not final trick, bid is safe — dump instead of trumping
+        let safeLowIdx = legal[0], safeLowVal = Infinity;
+        for(const idx of legal){
+          const v = hand[idx][0] + hand[idx][1];
+          if(v < safeLowVal){ safeLowVal = v; safeLowIdx = idx; }
+        }
+        return makeResult(safeLowIdx, "Bid safe: skip trump-in, conserve for count defense");
       }
-      return makeResult(safeLowIdx, "Bid safe in final trick: play lowest");
+      if(tricksLeft <= 1){
+        // Final trick, bid safe — just play lowest
+        let safeLowIdx = legal[0], safeLowVal = Infinity;
+        for(const idx of legal){
+          const v = hand[idx][0] + hand[idx][1];
+          if(v < safeLowVal){ safeLowVal = v; safeLowIdx = idx; }
+        }
+        return makeResult(safeLowIdx, "Bid safe in final trick: play lowest");
+      }
     }
 
     // TN51 3-TEAM: if another defender already trumped and is winning, save our trump
@@ -6007,6 +6025,30 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       // Prefer lower pip sum
       score -= Math.floor(pipSum * 0.5);
       _bd.sumPenalty = -Math.floor(pipSum * 0.5);
+
+      // MOON INDIVIDUAL PLAY: in Moon, no partners — dump strategically to keep winning potential.
+      // Prefer dumping low tiles in suits we're weak in; keep high tiles and doubles for future wins.
+      if(isMoon && !gameState._is_trump_tile(tile) && tile[0] !== tile[1]){
+        const moonHighPip = Math.max(tile[0], tile[1]);
+        // Count our strength in this suit (total rank of our tiles)
+        let suitStrength = 0, suitTileCount = 0;
+        for(const h of hand){
+          if(h[0] === moonHighPip || h[1] === moonHighPip){
+            suitTileCount++;
+            suitStrength += h[0] + h[1];
+          }
+        }
+        // Prefer dumping from suits where we're WEAK (few tiles, low strength)
+        if(suitTileCount <= 1){ score += 8; _bd.moonWeakSuitDump = 8; }
+        else if(suitStrength <= 8){ score += 4; _bd.moonWeakSuitDump = 4; }
+        // Keep tiles in suits where we're STRONG (many tiles, high values)
+        if(suitTileCount >= 3 && suitStrength >= 15){ score -= 8; _bd.moonStrongSuitKeep = -8; }
+        // For Moon bidder: keep low tiles that help avoid winning (reverse priority)
+        if(iAmBidder){
+          score += pipSum; // prefer dumping HIGH tiles (they'd win tricks we don't want)
+          _bd.moonBidderDumpHigh = pipSum;
+        }
+      }
 
       // OPPONENT STRENGTH: prefer dumping tiles in suits opponents are strong in
       // (we'll lose those suits anyway; save tiles in suits we can win)
