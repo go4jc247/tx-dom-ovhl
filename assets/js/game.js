@@ -3486,26 +3486,74 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       return makeResult(lowIdx, "Nel-O bidder: play low (no safe dump)");
     }
     if(iAmOpponent){
-      // OPPONENT following in Nello: play HIGH to put pressure on bidder
-      // If bidder hasn't played yet, play just below the current winner to keep
-      // the trick competitive, forcing bidder into a difficult position
+      // OPPONENT following in Nello: use SUIT RANK (not pip sum) to maximize winning chance
+      // In 42, the double is highest in suit, then rank = suit_rank ordering
       const bidderPlayed = trick.some(play => Array.isArray(play) && play[0] === bidderSeat);
-      if(!bidderPlayed){
-        // Bidder still has to play — play our highest to set a high bar
-        let highIdx = legal[0], highVal = 0;
-        for(const idx of legal){
-          const val = hand[idx][0]+hand[idx][1];
-          if(val > highVal){ highVal = val; highIdx = idx; }
+
+      // Find the led suit and current winner rank
+      const nLedSuit = gameState._led_suit_for_trick();
+      let nWinnerRank = -1;
+      if(nLedSuit !== null && nLedSuit >= 0){
+        const nWinSeat = gameState._determine_trick_winner();
+        for(const play of trick){
+          if(!Array.isArray(play) || play[0] !== nWinSeat) continue;
+          const wr = gameState._suit_rank(play[1], nLedSuit);
+          nWinnerRank = wr[0] * 100 + wr[1];
         }
-        return makeResult(highIdx, "Nel-O opp: play high (bidder hasn't played)");
       }
-      // Bidder already played — play high to try to overtake bidder if bidder is close to winning
-      let highIdx = legal[0], highVal = 0;
+
+      if(!bidderPlayed){
+        // Bidder still has to play — play our HIGHEST RANK to set a high bar
+        let highIdx = legal[0], highRank = -1;
+        for(const idx of legal){
+          const tile = hand[idx];
+          if(nLedSuit !== null && nLedSuit >= 0){
+            const r = gameState._suit_rank(tile, nLedSuit);
+            const rank = r[0] * 100 + r[1];
+            if(rank > highRank){ highRank = rank; highIdx = idx; }
+          } else {
+            const val = tile[0]+tile[1]; // fallback for trump-led
+            if(val > highRank){ highRank = val; highIdx = idx; }
+          }
+        }
+        return makeResult(highIdx, "Nel-O opp: play highest rank (bidder hasn't played)");
+      }
+
+      // Bidder already played — find bidder's rank and play just enough to beat them
+      let bidderRank = -1;
+      for(const play of trick){
+        if(!Array.isArray(play) || play[0] !== bidderSeat) continue;
+        if(nLedSuit !== null && nLedSuit >= 0){
+          const br = gameState._suit_rank(play[1], nLedSuit);
+          bidderRank = br[0] * 100 + br[1];
+        }
+      }
+      // If bidder is NOT currently winning, we don't need to overtake — play low
+      const bidderIsWinning = bidderRank >= nWinnerRank;
+      if(!bidderIsWinning){
+        // Another opponent already has bidder beat — play low to save our high cards
+        let lowIdx = legal[0], lowRank = Infinity;
+        for(const idx of legal){
+          const tile = hand[idx];
+          const val = tile[0]+tile[1];
+          if(val < lowRank){ lowRank = val; lowIdx = idx; }
+        }
+        return makeResult(lowIdx, "Nel-O opp: bidder losing, play low (save high)");
+      }
+      // Bidder is winning — play highest to try to beat them
+      let highIdx = legal[0], highRank = -1;
       for(const idx of legal){
-        const val = hand[idx][0]+hand[idx][1];
-        if(val > highVal){ highVal = val; highIdx = idx; }
+        const tile = hand[idx];
+        if(nLedSuit !== null && nLedSuit >= 0){
+          const r = gameState._suit_rank(tile, nLedSuit);
+          const rank = r[0] * 100 + r[1];
+          if(rank > highRank){ highRank = rank; highIdx = idx; }
+        } else {
+          const val = tile[0]+tile[1];
+          if(val > highRank){ highRank = val; highIdx = idx; }
+        }
       }
-      return makeResult(highIdx, "Nel-O opp: play high (pressure bidder)");
+      return makeResult(highIdx, "Nel-O opp: overtake bidder");
     }
     {
       // Partner of bidder follow — play low to help bidder avoid winning
@@ -3847,10 +3895,13 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       }
 
       // P3: Trump aggression — lead trump even without highest
-      // Early game (trick 0-1) OR endgame must-win: force opponent trumps
+      // Early-mid game (tricks 0-3) OR endgame must-win: force opponent trumps
+      // Tricks 0-1: standard threshold (3 trumps). Tricks 2-3: require 4+ trumps (more conservative)
       // Skip if remaining trumps are only held by partners (don't pull partner trumps)
       // PICK safest trump: avoid count tiles, then prefer low value
-      if(otherTrumps.length >= 2 && trumpsInHand.length >= 3 && (trickNum <= 1 || mustWin) && !bidIsSafe && !partnersHoldRemainingTrumps){
+      const p3EarlyWindow = trickNum <= 1;
+      const p3MidWindow = trickNum <= 3 && trumpsInHand.length >= 4; // stricter in mid-game
+      if(otherTrumps.length >= 2 && trumpsInHand.length >= 3 && (p3EarlyWindow || p3MidWindow || mustWin) && !bidIsSafe && !partnersHoldRemainingTrumps){
         let bestIdx = otherTrumps[0], bestScore = -Infinity;
         for(const idx of otherTrumps){
           const tile = hand[idx];
