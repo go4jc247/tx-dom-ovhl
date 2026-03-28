@@ -4259,7 +4259,14 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         const desperation = Math.max(0.5, Math.min(1.5, (35 - bidderNeedsMore) / 20));
         let score = Math.round(info.countRemaining * 2 * desperation) + myCount;
         const bidderVoidHere = voidIn[bidderSeat] && voidIn[bidderSeat].has(pip);
-        if(bidderVoidHere) score += 10; // bidder can't follow, must trump or lose — valuable even without count
+        if(bidderVoidHere && opponentsVoidInTrump){
+          score += 10; // bidder void + no trump = free trick
+        } else if(bidderVoidHere && !opponentsVoidInTrump){
+          // Bidder void but HAS trump — they'll trump our double! Penalize heavily.
+          score -= 15;
+        } else if(bidderVoidHere){
+          score += 5; // bidder void, uncertain trump status
+        }
         if(score > bestCapScore){ bestCapScore = score; bestCapIdx = idx; }
       }
       if(bestCapIdx >= 0 && bestCapScore >= 10){
