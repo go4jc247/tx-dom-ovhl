@@ -1651,6 +1651,22 @@ function aiChooseTrump(hand, bidAmount) {
     }
     score += voidSuits * 5; // each void suit = opportunity to trump in
 
+    // Non-trump doubles bonus: each non-trump double is a guaranteed trick win
+    // (the double always wins its suit unless trumped)
+    const ntDoubles = hand.filter(t => t[0] === t[1] && t[0] !== pip);
+    score += ntDoubles.length * 8;
+
+    // Non-trump covered offs: non-double tiles where we hold that suit's double
+    // These are near-guaranteed wins (lead double first, then the covered off walks)
+    const ntDoublePips = new Set(ntDoubles.map(d => d[0]));
+    let coveredOffs = 0;
+    for (const t of nonTrumpTiles) {
+      if (t[0] === t[1]) continue;
+      const highPip = Math.max(t[0], t[1]);
+      if (ntDoublePips.has(highPip)) coveredOffs++;
+    }
+    score += coveredOffs * 4; // covered offs are safe side tricks
+
     // Count tile awareness: penalty if our trump tiles are count tiles
     // (10-count: pip sum = 10; 5-count: pip sum = 5)
     // These are valuable points we'd rather capture, not risk losing
