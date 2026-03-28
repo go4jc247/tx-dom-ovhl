@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.45.0 — Moon trump conservation fix
+// Version: v17.46.0 — multi-gap AI fix
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.45.0';
+const CACHE_NAME = 'tx-dom-v17.46.0';
 const urlsToCache = [
   './index.html',
   // CSS

@@ -3801,10 +3801,22 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     // Non-bidders: when bidder is winning, play high to rescue (overtake bidder)
     // Bidder: should NOT play high — they WANT to lose
     if(bidderWinning && !iAmBidder){
-      let highIdx = legal[0], highVal = 0;
+      // Use suit rank (not pip sum) — the double always wins its suit
+      const _nRescueLed = gameState._led_suit_for_trick();
+      const _nRescueDoublesLed = _nRescueLed === -2;
+      let highIdx = legal[0], highRank = -1;
       for(const idx of legal){
-        const val = hand[idx][0]+hand[idx][1];
-        if(val > highVal){ highVal = val; highIdx = idx; }
+        const tile = hand[idx];
+        let rank;
+        if(_nRescueDoublesLed){
+          rank = (tile[0] === tile[1]) ? 100 + tile[0] : tile[0] + tile[1];
+        } else if(_nRescueLed !== null && _nRescueLed >= 0){
+          const sr = gameState._suit_rank(tile, _nRescueLed);
+          rank = sr[0] * 100 + sr[1]; // double = 100, non-double = other pip
+        } else {
+          rank = tile[0] + tile[1]; // fallback
+        }
+        if(rank > highRank){ highRank = rank; highIdx = idx; }
       }
       return makeResult(highIdx, "Nel-O: bidder winning, play high to rescue");
     }
@@ -3908,12 +3920,23 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         : (nLedSuit !== null && nLedSuit >= 0 &&
            legal.some(i => hand[i][0] === nLedSuit || hand[i][1] === nLedSuit));
       if(!_nHaveInSuit){
-        let dumpIdx = legal[0], dumpVal = Infinity;
+        // Strategic dump: prefer dumping from suits where we're STRONGEST
+        // (keep tiles in suits where bidder still has presence — we need them to force wins)
+        let dumpIdx = legal[0], bestDumpScore = -Infinity;
         for(const idx of legal){
-          const val = hand[idx][0] + hand[idx][1];
-          if(val < dumpVal){ dumpVal = val; dumpIdx = idx; }
+          const tile = hand[idx];
+          const tilePip = Math.max(tile[0], tile[1]);
+          const val = tile[0] + tile[1];
+          // Count how many tiles we have in this pip's suit
+          let suitCount = 0;
+          for(const h of hand){ if(Math.max(h[0], h[1]) === tilePip) suitCount++; }
+          // Dump from suits where we have many tiles (strong) — score higher = more dumpable
+          // Dump low tiles first, and prefer suits where bidder is void (less useful to keep)
+          const bidderVoidHere = voidIn[bidderSeat] && voidIn[bidderSeat][tilePip];
+          let dScore = suitCount * 5 - val + (bidderVoidHere ? 10 : 0);
+          if(dScore > bestDumpScore){ bestDumpScore = dScore; dumpIdx = idx; }
         }
-        return makeResult(dumpIdx, "Nel-O opp: off-suit, dump low (save high for later)");
+        return makeResult(dumpIdx, "Nel-O opp: off-suit, strategic dump (suit strength aware)");
       }
 
       if(!bidderPlayed){
@@ -5383,7 +5406,10 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   // ═══════════════════════════════════════════════════════════════════
 
   // ── Partner/teammate winning: throw count (but NEVER dump trumps if non-trump options exist) ──
-  if(partnerWinning){
+  // TN51: another defender team winning is also favorable — treat as "friendly win"
+  const friendlyDefenderWinning = isTN51 && !isBidderTeam && !partnerWinning
+    && winnerSeat !== undefined && gameState.team_of(winnerSeat) !== bidderTeamIdx && winnerSeat !== p;
+  if(partnerWinning || friendlyDefenderWinning){
     // Separate legal tiles into trump and non-trump
     const pwNonTrumps = [];
     const pwTrumps = [];
@@ -5417,7 +5443,13 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       }
       if(pipSum < lowVal){ lowVal = pipSum; lowIdx = idx; }
     }
-    if(countIdx >= 0 && safeToThrowCount) return makeResult(countIdx, "Partner winning (safe), throw count (" + countVal + "pts)");
+    if(countIdx >= 0 && safeToThrowCount){
+      // TN51 friendly defender: only throw 5-count (10 helps their team too much)
+      if(friendlyDefenderWinning && countVal === 10){
+        return makeResult(lowIdx, "TN51: friendly defender winning, keep 10-count");
+      }
+      return makeResult(countIdx, (friendlyDefenderWinning ? "TN51 friendly" : "Partner") + " winning (safe), throw count (" + countVal + "pts)");
+    }
     if(countIdx >= 0 && !safeToThrowCount){
       // Opponents still to play — throw count more aggressively if bidder team needs points
       // BUT only throw 10-count if opponents are void in trump (can't overtrump)
@@ -5687,11 +5719,12 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           }, 0);
           // 10-count: duck unless trick already has count worth fighting for
           // 5-count: duck only if trick is empty and many opponents remain
-          if(bestWinCountVal === 10 && trickCountNow < 5){
-            if(lowIdx >= 0) return makeResult(lowIdx, "2nd-seat: duck to protect 10-count (opps may trump)");
+          // Endgame: protect count even more aggressively
+          if(bestWinCountVal === 10 && (trickCountNow < 5 || (isEndgame && trickCountNow < 10))){
+            if(lowIdx >= 0) return makeResult(lowIdx, "2nd-seat: duck to protect 10-count (opps may trump" + (isEndgame ? ", endgame" : "") + ")");
           }
-          if(bestWinCountVal === 5 && trickCountNow === 0 && _oppsAfterUs >= 2){
-            if(lowIdx >= 0) return makeResult(lowIdx, "2nd-seat: duck to protect 5-count (many opps behind)");
+          if(bestWinCountVal === 5 && ((trickCountNow === 0 && _oppsAfterUs >= 2) || (isEndgame && trickCountNow < 5))){
+            if(lowIdx >= 0) return makeResult(lowIdx, "2nd-seat: duck to protect 5-count" + (isEndgame ? " (endgame)" : " (many opps behind)"));
           }
         }
       }
@@ -6303,8 +6336,10 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         const countMult = oppWinning ? 5 : (3 + _oppsStillToPlay);
         // Double penalty if we need count for our bid, OR if opponents need count (deny it)
         const countProtect = (mustWinCountTricks || opponentsNeedCount) ? 2 : 1;
-        const countCap = opponentsNeedCount ? 120 : 80; // higher cap when denying count to desperate bidder
-        const countPenalty = Math.min(myCount * countMult * countProtect, countCap);
+        // Endgame: count tiles become more precious — scale penalty up
+        const endgameCountScale = tricksLeft <= 2 ? 3 : (tricksLeft <= 3 ? 2 : 1);
+        const countCap = opponentsNeedCount ? 120 * endgameCountScale : 80 * endgameCountScale;
+        const countPenalty = Math.min(myCount * countMult * countProtect * endgameCountScale, countCap);
         score -= countPenalty;
         _bd.countPenalty = -countPenalty;
       }
@@ -7367,7 +7402,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.45.0';  // v17.45.0: Moon trump conservation fix
+const MP_VERSION = 'v17.46.0';  // v17.46.0: multi-gap AI fix (Nello suit rank, TN51 friendly defender, endgame count protection)
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
