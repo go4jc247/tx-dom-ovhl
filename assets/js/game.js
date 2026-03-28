@@ -1712,13 +1712,21 @@ function aiChooseTrump(hand, bidAmount) {
     const lowTiles = hand.filter(t => t[0] <= 3 && t[1] <= 3);
     // Count tiles with a blank (0-x)
     const has01 = blanks.some(t => (t[0] === 0 && t[1] === 1) || (t[0] === 1 && t[1] === 0));
-    // Strong Nello: 4+ blanks, has 0-1, all tiles low
-    if (blanks.length >= 4 && has01 && lowTiles.length >= hand.length - 1) {
+    // Doubles are risky in Nello — they win their suit. Count mid+ doubles (pip >= 3)
+    const riskyDoubles = doubles.filter(d => d[0] >= 3);
+    // Total pip sum — lower = safer for Nello
+    const pipSum = hand.reduce((s, t) => s + t[0] + t[1], 0);
+    // Strong Nello: 4+ blanks, has 0-1, all tiles low, at most 1 risky double
+    if (blanks.length >= 4 && has01 && lowTiles.length >= hand.length - 1 && riskyDoubles.length <= 1) {
       return "NELLO";
     }
-    // Moderate Nello: 3+ blanks, has 0-1, most tiles low, no high doubles
-    const highDoubles = doubles.filter(d => d[0] >= 4);
-    if (blanks.length >= 3 && has01 && lowTiles.length >= hand.length - 2 && highDoubles.length === 0) {
+    // Moderate Nello: 3+ blanks, has 0-1, most tiles low, no risky doubles
+    if (blanks.length >= 3 && has01 && lowTiles.length >= hand.length - 2 && riskyDoubles.length === 0) {
+      return "NELLO";
+    }
+    // Pip-sum Nello: very low total pip sum hand is safe even with fewer blanks
+    // e.g. [0-1, 0-2, 0-3, 1-2, 1-3, 2-3] = pip sum 18, all low
+    if (pipSum <= 20 && lowTiles.length >= hand.length - 1 && riskyDoubles.length <= 1) {
       return "NELLO";
     }
   }
@@ -1888,8 +1896,8 @@ function aiChooseTrump(hand, bidAmount) {
       if (!ndSuits.has(s)) doublesVoids++;
     }
     doublesScore += doublesVoids * 5;
-    // Compare DOUBLES vs best pip suit
-    if (doublesScore > bestScore) {
+    // Compare DOUBLES vs best pip suit (+2 bias: DOUBLES is non-standard, needs clear advantage)
+    if (doublesScore > bestScore + 2) {
       return "DOUBLES";
     }
   }
@@ -4467,6 +4475,13 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         // (fewer opponents can follow, more likely to walk)
         if(info.tilesLeft <= 2) score += 10;
         else if(info.tilesLeft <= 4) score += 5;
+        // Partner void penalty: if partner is void in this suit, leading our double
+        // doesn't help them (they dump low while opponents follow normally)
+        if(!isMoon){
+          for(const ps of _partnerSeats(p)){
+            if(voidIn[ps] && voidIn[ps].has(pip)){ score -= 8; break; }
+          }
+        }
         if(score > bestScore){ bestScore = score; bestIdx = idx; }
       }
       return makeResult(bestIdx, "Lead: double (controls suit)");
@@ -4860,11 +4875,13 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         return makeResult(highIdx, "Moon endgame: must win every trick");
       }
       // MOON OPPONENT: aggressively win when bidder is on pace for all tricks
+      // Shoot-the-moon (bid 7): be aggressive from trick 0 — one lost trick = -21pts for bidder
       if(isMoon && !iAmBidder && canSetBid){
         const bidderTricksWon = gameState.team_points[bidderTeamIdx] || 0;
         const bidderOnPace = bidderTricksWon >= trickNum;
-        if(bidderOnPace && tricksLeft <= 4){
-          return makeResult(highIdx, "Moon opp: block bidder from winning all tricks");
+        const isShootMoon = session && session.moon_shoot;
+        if(bidderOnPace && (isShootMoon || tricksLeft <= 4)){
+          return makeResult(highIdx, "Moon opp: block bidder" + (isShootMoon ? " (shoot the moon)" : ""));
         }
       }
       // DUCK: if partner plays after us and likely has the double (higher card),
@@ -5185,11 +5202,15 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         if(pipSum < lowVal){ lowVal = pipSum; lowIdx = idx; }
       }
       // If opponents might over-trump, don't throw 10-count (only throw 5)
+      // EXCEPTION: bidder team urgently needs points — accept the risk
       if(countIdx >= 0 && !oppsMayOvertrump){
         return makeResult(countIdx, "Partner trumped (safe), throw count (" + countVal + "pts)");
       }
       if(countIdx >= 0 && oppsMayOvertrump && countVal === 5){
         return makeResult(countIdx, "Partner trumped (risky), throw small count");
+      }
+      if(countIdx >= 0 && oppsMayOvertrump && countVal === 10 && isBidderTeam && pointsNeeded >= 10){
+        return makeResult(countIdx, "Partner trumped: urgent 10-count throw (need " + pointsNeeded + "pts)");
       }
       return makeResult(lowIdx, "Partner trumped, play low");
     }
@@ -5221,10 +5242,12 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     }
 
     // MOON OPPONENT: always trump in when bidder is on pace for all tricks
+    // Shoot-the-moon: always trump in to deny even a single trick
     if(isMoon && !iAmBidder && canSetBid && winTrumpIdx >= 0){
       const bidderTricksWon2 = gameState.team_points[bidderTeamIdx] || 0;
-      if(bidderTricksWon2 >= trickNum){
-        return makeResult(winTrumpIdx, "Moon opp: trump in to block bidder (on pace for all tricks)");
+      const isShootMoon2 = session && session.moon_shoot;
+      if(bidderTricksWon2 >= trickNum || isShootMoon2){
+        return makeResult(winTrumpIdx, "Moon opp: trump in to block bidder" + (isShootMoon2 ? " (shoot the moon)" : ""));
       }
     }
 
@@ -5432,10 +5455,11 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
 
       // Preserve walker pairs: penalize dumping a tile that's part of a double+covered-off pair
       // Walking pairs (lead double, then play the covered off) are guaranteed 2-trick combos
-      // Skip in DOUBLES mode: doubles are trump, not suit winners, so walker pairs don't apply
-      if(!gameState._is_trump_tile(tile) && tile[0] !== tile[1] && gameState.trump_mode !== 'DOUBLES'){
+      // In DOUBLES mode: trump doubles still cover offs — after leading the trump double,
+      // the non-double walks its suit (the double/suit-winner is now played)
+      if(!gameState._is_trump_tile(tile) && tile[0] !== tile[1]){
         const highPip2 = Math.max(tile[0], tile[1]);
-        // Check if we hold the double for this suit
+        // Check if we hold the double for this suit (in DOUBLES mode, this is a trump double)
         const holdDouble = hand.some(h => h[0] === highPip2 && h[1] === highPip2);
         // Check if this tile is the covered off (second highest = pip, pip-1)
         const lowPip2 = Math.min(tile[0], tile[1]);
@@ -14231,8 +14255,9 @@ function aiWidowSwap(seat){
         // Blanks are excellent (0-x tiles)
         if(t[0] === 0 || t[1] === 0) score += 8;
         // Doubles are dangerous in Nello (win their suit when led)
-        if(isDouble) score -= (pipSum >= 6 ? 12 : 4);
-        // Low doubles (0-0, 1-1) are less dangerous
+        // Higher doubles are much more dangerous — they beat more tiles
+        if(isDouble) score -= (pipSum >= 6 ? 14 : pipSum >= 4 ? 10 : 4);
+        // Low doubles (0-0, 1-1) are less dangerous — fewer tiles below them
         if(isDouble && pipSum <= 2) score += 6;
         continue;
       }
@@ -14292,10 +14317,18 @@ function aiWidowSwap(seat){
       if(trumpCount >= 5) score += 8;
 
       // Walker pair bonus: double + covered off = guaranteed 2-trick combo
+      // In PIP mode, skip trump tiles (they're trump plays, not suit walker pairs)
       var dblPips = new Set();
-      for(var t3 of h){ if(t3[0] === t3[1]) dblPips.add(t3[0]); }
+      for(var t3 of h){
+        if(t3[0] !== t3[1]) continue;
+        // In PIP mode, the trump double is a trump winner, not a suit walker
+        if(tm === 'PIP' && t3[0] === ts) continue;
+        dblPips.add(t3[0]);
+      }
       for(var t4 of h){
         if(t4[0] === t4[1]) continue; // skip doubles themselves
+        // In PIP mode, trump tiles aren't covered offs for walker purposes
+        if(tm === 'PIP' && (t4[0] === ts || t4[1] === ts)) continue;
         if(dblPips.has(t4[0]) || dblPips.has(t4[1])) score += 7; // covered off bonus
       }
     }
