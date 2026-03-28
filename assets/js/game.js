@@ -3694,6 +3694,20 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   const bidderNeedsMore = currentBid - bidderScore;
   const bidderIsClose = !isBidderTeam && bidderNeedsMore > 0 && bidderNeedsMore <= 10;
   const canSetBid = !isBidderTeam && bidderNeedsMore > 0; // opponent's bid can still be set
+  // SET BID URGENCY: how realistic is setting the bid? (0-100)
+  // High urgency = close to settable, worth aggressive play
+  // Low urgency = bidder near-certain, conserve resources for scoring
+  let setBidUrgency = 0;
+  if(canSetBid){
+    // Ratio of what bidder still needs vs what's theoretically available
+    const bidderMaxLeft = isMoon ? tricksLeft : (tricksLeft + totalCountRemaining);
+    const shortfall = bidderMaxLeft > 0 ? bidderNeedsMore / bidderMaxLeft : 0;
+    // High shortfall = bidder needs a lot relative to what's left = easier to set
+    setBidUrgency = Math.min(100, Math.round(shortfall * 100));
+    // Endgame boost: setting gets more urgent as tricks run out
+    if(tricksLeft <= 3) setBidUrgency = Math.min(100, setBidUrgency + 20);
+    if(tricksLeft <= 2) setBidUrgency = Math.min(100, setBidUrgency + 15);
+  }
 
   // ═══════════════════════════════════════════════════════════════════
   //  ENDGAME AWARENESS — adjust strategy in final tricks
@@ -5401,6 +5415,20 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
               score += Math.floor(info.countRemaining * 0.8);
               _breakdown.setBidCountBonus = Math.floor(info.countRemaining * 0.8);
             }
+            // OFF-TRACKER EARLY PROBE: even at low suspicion, bias toward suspected off suit
+            // This helps flush the bidder's weak tile before they can walk it safely
+            if(offTracker && (offTracker.trumpMode === 'PIP' || offTracker.trumpMode === 'DOUBLES')){
+              const suspList = getOffSuspicion();
+              if(suspList && suspList.length > 0){
+                const topSusp = suspList[0];
+                if(topSusp.pip === ledSuit && topSusp.suspicion >= 20){
+                  // Graduated bonus: higher suspicion = stronger bias
+                  const offProbe = topSusp.suspicion >= 50 ? 15 : (topSusp.suspicion >= 35 ? 10 : 5);
+                  score += offProbe;
+                  _breakdown.offTrackerProbe = offProbe;
+                }
+              }
+            }
             // DEFENSIVE HIGH-CARD LEAD: in depleted suits where we hold the highest
             // remaining card, leading it is a safe trick win that denies bidder
             if(info && info.tilesLeft <= 2 && info.winnerPlayed){
@@ -6404,8 +6432,10 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       // +2 margin (was +5): allow conservation when bidder still needs significantly more than tricks left
       const bidderNearMaking = bidderNeedsMore <= tricksLeft + 2;
       // Moon: never conserve based on count — every trick is worth 1 point regardless of count
-      const _shouldConserve = !isMoon && !isBidderTeam && trickCount === 0 && !isEndgame && !bidderIsClose && !canSetBid
-        && !bidderNearMaking
+      // Use setBidUrgency: conserve when set is unrealistic (urgency < 30) on 0-count tricks
+      const _lowUrgency = setBidUrgency < 30;
+      const _shouldConserve = !isMoon && !isBidderTeam && trickCount === 0 && !isEndgame && !bidderIsClose
+        && _lowUrgency && !bidderNearMaking
         && (shouldSaveLastTrump || (_trumpRatio <= 0.5 && trumpsInHand.length <= 2));
       if(_shouldConserve){
         // Low-value trick on defense with scarce trumps — save for count-heavy trick
@@ -6657,8 +6687,12 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         const voidTargetPip = (cntA <= cntB) ? pA : pB;
         // Check if bidder has shown strength in this suit (oppSuitSignal tracks bidder plays)
         const bidderStrength = oppSuitSignal[voidTargetPip] || 0;
-        if(bidderStrength >= 10){
-          const strengthBonus = Math.min(Math.floor(bidderStrength / 2), 12);
+        if(bidderStrength >= 8){
+          // Scale more aggressively — voiding bidder's strong suit is the best defensive void
+          // Also factor in remaining count: voiding a count-rich bidder suit is devastating
+          const suitInfo2 = suitInfo[voidTargetPip];
+          const countFactor = (suitInfo2 && suitInfo2.countRemaining > 0) ? Math.min(suitInfo2.countRemaining, 10) : 0;
+          const strengthBonus = Math.min(Math.floor(bidderStrength / 2) + countFactor, 25);
           score += strengthBonus;
           _bd.voidBidderStrength = strengthBonus;
         }
@@ -7705,7 +7739,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.64.0';  // v17.64.0: trump selection overhaul — competitive eval, gap penalty, count protection, Moon voids
+const MP_VERSION = 'v17.65.0';  // v17.65.0: defensive play — set-bid urgency, off-tracker probe, conservation fix, void targeting
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
