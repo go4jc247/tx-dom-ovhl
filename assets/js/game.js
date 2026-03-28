@@ -2978,6 +2978,17 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         countRemaining += pts;
       }
     }
+    // Count our tiles in this suit and their count value
+    let _tilesInHand = 0, _countInHand = 0;
+    for(const h of hand){
+      const hPip = Math.max(h[0], h[1]);
+      if(hPip === pip && !gameState._is_trump_tile(h)){
+        _tilesInHand++;
+        const hSum = h[0] + h[1];
+        if(hSum === 5) _countInHand += 5;
+        else if(hSum === 10) _countInHand += 10;
+      }
+    }
     suitInfo[pip] = {
       remaining: suitTiles,
       countRemaining: countRemaining,
@@ -2985,7 +2996,9 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       // Treat the suit as if its "winner" is accounted for (no unbeatable suit card exists).
       winnerPlayed: (trumpMode === "DOUBLES") ? true : isPlayed(pip, pip),
       winnerCount: (trumpMode === "DOUBLES") ? 0 : ((pip + pip === 5) ? 5 : (pip + pip === 10) ? 10 : 0),
-      tilesLeft: suitTiles.length
+      tilesLeft: suitTiles.length,
+      tilesInHand: _tilesInHand,
+      countInHand: _countInHand
     };
   }
 
@@ -4800,9 +4813,25 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     // ── ENDGAME COUNT HUNT: bidder needs count points to make bid ──
     // Trigger: must-win OR when count alone can close the gap (even before endgame)
     // Moon mode: count is irrelevant (1 point per trick only) — skip count hunt entirely
+    // Partner count throw: if partner is void in a suit where we hold the double,
+    // they can dump count on our winning trick even if WE don't hold enough count
+    let partnerCanThrowCount = false;
+    if(!isMoon && weHaveTrumpControl && countNeeded > 0){
+      for(const idx of nonTrumpDoubles){
+        const dblPip = hand[idx][0];
+        for(let s = 0; s < gameState.player_count; s++){
+          if(!isSameTeam(s) || s === p) continue;
+          if(voidIn[s] && voidIn[s].has(dblPip)){
+            partnerCanThrowCount = true; break;
+          }
+        }
+        if(partnerCanThrowCount) break;
+      }
+    }
     const countHuntActive = !isMoon && isBidderTeam && !bidIsDoomed && pointsNeeded > 0
       && (mustWin || (countNeeded > 0 && tricksLeft <= 3)
-        || (countInOurHand >= pointsNeeded && tricksLeft <= 5 && weHaveTrumpControl));
+        || (countInOurHand >= pointsNeeded && tricksLeft <= 5 && weHaveTrumpControl)
+        || (partnerCanThrowCount && tricksLeft <= 5 && weHaveTrumpControl));
     // In DOUBLES mode, all doubles are trump — include trump doubles as count hunt candidates
     const countHuntDoubles = trumpMode === 'DOUBLES'
       ? [...nonTrumpDoubles, ...trumpDoubles] : nonTrumpDoubles;
@@ -4814,8 +4843,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           const pip = hand[idx][0];
           const info = suitInfo[pip];
           if(!info) continue;
-          // Prefer suits with remaining count tiles (we can win the double then walk count)
-          let score = info.countRemaining * 3 + pip;
+          // Prefer suits with count tiles (remaining from opponents + our own count in suit)
+          let score = (info.countRemaining + info.countInHand) * 3 + pip;
           // Check opponent voids — if opponents void and we have trump control, count is safe
           if(weHaveTrumpControl) score += 10;
           if(score > bestCountScore){ bestCountScore = score; bestCountDbl = idx; }
@@ -4833,16 +4862,45 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           const pip = Math.max(tile[0], tile[1]);
           const info = suitInfo[pip];
           if(!info || !info.winnerPlayed) continue; // double not out = not a guaranteed winner
+          // VERIFY: is this tile actually the highest remaining in the suit?
+          // (double is out, but other higher off-tiles might still be in play)
+          const myRank = gameState._suit_rank(tile, pip);
+          const myRankNum = myRank[0] * 100 + myRank[1];
+          let isHighestRemaining = true;
+          if(info.remaining){
+            for(const rt of info.remaining){
+              if(rt[0] === tile[0] && rt[1] === tile[1]) continue; // skip self
+              // Check if this remaining tile is in our hand (safe) or an opponent's (dangerous)
+              const inOurHand = hand.some(h => h[0] === rt[0] && h[1] === rt[1]);
+              if(inOurHand) continue; // we hold it too, no threat
+              const rtRank = gameState._suit_rank(rt, pip);
+              if(rtRank[0] * 100 + rtRank[1] > myRankNum){ isHighestRemaining = false; break; }
+            }
+          }
+          if(!isHighestRemaining) continue; // not a true walker — higher tiles still out
           const pipSum = tile[0] + tile[1];
           const myCount = (pipSum === 5) ? 5 : (pipSum === 10) ? 10 : 0;
-          if(myCount > 0 && info.tilesLeft <= 2){
-            // Count tile in a depleted suit with double already played — guaranteed winner
-            let score = myCount * 3 + (weHaveTrumpControl ? 8 : 0);
+          // Walk count tiles for points, or non-count tiles to pull partner count
+          if(info.tilesLeft <= 2){
+            let score = (weHaveTrumpControl ? 8 : 0);
+            if(myCount > 0){
+              score += myCount * 3; // count walker — captures our own points
+            } else {
+              // Non-count walker: partner might throw count on our winning trick
+              let partnerVoidInSuit = false;
+              for(let s = 0; s < gameState.player_count; s++){
+                if(!isSameTeam(s) || s === p) continue;
+                if(voidIn[s] && voidIn[s].has(pip)){ partnerVoidInSuit = true; break; }
+              }
+              if(partnerVoidInSuit && totalCountRemaining > countInOurHand){
+                score += 5; // partner can dump count on our guaranteed win
+              }
+            }
             if(score > bestWalkerScore){ bestWalkerScore = score; bestWalkerIdx = idx; }
           }
         }
         if(bestWalkerIdx >= 0){
-          return makeResult(bestWalkerIdx, "Endgame: walk count tile (double out, suit depleted)");
+          return makeResult(bestWalkerIdx, "Count hunt: walk tile (highest in suit, double out)");
         }
       }
     }
@@ -7749,7 +7807,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.66.0';  // v17.66.0: safety + widow — try/catch fallback, session guard, trump change penalty, void fix
+const MP_VERSION = 'v17.67.0';  // v17.67.0: count hunt — walker rank verify, suitInfo enrichment, partner count throw, non-count walkers
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables

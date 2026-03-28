@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.66.0 — safety: try/catch, session guard, widow trump penalty, void fix
+// Version: v17.67.0 — count hunt: walker verify, suitInfo, partner throw, non-count walkers
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.66.0';
+const CACHE_NAME = 'tx-dom-v17.67.0';
 const urlsToCache = [
   './index.html',
   // CSS
