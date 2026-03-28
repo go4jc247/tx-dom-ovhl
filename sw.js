@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v14.3.0 — AI Phase 3 complete: 26 commits, full strategy overhaul
+// Version: v14.4.0 — Phase 4: Moon fixes, DOUBLES trump, void detection, count throw
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v14.3.0';
+const CACHE_NAME = 'tx-dom-v14.4.0';
 const urlsToCache = [
   './index.html',
   // CSS
