@@ -4132,18 +4132,28 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           }
         }
 
-        // 4. Play covered off (should be a walker now)
+        // 4. Play covered off (should be a walker now — double already played)
         if (coveredOffs.length > 0) {
-          // Pick the off whose suit has fewest remaining tiles (most likely walker)
-          let bestOffIdx = coveredOffs[0].offIdx, bestOffScore = -Infinity;
-          for (const co of coveredOffs) {
-            const pip = co.coverPip;
-            const info = suitInfo[pip];
-            let score = 0;
-            if (info) score = 100 - info.tilesLeft * 10;
-            if (score > bestOffScore) { bestOffScore = score; bestOffIdx = co.offIdx; }
+          // Only play offs whose covering double has ALREADY been played (not still in hand)
+          // If the double is still in hand, go back and lead it first (step 3 should have caught this)
+          const readyOffs = coveredOffs.filter(co => {
+            // Check if covering double is still in our hand
+            const dblStillInHand = hand.some(h => h[0] === co.coverPip && h[1] === co.coverPip);
+            return !dblStillInHand; // only "ready" if double is gone (already played)
+          });
+          if (readyOffs.length > 0) {
+            // Pick the off whose suit has fewest remaining tiles (most likely walker)
+            let bestOffIdx = readyOffs[0].offIdx, bestOffScore = -Infinity;
+            for (const co of readyOffs) {
+              const pip = co.coverPip;
+              const info = suitInfo[pip];
+              let score = 0;
+              if (info) score = 100 - info.tilesLeft * 10;
+              if (score > bestOffScore) { bestOffScore = score; bestOffIdx = co.offIdx; }
+            }
+            return makeResult(bestOffIdx, "Lead: covered-off strategy — play off (walker)");
           }
-          return makeResult(bestOffIdx, "Lead: covered-off strategy — play off (walker)");
+          // If no ready offs (all doubles still in hand), fall through — doubles will be led elsewhere
         }
 
         // 5. Uncovered offs last (risky but no choice)
