@@ -13702,83 +13702,101 @@ function _cleanupWidowSwap(){
 }
 
 function aiWidowSwap(seat){
-  // Enhanced AI widow swap: considers voids, trump strength, and count tiles
+  // Enhanced AI widow swap: evaluates whole-hand strength with re-predicted trump per swap
   if(!session || !session.moon_widow) { session.skipWidow(); afterWidowSwap(); return; }
   var hand = session.game.hands[seat];
   var widow = session.moon_widow;
-  // Trump hasn't been chosen yet during widow swap — predict what we'd pick
-  // so we can evaluate tiles relative to our likely trump choice
-  var predictedTrump = aiChooseTrump(hand, session.current_bid || 4);
-  var trumpSuit = (typeof predictedTrump === 'number') ? predictedTrump : null;
-  var trumpMode = (predictedTrump === 'DOUBLES') ? 'DOUBLES' : (trumpSuit !== null ? 'PIP' : 'NONE');
+  var bid = session.current_bid || 4;
 
-  function tileValue(t, handWithout){
-    var val = t[0] + t[1];
-    var isTrump = (trumpMode === 'PIP' && (t[0] === trumpSuit || t[1] === trumpSuit))
-               || (trumpMode === 'DOUBLES' && t[0] === t[1]);
-    // Trump tiles are more valuable
-    if(isTrump) val += 20;
-    if(t[0] === t[1]) val += 10; // Doubles generally strong
-    // Count tiles we can win are worth extra
-    var pipSum = t[0] + t[1];
-    if(isTrump && pipSum === 10) val += 8; // trump 10-count: we'll likely win it
-    else if(isTrump && pipSum === 5) val += 4; // trump 5-count: likely win
-    else if(!isTrump && pipSum === 10) val -= 3; // non-trump 10-count: risky to hold
-    else if(!isTrump && pipSum === 5) val -= 2; // non-trump 5-count: exposed
-    // Sequential trump strength: higher-ranked trumps more valuable
-    if(isTrump && trumpMode === 'PIP'){
-      var otherPip = (t[0] === trumpSuit) ? t[1] : t[0];
-      val += otherPip; // 7-6 > 7-3 > 7-0
-    }
-    // Bonus for creating/maintaining voids when swapping
-    if(handWithout){
-      var pA = t[0], pB = t[1];
-      var cntA = 0, cntB = 0;
-      for(var h of handWithout){
-        if(h[0] === pA || h[1] === pA) cntA++;
-        if(h[0] === pB || h[1] === pB) cntB++;
+  // Evaluate a complete hand's strength for a given trump choice
+  function evalHand(h, trump){
+    var ts = (typeof trump === 'number') ? trump : null;
+    var tm = (trump === 'DOUBLES') ? 'DOUBLES' : (ts !== null ? 'PIP' : 'NONE');
+    var score = 0;
+    var voidPips = {}; // track pip presence counts
+
+    for(var t of h){
+      var isTrump = (tm === 'PIP' && (t[0] === ts || t[1] === ts))
+                 || (tm === 'DOUBLES' && t[0] === t[1]);
+      var pipSum = t[0] + t[1];
+      var isDouble = t[0] === t[1];
+      var isCount = (pipSum === 5 || pipSum === 10);
+
+      // Base value
+      score += pipSum;
+
+      // Trump strength
+      if(isTrump){
+        score += 20;
+        if(tm === 'PIP'){
+          var otherPip = (t[0] === ts) ? t[1] : t[0];
+          score += otherPip; // higher sequential trump = stronger
+        }
+        // Trump count we'll likely win
+        if(pipSum === 10) score += 10;
+        else if(pipSum === 5) score += 5;
+      } else {
+        // Non-trump count is risky in Moon (individual scoring)
+        if(pipSum === 10) score -= 8;
+        else if(pipSum === 5) score -= 5;
       }
-      // If removing this tile creates a void, it's less valuable to keep
-      if(Math.min(cntA, cntB) === 0) val -= 5;
+
+      // Doubles are strong (control their suit)
+      if(isDouble) score += 12;
+
+      // Track pip presence for void calculation
+      voidPips[t[0]] = (voidPips[t[0]] || 0) + 1;
+      voidPips[t[1]] = (voidPips[t[1]] || 0) + 1;
     }
-    return val;
+
+    // Void bonuses: suits with 0 presence allow trump-in opportunities
+    var maxPip = session.game.max_pip || 6;
+    for(var pip = 0; pip <= maxPip; pip++){
+      if(tm === 'PIP' && pip === ts) continue; // trump suit can't be void bonus
+      if(!voidPips[pip]){
+        score += 4; // void bonus
+        // Extra if suit has count tiles
+        for(var p2 = 0; p2 <= maxPip; p2++){
+          if(p2 === pip) continue;
+          var s = pip + p2;
+          if(s === 5 || s === 10){ score += 3; break; }
+        }
+      }
+    }
+
+    // Trump count bonus
+    var trumpCount = 0;
+    for(var t2 of h){
+      var isTr = (tm === 'PIP' && (t2[0] === ts || t2[1] === ts))
+              || (tm === 'DOUBLES' && t2[0] === t2[1]);
+      if(isTr) trumpCount++;
+    }
+    if(trumpCount >= 4) score += 10; // strong trump mass
+    if(trumpCount >= 5) score += 8;
+
+    return score;
   }
 
-  // Evaluate each possible swap: try replacing each hand tile with the widow
+  // Score original hand
+  var origTrump = aiChooseTrump(hand, bid);
+  var origScore = evalHand(hand, origTrump);
+
+  // Evaluate each possible swap with re-predicted trump
   var bestSwapIdx = -1;
-  var bestSwapGain = 0;
-  var widowVal = tileValue(widow, null);
+  var bestSwapGain = -Infinity;
 
   for(var i = 0; i < hand.length; i++){
-    var handWithout = hand.filter((_, idx) => idx !== i);
-    var removedVal = tileValue(hand[i], handWithout);
-    var addedVal = tileValue(widow, handWithout);
-    var gain = addedVal - removedVal;
-    // Also consider if swapping creates a void (bonus)
-    var pA = hand[i][0], pB = hand[i][1];
-    var countA = handWithout.filter(h => h[0] === pA || h[1] === pA).length;
-    var countB = handWithout.filter(h => h[0] === pB || h[1] === pB).length;
-    if(Math.min(countA, countB) === 0){
-      var voidPip = (countA === 0) ? pA : pB;
-      // Check if widow fills the void back (illusory void)
-      var widowFillsVoid = (widow[0] === voidPip || widow[1] === voidPip);
-      if(!widowFillsVoid){
-        gain += 3; // genuine void creation bonus
-        // Extra bonus if the voided suit has count tiles remaining in the game
-        var suitHasCount = false;
-        for(var pip2 = 0; pip2 <= 6; pip2++){
-          if(pip2 === voidPip) continue;
-          var sum2 = voidPip + pip2;
-          if(sum2 === 5 || sum2 === 10) suitHasCount = true;
-        }
-        if(suitHasCount) gain += 4; // we can trump into count-rich tricks
-      }
-      // Illusory void: widow fills the suit back, no bonus
-    }
+    var postSwapHand = hand.filter(function(_, idx){ return idx !== i; });
+    postSwapHand.push(widow);
+    // Re-predict optimal trump for this new hand composition
+    var newTrump = aiChooseTrump(postSwapHand, bid);
+    var newScore = evalHand(postSwapHand, newTrump);
+    var gain = newScore - origScore;
     if(gain > bestSwapGain){ bestSwapGain = gain; bestSwapIdx = i; }
   }
 
-  if(bestSwapIdx >= 0){
+  // Only swap if gain exceeds threshold (avoid marginal swaps)
+  if(bestSwapIdx >= 0 && bestSwapGain > 3){
     session.swapWidow(bestSwapIdx);
   } else {
     session.skipWidow();
