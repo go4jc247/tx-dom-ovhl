@@ -17837,6 +17837,23 @@ function processAIBidWithEval(seat, evaluation) {
     }
   }
 
+  // PARTNER CHECK: don't competitively overbid your own partner unless hand is significantly stronger
+  // If partner already has the bid and our hand isn't dramatically better, just pass
+  const partnerIsHighBidder = biddingState.highBidder !== undefined && biddingState.highBidder !== null
+    && _partnerSeats(seat).includes(biddingState.highBidder);
+  if (partnerIsHighBidder && GAME_MODE !== 'MOON') {
+    // Only overbid partner if: our hand is max bid with higher marks, or significantly stronger
+    const partnerBid = biddingState.highBid || 0;
+    const partnerMarks = biddingState.highMarks || 1;
+    const weAreMuchStronger = (bidAmount >= maxBid && evalMarks > partnerMarks)
+      || (bidAmount >= maxBid && evalMarks >= 2 && partnerBid < maxBid);
+    if (!weAreMuchStronger) {
+      biddingState.passCount++;
+      biddingState.bids.push({ seat, playerNumber: seatToPlayer(seat), bid: "pass" });
+      return { action: "pass" };
+    }
+  }
+
   // Competitive outbid: if our natural bid is at or near the leader, try to outbid
   // Sustainability check: require double trump + second trump (top 2 in suit)
   const maxBidForMode = GAME_MODE === 'MOON' ? 7 : (GAME_MODE === 'T42' ? 42 : 51);
