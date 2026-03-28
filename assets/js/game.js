@@ -1789,6 +1789,14 @@ function aiChooseTrump(hand, bidAmount) {
       if (sum === 10) ntScore -= 4;
       else if (sum === 5) ntScore -= 2;
     }
+    // Void penalty: in NT, void suits can't be trumped (unlike PIP) — dangerous
+    let ntVoids = 0;
+    const ntAllPips = new Set();
+    for (const t of hand) { ntAllPips.add(t[0]); ntAllPips.add(t[1]); }
+    for (let s = 0; s <= maxPip; s++) {
+      if (!ntAllPips.has(s)) ntVoids++;
+    }
+    ntScore -= ntVoids * 3;
     // Threshold: NT must beat best pip suit (NT is riskier with no trump protection)
     if (ntScore > bestScore + 3) {
       return "NONE";
@@ -4782,9 +4790,9 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       if(lowTrumpF >= 0) return makeResult(lowTrumpF, "Trump led, partner winning — play low trump");
     }
 
-    // Last in trick: win if count in trick (but not if partner already winning)
-    if(isLastInTrick && winTrumpF >= 0 && trickCountF > 0 && !partnerWinningTrumpF){
-      return makeResult(winTrumpF, "Trump led, last: win for " + trickCountF + "pts");
+    // Last in trick: win if count in trick or final trick (but not if partner already winning)
+    if(isLastInTrick && winTrumpF >= 0 && !partnerWinningTrumpF && (trickCountF > 0 || tricksLeft <= 1)){
+      return makeResult(winTrumpF, "Trump led, last: win" + (trickCountF > 0 ? " for " + trickCountF + "pts" : " (final trick)"));
     }
 
     // Can we beat the current winner?
