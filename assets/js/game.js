@@ -4594,6 +4594,10 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       }
     }
     if(highIdx >= 0 && highRank > winnerRank){
+      // MOON: always win when bid not safe and endgame (no partners to help)
+      if(isMoon && !bidIsSafe && tricksLeft <= 3){
+        return makeResult(highIdx, "Moon endgame: must win every trick");
+      }
       // DUCK: if partner plays after us and likely has the double (higher card),
       // duck to let partner win (they can then lead a strategic suit)
       if(!isMoon && !isLastInTrick && !canSetBid && !winnerIsTrump){
@@ -11606,8 +11610,13 @@ function ppResetRotation() {
     const el = document.getElementById('playerIndicator' + p);
     if (el) {
       el.textContent = 'P' + p;
-      el.classList.remove('team1', 'team2');
-      el.classList.add((p - 1) % 2 === 0 ? 'team1' : 'team2');
+      el.classList.remove('team1', 'team2', 'team3');
+      if (GAME_MODE === 'TN51') {
+        const teamIdx = (p - 1) % 3;
+        el.classList.add(teamIdx === 0 ? 'team1' : teamIdx === 1 ? 'team2' : 'team3');
+      } else {
+        el.classList.add((p - 1) % 2 === 0 ? 'team1' : 'team2');
+      }
     }
   }
 
@@ -15978,6 +15987,9 @@ function positionPlayerIndicators(){
         if (GAME_MODE === 'MOON') {
           // Moon: 3 individual colors — P1 blue, P2 red, P3 neon green
           el.classList.add(seat === 0 ? 'team1' : seat === 1 ? 'team2' : 'team3');
+        } else if (GAME_MODE === 'TN51') {
+          const teamIdx = seat % 3;
+          el.classList.add(teamIdx === 0 ? 'team1' : teamIdx === 1 ? 'team2' : 'team3');
         } else {
           el.classList.add(seat % 2 === 0 ? 'team1' : 'team2');
         }
@@ -17881,6 +17893,12 @@ function showHandEndPopup(){
       const winnerIdx = marks.indexOf(maxM);
       const _localSeat = MULTIPLAYER_MODE ? mpSeat : 0;
       localWon = (_localSeat === winnerIdx);
+    } else if (GAME_MODE === 'TN51') {
+      const marks = [session.team_marks[0], session.team_marks[1], session.team_marks[2] || 0];
+      const maxM = Math.max(...marks);
+      const winnerIdx = marks.indexOf(maxM);
+      const localTeamIdx = MULTIPLAYER_MODE ? (mpSeat % 3) : 0;
+      localWon = (localTeamIdx === winnerIdx);
     } else {
       const localTeam = MULTIPLAYER_MODE ? ((mpSeat % 2 === 0) ? 1 : 2) : 1;
       const t1m = session.team_marks[0];
@@ -19331,6 +19349,15 @@ function showGameEndSummary(){
     const _localSeat = MULTIPLAYER_MODE ? mpSeat : 0;
     _youWon = (_localSeat === winnerIdx);
     _endTitle = _youWon ? 'You Win!' : 'Player ' + (winnerIdx + 1) + ' Wins!';
+    _endBg = _youWon ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
+  } else if (GAME_MODE === 'TN51') {
+    const t3m = session.team_marks[2] || 0;
+    const marks = [t1m, t2m, t3m];
+    const maxM = Math.max(...marks);
+    const winnerIdx = marks.indexOf(maxM);
+    const localTeamIdx = MULTIPLAYER_MODE ? (mpSeat % 3) : 0;
+    _youWon = (localTeamIdx === winnerIdx);
+    _endTitle = _youWon ? 'Your Team Wins! \u{1F389}' : 'Team ' + (winnerIdx + 1) + ' Wins!';
     _endBg = _youWon ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
   } else {
     const winner = t1m > t2m ? 1 : 2;
