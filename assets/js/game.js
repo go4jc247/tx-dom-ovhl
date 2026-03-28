@@ -1525,10 +1525,10 @@ function evaluateHandForBid(hand) {
         maxSmallPip = Math.max(maxSmallPip, Math.max(a, b));
       }
     }
-    // TN51: much stricter — 4 opponents means every suit covered, very hard to duck
-    // Require 5+ blanks (of 6 tiles) or no doubles at all for TN51
-    const nelloSmallPipLimit = (GAME_MODE === 'TN51') ? 1 : 2;
-    const nelloBlanksOk = (GAME_MODE === 'TN51') ? (blanks.length >= 5 || maxDoublePip === 0) : true;
+    // TN51 Nello is 1v1 (bidder picks one opponent), same as T42 Nello
+    // Both: need 0-1 as anchor + low pips + at most one non-blank double
+    const nelloSmallPipLimit = (GAME_MODE === 'TN51') ? 2 : 2;
+    const nelloBlanksOk = (GAME_MODE === 'TN51') ? (blanks.length >= 3 || maxDoublePip === 0) : true;
     if (has01 && maxSmallPip <= nelloSmallPipLimit && maxDoublePip <= 1 && nelloBlanksOk) {
       return { action: "bid", bid: maxBid, marks: 1 };
     }
@@ -2135,7 +2135,7 @@ function acceptLayDown() {
   // V12.10.20: Fix lay-down scoring
   // Remaining tricks = tiles in one player's hand (each trick uses one tile per player)
   const gs = session.game;
-  const remainingTricks = (gs.hands[0] || []).length;
+  const remainingTricks = (gs.hands[layDownState.seat] || gs.hands[0] || []).length;
   let remainingPoints = 0;
 
   if (GAME_MODE === 'MOON') {
@@ -2731,16 +2731,40 @@ function detectLayDownHand(gameState, seat) {
   //    we can lead the double first to walk it, then the off walks too
   // Simplified: for lay-down, non-trumps must be doubles or offs covered by doubles in hand
 
-  // For NT mode: all tiles must be doubles (NT lay-down = all remaining tiles are doubles)
+  // For NT mode: all tiles must be guaranteed winners (doubles or covered-offs that walk)
   if (trumpMode === 'NONE') {
-    const allDoubles = hand.every(t => t[0] === t[1]);
-    if (!allDoubles) return null;
+    const ntDoublesInHand = new Set();
+    for (const t of hand) { if (t[0] === t[1]) ntDoublesInHand.add(t[0]); }
+    const ntWinners = [];
+    let ntAllSafe = true;
+    for (const t of hand) {
+      if (t[0] === t[1]) {
+        ntWinners.push(t); // double always wins its suit
+      } else {
+        const highPip = Math.max(t[0], t[1]);
+        const lowPip = Math.min(t[0], t[1]);
+        if (!ntDoublesInHand.has(highPip)) { ntAllSafe = false; break; }
+        // Verify all higher tiles in this suit are played or in our hand
+        let offSafe = true;
+        for (let op = lowPip + 1; op <= maxPip; op++) {
+          if (op === highPip) continue;
+          const a = Math.min(highPip, op), b = Math.max(highPip, op);
+          if (!isPlayed(a, b)) {
+            const weHave = hand.some(h => Math.min(h[0],h[1])===a && Math.max(h[0],h[1])===b);
+            if (!weHave) { offSafe = false; break; }
+          }
+        }
+        if (offSafe) ntWinners.push(t);
+        else { ntAllSafe = false; break; }
+      }
+    }
+    if (!ntAllSafe) return null;
     return {
       seat: seat,
       hand: hand.slice(),
       trumps: [],
-      winningNonTrumps: hand.slice(),
-      reason: 'All remaining tiles are doubles (No Trumps)'
+      winningNonTrumps: ntWinners,
+      reason: 'All remaining tiles are guaranteed winners (No Trumps)'
     };
   }
 
@@ -5029,7 +5053,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       // PICK safest trump: avoid count tiles, then prefer low value
       const p3EarlyWindow = trickNum <= 1;
       // TN51: 6 tiles per hand, so threshold must be reachable. 4 is already ambitious for 6-tile hands.
-      const p3TrumpThreshold = isTN51 ? 4 : 4;
+      const p3TrumpThreshold = isTN51 ? 3 : 4;
       const p3MidWindow = trickNum === 2 && trumpsInHand.length >= p3TrumpThreshold;
       const p3LateWindow = trickNum === 3 && trumpsInHand.length >= p3TrumpThreshold;
       // Defenders: more conservative — only pull early or when can set bid
@@ -7827,7 +7851,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.72.0';  // v17.72.0: TN51 Team 3 score display — 27+ locations fixed, moonScoreBar repurposed
+const MP_VERSION = 'v17.73.0';  // v17.73.0: TN51 Nello relaxed, NT lay-down covered-offs, lay-down hand fix, sustain threshold
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
@@ -19304,8 +19328,8 @@ function processAIBidWithEval(seat, evaluation) {
       const hasDouble = trumpTiles.some(t => t[0] === pip && t[1] === pip);
       const hasSecond = trumpTiles.some(t =>
         t[0] !== t[1] && ((t[0] === pip && t[1] === pip - 1) || (t[0] === pip - 1 && t[1] === pip)));
-      // TN51 has 4 opponents (vs 2 in T42) — need same trump strength to sustain outbid
-      const sustainThreshold = 4;
+      // TN51 has 6-tile hands (67% at 4), T42 has 7-tile (57% at 4) — lower for TN51
+      const sustainThreshold = (GAME_MODE === 'TN51') ? 3 : 4;
       if (trumpTiles.length >= sustainThreshold && hasDouble && hasSecond) { canSustain = true; break; }
     }
     if (canSustain && biddingState.highBid < maxBidForMode) {

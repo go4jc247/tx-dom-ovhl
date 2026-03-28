@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.72.0 — TN51 Team 3 score display: 27+ locations fixed, moonScoreBar repurposed
+// Version: v17.73.0 — TN51 Nello, NT lay-down, lay-down hand fix, sustain threshold
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.72.0';
+const CACHE_NAME = 'tx-dom-v17.73.0';
 const urlsToCache = [
   './index.html',
   // CSS
