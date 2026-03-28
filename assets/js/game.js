@@ -3912,9 +3912,9 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
                 const offLowPip = Math.min(offTile[0], offTile[1]);
                 // Check if any higher tile in this suit is still unplayed (by anyone else)
                 let isWalker = true;
-                for (let otherPip = offHighPip; otherPip >= 0; otherPip--) {
-                  if (otherPip === offLowPip) continue; // skip our own tile
-                  if (otherPip === offHighPip) continue; // the double we're about to play
+                // Only check tiles that can BEAT our off (higher-ranked = otherPip > offLowPip)
+                // Tiles with otherPip < offLowPip rank lower and can't beat us
+                for (let otherPip = offHighPip - 1; otherPip > offLowPip; otherPip--) {
                   const otherTile = [Math.min(offHighPip, otherPip), Math.max(offHighPip, otherPip)];
                   if (!isPlayed(otherTile[0], otherTile[1])) {
                     isWalker = false;
