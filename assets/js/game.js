@@ -1600,11 +1600,9 @@ function evaluateHandForBid(hand) {
       return { action: "bid", bid: bid, marks: 1 };
     }
 
-    // 4+ trumps with double but no 2nd → still worth a min bid
+    // 4+ trumps with double but no 2nd → min bid (lacks sequential control for mid)
     if (trumpCount >= 4 && hasDoubleTrump && ntUncoveredOffs <= 1) {
-      // TN51: 4 trumps = 67% of hand — very strong
-      const bid = handSize <= 6 ? midBid : minBid;
-      return { action: "bid", bid: bid, marks: 1 };
+      return { action: "bid", bid: minBid, marks: 1 };
     }
   }
 
@@ -17075,8 +17073,8 @@ function processAIBidWithEval(seat, evaluation) {
     // Only escalate to 3x with genuinely strong 2x hands (bid at max)
     // Only escalate to 4x with dominant hands (all doubles or top trump combo)
     const handIsMaxBid = evaluation.bid >= maxBid;
-    const shouldEscalate = (nextMult <= 2) ||
-      (nextMult === 3 && handIsMaxBid) ||
+    const shouldEscalate = (nextMult <= 2 && handIsMaxBid) ||
+      (nextMult === 3 && handIsMaxBid && evalMarks >= 2) ||
       (nextMult === 4 && handIsMaxBid && evalMarks >= 2);
     if (nextMult <= MAX_AI_MULTIPLIER && shouldEscalate) {
       bidMarks = nextMult;
@@ -17101,7 +17099,9 @@ function processAIBidWithEval(seat, evaluation) {
       const hasDouble = trumpTiles.some(t => t[0] === pip && t[1] === pip);
       const hasSecond = trumpTiles.some(t =>
         t[0] !== t[1] && ((t[0] === pip && t[1] === pip - 1) || (t[0] === pip - 1 && t[1] === pip)));
-      if (trumpTiles.length >= 4 && hasDouble && hasSecond) { canSustain = true; break; }
+      // TN51 (5-6 tile hands): 3+ trumps is already very strong (60%+ of hand)
+      const sustainThreshold = (GAME_MODE === 'TN51') ? 3 : 4;
+      if (trumpTiles.length >= sustainThreshold && hasDouble && hasSecond) { canSustain = true; break; }
     }
     if (canSustain && bidAmount < maxBidForMode) {
       bidAmount += 1; // outbid by minimum increment — hand can support it
