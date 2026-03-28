@@ -5157,6 +5157,31 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           }
         }
       }
+      // SECOND-SEAT COUNT PROTECTION: if we're not last and best winning card is count,
+      // opponents behind us could trump in and steal our count tile
+      if(!isLastInTrick && bestWinCountVal > 0 && !mustWin && !canSetBid){
+        let _oppsAfterUs = 0;
+        for(let s = 0; s < gameState.player_count; s++){
+          if(isSameTeam(s) || s === p || !gameState.active_players.includes(s)) continue;
+          if(!trick.some(play => Array.isArray(play) && play[0] === s)) _oppsAfterUs++;
+        }
+        if(_oppsAfterUs > 0 && !opponentsVoidInTrump){
+          // Opponents behind us might trump in — check trick count vs risk
+          const trickCountNow = trick.reduce((sum, play) => {
+            if(!Array.isArray(play) || !play[1]) return sum;
+            const ps = play[1][0] + play[1][1];
+            return sum + ((ps === 5) ? 5 : (ps === 10) ? 10 : 0);
+          }, 0);
+          // 10-count: duck unless trick already has count worth fighting for
+          // 5-count: duck only if trick is empty and many opponents remain
+          if(bestWinCountVal === 10 && trickCountNow < 5){
+            if(lowIdx >= 0) return makeResult(lowIdx, "2nd-seat: duck to protect 10-count (opps may trump)");
+          }
+          if(bestWinCountVal === 5 && trickCountNow === 0 && _oppsAfterUs >= 2){
+            if(lowIdx >= 0) return makeResult(lowIdx, "2nd-seat: duck to protect 5-count (many opps behind)");
+          }
+        }
+      }
       // BIDDER OFF-SUIT DEFUSE: if off-tracker suspects this suit is our "off",
       // win with a HIGHER card to show strength and reduce suspicion
       if(iAmBidder && offTracker && (offTracker.trumpMode === 'PIP' || offTracker.trumpMode === 'DOUBLES')){
