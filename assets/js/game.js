@@ -14026,12 +14026,16 @@ function aiWidowSwap(seat){
     var newScore = evalHand(postSwapHand, newTrump);
     var gain = newScore - origScore;
     // Penalty for changing trump strategy (risky to shift mid-hand)
-    if(newTrump !== origTrump) gain -= 3;
+    if(newTrump !== origTrump) gain -= 8; // high risk: committed to bid based on original trump
     if(gain > bestSwapGain){ bestSwapGain = gain; bestSwapIdx = i; }
   }
 
   // Dynamic threshold: higher bids require bigger improvement to justify swap risk
-  var swapThreshold = bid >= 6 ? 6 : (bid >= 5 ? 4 : 3);
+  // NELLO: essentially never swap (hand is carefully balanced for low tiles)
+  var swapThreshold;
+  if(origTrump === 'NELLO') swapThreshold = 20;
+  else if(origTrump === 'DOUBLES') swapThreshold = 10;
+  else swapThreshold = bid >= 6 ? 8 : 5; // raised minimums (was 6/4/3)
   if(bestSwapIdx >= 0 && bestSwapGain > swapThreshold){
     session.swapWidow(bestSwapIdx);
   } else {
@@ -17325,24 +17329,26 @@ function processAIBidWithEval(seat, evaluation) {
     }
   }
 
-  // Competitive outbid: if our natural bid ties the leader, bump by 1 — but only if hand can sustain it
-  // Sustainability check: require double trump + second trump (top 2 in suit) to justify the bump
-  if (bidAmount === biddingState.highBid && bidMarks === (biddingState.highMarks || 1) && evalMarks >= 1) {
-    const maxBidForMode = GAME_MODE === 'MOON' ? 7 : (GAME_MODE === 'T42' ? 42 : 51);
+  // Competitive outbid: if our natural bid is at or near the leader, try to outbid
+  // Sustainability check: require double trump + second trump (top 2 in suit)
+  const maxBidForMode = GAME_MODE === 'MOON' ? 7 : (GAME_MODE === 'T42' ? 42 : 51);
+  if (biddingState.highBid && bidAmount <= biddingState.highBid && bidMarks <= (biddingState.highMarks || 1) && evalMarks >= 1) {
     const maxPip = session.game.max_pip;
-    // Check if hand has a strong trump suit (double + second) to sustain the higher bid
     let canSustain = false;
     for (let pip = maxPip; pip >= 0; pip--) {
       const trumpTiles = hand.filter(t => t[0] === pip || t[1] === pip);
       const hasDouble = trumpTiles.some(t => t[0] === pip && t[1] === pip);
       const hasSecond = trumpTiles.some(t =>
         t[0] !== t[1] && ((t[0] === pip && t[1] === pip - 1) || (t[0] === pip - 1 && t[1] === pip)));
-      // TN51 (5-6 tile hands): 3+ trumps is already very strong (60%+ of hand)
       const sustainThreshold = (GAME_MODE === 'TN51') ? 3 : 4;
       if (trumpTiles.length >= sustainThreshold && hasDouble && hasSecond) { canSustain = true; break; }
     }
-    if (canSustain && bidAmount < maxBidForMode) {
-      bidAmount += 1; // outbid by minimum increment — hand can support it
+    if (canSustain && biddingState.highBid < maxBidForMode) {
+      // Adjust up to highBid + 1 (but only if within reasonable range of our natural bid)
+      const gap = biddingState.highBid - bidAmount;
+      if (gap <= 2) {
+        bidAmount = biddingState.highBid + 1; // outbid by minimum increment
+      }
     }
   }
 
