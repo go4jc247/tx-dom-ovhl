@@ -3721,6 +3721,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         // Track bidder's demonstrated suits from completed tricks — suits with more bidder
         // tiles are targets (bidder has more cards to follow with, more chances to be forced high)
         const bidderSuitStrength = {};
+        const suitsSeenFromBidder = new Set();
         for(const rec of (gameState.tricks_team || []).flat()){
           if(!rec) continue;
           for(let seat = 0; seat < rec.length; seat++){
@@ -3728,6 +3729,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
             const bt = rec[seat];
             const hp = Math.max(bt[0], bt[1]);
             bidderSuitStrength[hp] = (bidderSuitStrength[hp] || 0) + 1;
+            suitsSeenFromBidder.add(hp);
           }
         }
 
@@ -3745,6 +3747,13 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           // Bonus for suits where bidder has demonstrated presence (more tiles = more follow pressure)
           const suitPip = Math.max(tile[0], tile[1]);
           if(bidderSuitStrength[suitPip]) score += bidderSuitStrength[suitPip] * 8;
+
+          // SUIT ABSENCE EXPLOITATION: if we've seen multiple tricks but bidder
+          // has NEVER played in this suit, they may be void or weak — less useful to lead
+          // (void = safe dump for bidder; weak = fewer follow pressure chances)
+          if(trickNum >= 2 && !suitsSeenFromBidder.has(suitPip) && !dbl){
+            score -= 6; // bidder hasn't shown tiles in this suit — may be void/weak
+          }
 
           // If bidder is void in this suit, don't lead it
           if(bidderSeat !== undefined && voidIn[bidderSeat] && voidIn[bidderSeat].has(suitPip)){

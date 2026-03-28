@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.29.0 — Defender bid-safe counter, void density, TN51 dump
+// Version: v17.30.0 — Nello suit absence tracking
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.29.0';
+const CACHE_NAME = 'tx-dom-v17.30.0';
 const urlsToCache = [
   './index.html',
   // CSS
