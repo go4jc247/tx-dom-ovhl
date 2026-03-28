@@ -1670,7 +1670,8 @@ function aiChooseTrump(hand, bidAmount) {
 
   // Nello detection: AI calls Nello when hand is mostly low tiles
   // Only available when nelloDeclareMode is OFF (otherwise declared during bidding)
-  if (!nelloDeclareMode && bidAmount >= 51) {
+  const _nelloMaxBid = GAME_MODE === 'MOON' ? 7 : (GAME_MODE === 'T42' ? 42 : 51);
+  if (!nelloDeclareMode && bidAmount >= _nelloMaxBid) {
     // Count tiles that are "low" (both pips <= 3)
     const lowTiles = hand.filter(t => t[0] <= 3 && t[1] <= 3);
     // Count tiles with a blank (0-x)
@@ -1759,8 +1760,7 @@ function aiChooseTrump(hand, bidAmount) {
     let coveredOffs = 0;
     for (const t of nonTrumpTiles) {
       if (t[0] === t[1]) continue;
-      const highPip = Math.max(t[0], t[1]);
-      if (ntDoublePips.has(highPip)) coveredOffs++;
+      if (ntDoublePips.has(t[0]) || ntDoublePips.has(t[1])) coveredOffs++;
     }
     score += coveredOffs * 7; // covered offs are safe side tricks (walker pairs)
 
@@ -1796,8 +1796,7 @@ function aiChooseTrump(hand, bidAmount) {
     let ntCoveredOffs = 0;
     for (const t of hand) {
       if (t[0] === t[1]) continue;
-      const highPip = Math.max(t[0], t[1]);
-      if (ntDoublePips.has(highPip)) ntCoveredOffs++;
+      if (ntDoublePips.has(t[0]) || ntDoublePips.has(t[1])) ntCoveredOffs++;
     }
     ntScore += ntCoveredOffs * 8; // covered offs are near-guaranteed in NT
     // Bonus for diverse doubles (spread across suits = control more suits)
@@ -1805,8 +1804,7 @@ function aiChooseTrump(hand, bidAmount) {
     // Penalty for uncovered singles (no double for their suit = risky)
     const uncovered = hand.filter(t => {
       if (t[0] === t[1]) return false;
-      const hp = Math.max(t[0], t[1]);
-      return !ntDoublePips.has(hp);
+      return !ntDoublePips.has(t[0]) && !ntDoublePips.has(t[1]);
     });
     ntScore -= uncovered.length * 5;
     // Count exposure penalty (NT has no trump to capture count)
@@ -4066,7 +4064,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       // AND don't waste high trumps pulling partner's trumps
       // PICK safest trump: avoid count tiles (pipSum=5 or 10), then prefer low value
       if(otherTrumps.length > 0 && iHaveHighestTrump && !shouldSaveLastTrump && !partnersHoldRemainingTrumps
-        && (trumpTilesRemaining.length > 0 || !opponentsVoidInTrump)){
+        && trumpTilesRemaining.length > 0 && !opponentsVoidInTrump){
         let bestIdx = otherTrumps[0], bestScore = -Infinity;
         for(const idx of otherTrumps){
           const tile = hand[idx];
@@ -4090,7 +4088,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       // Defenders: more conservative — only pull early or when can set bid
       // Bidders: aggressive pulling to gain control
       const p3RoleOk = isBidderTeam || canSetBid || p3EarlyWindow;
-      if(otherTrumps.length >= 2 && trumpsInHand.length >= 3 && (p3EarlyWindow || p3MidWindow || p3LateWindow || mustWin) && p3RoleOk && !bidIsSafe && !partnersHoldRemainingTrumps){
+      if(otherTrumps.length >= 2 && trumpsInHand.length >= 3 && !opponentsVoidInTrump && (p3EarlyWindow || p3MidWindow || p3LateWindow || mustWin) && p3RoleOk && !bidIsSafe && !partnersHoldRemainingTrumps){
         let bestIdx = otherTrumps[0], bestScore = -Infinity;
         for(const idx of otherTrumps){
           const tile = hand[idx];
@@ -4349,7 +4347,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           }
           // Without trump control, count tiles are very exposed — opponents can trump in
           // Harsher penalty when opponents are void (will trump our count)
-          const countPenMult = (oppsVoid > 0 && !opponentsVoidInTrump) ? (3 + oppsVoid * 2) : 3;
+          const countPenMult = (oppsVoid > 0 && !opponentsVoidInTrump) ? Math.min(5, 3 + oppsVoid * 2) : 3;
           score -= myCount * countPenMult;
           _breakdown.myCountPenalty = -(myCount * countPenMult);
           if(!info.winnerPlayed){
@@ -5014,10 +5012,10 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       const _shouldConserve = !isBidderTeam && trickCount === 0 && !isEndgame && !bidderIsClose && !canSetBid
         && !bidderNearMaking
         && (shouldSaveLastTrump || (_trumpRatio <= 0.5 && trumpsInHand.length <= 2));
-      if(_shouldConserve){
+      if(_shouldConserve && legalTiles.some(t => !gameState._is_trump_tile(t))){
         // Low-value trick on defense with scarce trumps — save for count-heavy trick
-        // Fall through to dump logic
-      } else {
+        // Fall through to dump logic (only if we have non-trump dump options)
+      } else if(winTrumpIdx >= 0){
         return makeResult(winTrumpIdx, canSetBid && !isBidderTeam ? "Trump in (setting bid)" : "Trump in to win");
       }
     }
