@@ -3696,8 +3696,15 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
 
       // Find the led suit and current winner rank
       const nLedSuit = gameState._led_suit_for_trick();
+      const _nDoublesLed = nLedSuit === -2;
       let nWinnerRank = -1;
-      if(nLedSuit !== null && nLedSuit >= 0){
+      if(_nDoublesLed){
+        const nWinSeat = gameState._determine_trick_winner();
+        for(const play of trick){
+          if(!Array.isArray(play) || play[0] !== nWinSeat) continue;
+          if(play[1] && play[1][0] === play[1][1]) nWinnerRank = play[1][0]; // double rank = pip
+        }
+      } else if(nLedSuit !== null && nLedSuit >= 0){
         const nWinSeat = gameState._determine_trick_winner();
         for(const play of trick){
           if(!Array.isArray(play) || play[0] !== nWinSeat) continue;
@@ -3708,8 +3715,10 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
 
       // Check if we're off-suit (no tiles in led suit). In Nello (no trumps),
       // off-suit tiles can NEVER win — dump lowest to save high tiles for later.
-      const _nHaveInSuit = nLedSuit !== null && nLedSuit >= 0 &&
-        legal.some(i => hand[i][0] === nLedSuit || hand[i][1] === nLedSuit);
+      const _nHaveInSuit = _nDoublesLed
+        ? legal.some(i => hand[i][0] === hand[i][1]) // doubles-led: have any doubles?
+        : (nLedSuit !== null && nLedSuit >= 0 &&
+           legal.some(i => hand[i][0] === nLedSuit || hand[i][1] === nLedSuit));
       if(!_nHaveInSuit){
         let dumpIdx = legal[0], dumpVal = Infinity;
         for(const idx of legal){
@@ -3724,12 +3733,15 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         let highIdx = legal[0], highRank = -1;
         for(const idx of legal){
           const tile = hand[idx];
-          if(nLedSuit !== null && nLedSuit >= 0){
+          if(_nDoublesLed){
+            // Doubles-as-suit: rank by double pip value
+            if(tile[0] === tile[1] && tile[0] > highRank){ highRank = tile[0]; highIdx = idx; }
+          } else if(nLedSuit !== null && nLedSuit >= 0){
             const r = gameState._suit_rank(tile, nLedSuit);
             const rank = r[0] * 100 + r[1];
             if(rank > highRank){ highRank = rank; highIdx = idx; }
           } else {
-            const val = tile[0]+tile[1]; // fallback for trump-led
+            const val = tile[0]+tile[1]; // fallback
             if(val > highRank){ highRank = val; highIdx = idx; }
           }
         }
@@ -3740,7 +3752,9 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       let bidderRank = -1;
       for(const play of trick){
         if(!Array.isArray(play) || play[0] !== bidderSeat) continue;
-        if(nLedSuit !== null && nLedSuit >= 0){
+        if(_nDoublesLed){
+          if(play[1] && play[1][0] === play[1][1]) bidderRank = play[1][0];
+        } else if(nLedSuit !== null && nLedSuit >= 0){
           const br = gameState._suit_rank(play[1], nLedSuit);
           bidderRank = br[0] * 100 + br[1];
         }
@@ -3752,7 +3766,9 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         let lowIdx = legal[0], lowRank = Infinity;
         for(const idx of legal){
           const tile = hand[idx];
-          if(nLedSuit !== null && nLedSuit >= 0){
+          if(_nDoublesLed){
+            if(tile[0] === tile[1] && tile[0] < lowRank){ lowRank = tile[0]; lowIdx = idx; }
+          } else if(nLedSuit !== null && nLedSuit >= 0){
             const r = gameState._suit_rank(tile, nLedSuit);
             const rank = r[0] * 100 + r[1];
             if(rank < lowRank){ lowRank = rank; lowIdx = idx; }
@@ -3767,7 +3783,9 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       let highIdx = legal[0], highRank = -1;
       for(const idx of legal){
         const tile = hand[idx];
-        if(nLedSuit !== null && nLedSuit >= 0){
+        if(_nDoublesLed){
+          if(tile[0] === tile[1] && tile[0] > highRank){ highRank = tile[0]; highIdx = idx; }
+        } else if(nLedSuit !== null && nLedSuit >= 0){
           const r = gameState._suit_rank(tile, nLedSuit);
           const rank = r[0] * 100 + r[1];
           if(rank > highRank){ highRank = rank; highIdx = idx; }
