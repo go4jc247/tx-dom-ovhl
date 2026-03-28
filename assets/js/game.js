@@ -1615,7 +1615,7 @@ function aiChooseTrump(hand, bidAmount) {
   }
 
   if (doubles.length >= 4) {
-    return "NT";
+    return "DOUBLES";
   }
 
   let bestSuit = null;
@@ -11867,7 +11867,7 @@ function buildTrumpOptions() {
     if(hintBar && hintText){
       let label = '';
       if(aiTrump === 'NELLO') label = 'Nel-O';
-      else if(aiTrump === 'NT') label = 'No Trump (Doubles)';
+      else if(aiTrump === 'DOUBLES') label = 'Doubles Trump';
       else if(typeof aiTrump === 'number') label = aiTrump + 's Trump';
       else label = String(aiTrump);
       hintText.textContent = label;
@@ -11879,7 +11879,7 @@ function buildTrumpOptions() {
           selectedTrump = 'NELLO';
           nelloBtn.classList.add('selected');
           document.getElementById('btnTrumpConfirm').disabled = false;
-        } else if(aiTrump === 'NT'){
+        } else if(aiTrump === 'DOUBLES'){
           selectedTrump = 'DOUBLES';
           doublesBtn.classList.add('selected');
           document.getElementById('btnTrumpConfirm').disabled = false;
