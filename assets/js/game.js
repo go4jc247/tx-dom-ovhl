@@ -2752,7 +2752,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   const trickNum = gameState.trick_number; // 0-indexed: how many tricks completed so far
   const totalTricks = gameState.hand_size || 6;
   const posInTrick = trick.length; // 0 = leading, 1 = 2nd, etc.
-  const isLastInTrick = posInTrick === gameState.player_count - 1;
+  const isLastInTrick = posInTrick === gameState.active_players.length - 1;
 
   // ── Led suit via game engine ──
   let ledPip = null;
@@ -4701,11 +4701,11 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     const pwCandidates = pwNonTrumps.length > 0 ? pwNonTrumps : pwTrumps;
 
     // Check how many opponents still have to play after us
-    const playersRemaining = gameState.player_count - trick.length - 1;
+    const playersRemaining = gameState.active_players.length - trick.length - 1;
     let oppsRemaining = 0;
-    // Count opponent seats that haven't played yet
+    // Count active opponent seats that haven't played yet
     for(let s = 0; s < gameState.player_count; s++){
-      if(isSameTeam(s) || s === p) continue;
+      if(isSameTeam(s) || s === p || !gameState.active_players.includes(s)) continue;
       const alreadyPlayed = trick.some(play => Array.isArray(play) && play[0] === s);
       if(!alreadyPlayed) oppsRemaining++;
     }
@@ -4811,7 +4811,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         // Check if opponents can still over-trump before throwing count
         let _oppsLeft = 0;
         for(let s = 0; s < gameState.player_count; s++){
-          if(isSameTeam(s) || s === p) continue;
+          if(isSameTeam(s) || s === p || !gameState.active_players.includes(s)) continue;
           if(!trick.some(play => Array.isArray(play) && play[0] === s)) _oppsLeft++;
         }
         const _safeFromOvertrump = _oppsLeft === 0 || opponentsVoidInTrump;
@@ -4872,7 +4872,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       if(!isMoon && !isLastInTrick && !canSetBid && !winnerIsTrump && !mustWin){
         let partnerAfterUs = false;
         for(let s = 0; s < gameState.player_count; s++){
-          if(!isSameTeam(s) || s === p) continue;
+          if(!isSameTeam(s) || s === p || !gameState.active_players.includes(s)) continue;
           const partnerPlayed = trick.some(play => Array.isArray(play) && play[0] === s);
           if(!partnerPlayed){ partnerAfterUs = true; break; }
         }
@@ -4948,7 +4948,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       if(partnerWinning){
         let _oppsLeft2 = 0;
         for(let s = 0; s < gameState.player_count; s++){
-          if(isSameTeam(s) || s === p) continue;
+          if(isSameTeam(s) || s === p || !gameState.active_players.includes(s)) continue;
           if(!trick.some(play => Array.isArray(play) && play[0] === s)) _oppsLeft2++;
         }
         // Safety: opponents can't beat partner with trump OR higher suit card
@@ -5057,7 +5057,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       // Throw count trump if safe, otherwise lowest trump
       let oppsLeftF = 0;
       for(let s = 0; s < gameState.player_count; s++){
-        if(isSameTeam(s) || s === p) continue;
+        if(isSameTeam(s) || s === p || !gameState.active_players.includes(s)) continue;
         if(!trick.some(play => Array.isArray(play) && play[0] === s)) oppsLeftF++;
       }
       const safeF = oppsLeftF === 0 || isLastInTrick;
@@ -5169,7 +5169,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       // Check: can opponents still over-trump?
       let oppsYetToPlay = 0;
       for(let s = 0; s < gameState.player_count; s++){
-        if(isSameTeam(s) || s === p) continue;
+        if(isSameTeam(s) || s === p || !gameState.active_players.includes(s)) continue;
         const alreadyPlayed = trick.some(play => Array.isArray(play) && play[0] === s);
         if(!alreadyPlayed) oppsYetToPlay++;
       }
@@ -5310,7 +5310,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     // Check opponents behind us can't overtrump
     let _egOppsLeft = 0;
     for(let s = 0; s < gameState.player_count; s++){
-      if(isSameTeam(s) || s === p) continue;
+      if(isSameTeam(s) || s === p || !gameState.active_players.includes(s)) continue;
       if(!trick.some(play => Array.isArray(play) && play[0] === s)) _egOppsLeft++;
     }
     const _egSafe = _egOppsLeft === 0 || opponentsVoidInTrump || isLastInTrick;
@@ -5372,7 +5372,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         const oppWinning = !partnerWinning && trick.length > 0;
         let _oppsStillToPlay = 0;
         for(let s = 0; s < gameState.player_count; s++){
-          if(isSameTeam(s) || s === p) continue;
+          if(isSameTeam(s) || s === p || !gameState.active_players.includes(s)) continue;
           if(!trick.some(play => Array.isArray(play) && play[0] === s)) _oppsStillToPlay++;
         }
         // More opponents remaining = higher risk of losing count
