@@ -5228,10 +5228,25 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           const info = suitInfo[pip];
           if(!info) continue;
           let score = 100 + info.countRemaining + pip - (info.tilesLeft * 3);
-          // Walker setup: if we hold a covered off for this double, lead double first
-          // so the off "walks" next trick (guaranteed 2-trick win combo)
-          const hasCoveredOff = hand.some(t => t[0] !== t[1] && (t[0] === pip || t[1] === pip));
-          if(hasCoveredOff) score += 20;
+          // Walker setup: check if any off in this suit is guaranteed to walk after leading double
+          let walkerSetupBonus = 0;
+          for(const t of hand){
+            if(t[0] === t[1]) continue;
+            if(t[0] !== pip && t[1] !== pip) continue;
+            const offLow = Math.min(t[0], t[1]);
+            // Off walks if no unplayed tile in this suit outranks it
+            let isWalker = true;
+            for(let op = offLow + 1; op <= maxPip; op++){
+              if(op === pip) continue; // the double itself
+              const a = Math.min(pip, op), b = Math.max(pip, op);
+              if(!isPlayed(a, b) && !hand.some(h => Math.min(h[0],h[1])===a && Math.max(h[0],h[1])===b)){
+                isWalker = false; break;
+              }
+            }
+            if(isWalker){ walkerSetupBonus = 20; break; }
+          }
+          if(walkerSetupBonus > 0) score += walkerSetupBonus;
+          else if(hand.some(t => t[0] !== t[1] && (t[0] === pip || t[1] === pip))) score += 8; // non-walking off still has some value
           // Depleted-suit bonus: fewer remaining tiles = safer double lead
           if(info.tilesLeft <= 2) score += 8;
           // Opponent void bonus: if opponents are void in this suit, our double is ultra-safe
@@ -5771,7 +5786,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   // ── Partner/teammate winning: throw count (but NEVER dump trumps if non-trump options exist) ──
   // TN51: another defender team winning is also favorable — treat as "friendly win"
   const friendlyDefenderWinning = isTN51 && !isBidderTeam && !partnerWinning
-    && winnerSeat !== undefined && gameState.team_of(winnerSeat) !== bidderTeamIdx && winnerSeat !== p;
+    && currentWinner !== null && gameState.team_of(currentWinner) !== bidderTeamIdx && currentWinner !== p;
   if(partnerWinning || friendlyDefenderWinning){
     // Separate legal tiles into trump and non-trump
     const pwNonTrumps = [];
@@ -7906,7 +7921,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.75.0';  // v17.75.0: lead logic — void creation, defender count denial, count-10 safety
+const MP_VERSION = 'v17.76.0';  // v17.76.0: winnerSeat scope fix, walker verify, trick history 3-team marks, Moon MP scores
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
@@ -9391,11 +9406,13 @@ async function mpHandleDeal(move) {
 
   // Update scores
   if (GAME_MODE === 'MOON') {
-    // Moon: 3 individual scores, updateScoreDisplay handles moonScoreBar
-    for (let i = 0; i < 3; i++) {
-      if (session.game.team_points[i] !== undefined) {}
-      if (session.team_marks[i] !== undefined) {}
-    }
+    // Moon: 3 individual scores — sync display variables, updateScoreDisplay uses moonScoreBar
+    team1Score = session.game.team_points[0] || 0;
+    team2Score = session.game.team_points[1] || 0;
+    team3Score = session.game.team_points[2] || 0;
+    team1Marks = session.team_marks[0] || 0;
+    team2Marks = session.team_marks[1] || 0;
+    team3Marks = session.team_marks[2] || 0;
   } else {
     team1Score = session.game.team_points[0];
     team2Score = session.game.team_points[1];
@@ -23010,7 +23027,7 @@ function resumeGameFromSave(){
     session.game.active_players = snap.active_players || Array.from({length: session.game.player_count}, (_, i) => i);
 
     session.phase = snap.phase || PHASE_PLAYING;
-    session.team_marks = snap.team_marks || [saved.team1Marks || 0, saved.team2Marks || 0];
+    session.team_marks = snap.team_marks || ((GAME_MODE === 'MOON' || GAME_MODE === 'TN51') ? [saved.team1Marks || 0, saved.team2Marks || 0, saved.team3Marks || 0] : [saved.team1Marks || 0, saved.team2Marks || 0]);
     session.marks_to_win = snap.marks_to_win || 7;
     session.contract = snap.contract || "NORMAL";
     session.current_bid = snap.current_bid || 34;
@@ -23231,7 +23248,7 @@ function saveHandForReplay(name){
     hands: handsToSave,
     dealerSeat: dealerToSave,
     contract: contractToSave,
-    marks: [session.team_marks[0], session.team_marks[1]],
+    marks: (GAME_MODE === 'MOON' || GAME_MODE === 'TN51') ? [session.team_marks[0], session.team_marks[1], session.team_marks[2] || 0] : [session.team_marks[0], session.team_marks[1]],
     marksToWin: session.marks_to_win,
     moon_widow: widowToSave
   };
@@ -23355,7 +23372,7 @@ function replayHand(index){
 
   // Restore marks if saved
   if(entry.marks){
-    session.team_marks = [entry.marks[0], entry.marks[1]];
+    session.team_marks = entry.marks.length >= 3 ? [entry.marks[0], entry.marks[1], entry.marks[2]] : [entry.marks[0], entry.marks[1]];
   }
   if(entry.marksToWin){
     session.marks_to_win = entry.marksToWin;

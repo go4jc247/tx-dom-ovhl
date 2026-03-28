@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.75.0 — Lead logic: void creation, defender count denial, count-10 safety
+// Version: v17.76.0 — CRITICAL: winnerSeat scope fix, walker verify, trick history marks, Moon MP scores
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.75.0';
+const CACHE_NAME = 'tx-dom-v17.76.0';
 const urlsToCache = [
   './index.html',
   // CSS
