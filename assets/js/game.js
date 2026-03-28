@@ -5565,9 +5565,18 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       _bd.suitCounts = cntA+'|'+cntB;
 
       // When partner is winning, prefer throwing count (it's free points for our team)
-      if(partnerWinning && isLastInTrick && myCount > 0){
-        score += myCount * 3; // strong incentive to throw count to partner
-        _bd.partnerCountBonus = myCount * 3;
+      if(partnerWinning && myCount > 0){
+        if(isLastInTrick){
+          score += myCount * 3; // guaranteed: no opponents left to beat partner
+          _bd.partnerCountBonus = myCount * 3;
+        } else if(opponentsVoidInTrump){
+          // Opponents can't over-trump — safe to throw count even if not last
+          score += myCount * 2;
+          _bd.partnerCountBonus = myCount * 2;
+        } else {
+          // Risky: opponents might still overtake, but 5-count is low risk
+          if(myCount === 5){ score += 5; _bd.partnerCountBonus = 5; }
+        }
       }
 
       // Don't give opponents our count (but if bid is doomed, dump count to minimize loss)
