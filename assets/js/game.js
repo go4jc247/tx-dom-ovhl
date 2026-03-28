@@ -3756,7 +3756,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
 
     // ── PHASE C: NO TRUMP CONTROL, no more trump leads — play safe non-trumps ──
 
-    // Lead non-trump doubles
+    // Lead non-trump doubles — but beware of opponents trumping in
     if(nonTrumpDoubles.length > 0){
       let bestIdx = nonTrumpDoubles[0], bestScore = -Infinity;
       for(const idx of nonTrumpDoubles){
@@ -3764,6 +3764,20 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         const info = suitInfo[pip];
         if(!info) continue;
         let score = 100 + info.countRemaining + pip;
+        // Check if opponents are void in this suit — they might trump our double!
+        let oppsVoidInSuit = 0;
+        for(let s = 0; s < gameState.player_count; s++){
+          if(isSameTeam(s) || !gameState.active_players.includes(s)) continue;
+          if(voidIn[s].has(pip)) oppsVoidInSuit++;
+        }
+        // If opponents are void AND still have trump, our double gets trumped
+        if(oppsVoidInSuit > 0 && !opponentsVoidInTrump){
+          score -= oppsVoidInSuit * 15; // high penalty: double will lose
+          // Extra penalty if this double is a count tile
+          const dblSum = pip + pip;
+          if(dblSum === 10) score -= 15;
+          else if(dblSum === 5) score -= 8;
+        }
         if(score > bestScore){ bestScore = score; bestIdx = idx; }
       }
       return makeResult(bestIdx, "Lead: double (controls suit)");
