@@ -708,8 +708,8 @@ class GameStateV6_4g{
     this.leader=0;
     this.current_player=0;
     this.current_trick=[];
-    this.tricks_team = GAME_MODE === 'MOON' ? [[],[],[]] : [[],[]];
-    this.team_points = GAME_MODE === 'MOON' ? [0,0,0] : [0,0];
+    this.tricks_team = (GAME_MODE === 'MOON' || GAME_MODE === 'TN51') ? [[],[],[]] : [[],[]];
+    this.team_points = (GAME_MODE === 'MOON' || GAME_MODE === 'TN51') ? [0,0,0] : [0,0];
     this.trick_number=0;
     this.nello_doubles_suit=false;
     this.force_double_trump=false;
@@ -729,8 +729,8 @@ class GameStateV6_4g{
     this.current_player=this.leader;
     if(typeof _trackCpChange==='function') _trackCpChange('reset_hand');
     this.current_trick=[];
-    this.tricks_team = GAME_MODE === 'MOON' ? [[],[],[]] : [[],[]];
-    this.team_points = GAME_MODE === 'MOON' ? [0,0,0] : [0,0];
+    this.tricks_team = (GAME_MODE === 'MOON' || GAME_MODE === 'TN51') ? [[],[],[]] : [[],[]];
+    this.team_points = (GAME_MODE === 'MOON' || GAME_MODE === 'TN51') ? [0,0,0] : [0,0];
     this.trick_number=0;
     this.active_players=Array.from({length:this.player_count},(_,i)=>i);
     this.nello_doubles_suit=false;
@@ -743,8 +743,8 @@ class GameStateV6_4g{
     this.current_player=this.leader;
     if(typeof _trackCpChange==='function') _trackCpChange('set_hands');
     this.current_trick=[];
-    this.tricks_team = GAME_MODE === 'MOON' ? [[],[],[]] : [[],[]];
-    this.team_points = GAME_MODE === 'MOON' ? [0,0,0] : [0,0];
+    this.tricks_team = (GAME_MODE === 'MOON' || GAME_MODE === 'TN51') ? [[],[],[]] : [[],[]];
+    this.team_points = (GAME_MODE === 'MOON' || GAME_MODE === 'TN51') ? [0,0,0] : [0,0];
     this.trick_number=0;
   }
 
@@ -763,7 +763,7 @@ class GameStateV6_4g{
     this.active_players = valid.length ? valid : Array.from({length:this.player_count},(_,i)=>i);
   }
 
-  team_of(p){ if(GAME_MODE === 'MOON') return Number(p); return Number(p)%2; }
+  team_of(p){ if(GAME_MODE === 'MOON') return Number(p); if(GAME_MODE === 'TN51') return Number(p)%3; return Number(p)%2; }
 
   _is_trump_tile(tile){
     const a=tile[0], b=tile[1];
@@ -1014,7 +1014,7 @@ class SessionV6_4g{
   constructor(playerCount=6,maxPip=7,handSize=6,marksToWin=7){
     this.game=new GameStateV6_4g(playerCount,maxPip,handSize);
     this.marks_to_win=Number(marksToWin);
-    this.team_marks = GAME_MODE === 'MOON' ? [0,0,0] : [0,0];
+    this.team_marks = (GAME_MODE === 'MOON' || GAME_MODE === 'TN51') ? [0,0,0] : [0,0];
     this.phase=PHASE_SPLASH;
     this.status="";
     this.contract="NORMAL";
@@ -1027,7 +1027,7 @@ class SessionV6_4g{
   _notify(){ if(typeof this.on_change==="function"){ try{ this.on_change(); }catch(_e){} } }
 
   start_new_game(){
-    this.team_marks = GAME_MODE === 'MOON' ? [0,0,0] : [0,0];
+    this.team_marks = (GAME_MODE === 'MOON' || GAME_MODE === 'TN51') ? [0,0,0] : [0,0];
     this.new_hand_random();
   }
 
@@ -1158,10 +1158,10 @@ class SessionV6_4g{
           this.game.hands[partnerSeat] = [];
         } else {
           // TN51 (6-player): bidder's 2 partners sit out, bidder vs 3 opponents
-          const bidderTeamIdx = bidderSeat % 2;
+          const bidderTeamIdx = bidderSeat % 3;
           const partners = [];
           for (let s = 0; s < 6; s++) {
-            if (s !== bidderSeat && s % 2 === bidderTeamIdx) partners.push(s);
+            if (s !== bidderSeat && (s % 3) === bidderTeamIdx) partners.push(s);
           }
           const activePlayers = [0,1,2,3,4,5].filter(s => !partners.includes(s));
           this.game.set_active_players(activePlayers);
@@ -1237,11 +1237,11 @@ class SessionV6_4g{
       return null;
     }
     const bidderSeat = this.bid_winner_seat !== undefined ? this.bid_winner_seat : 0;
-    const bidderTeamIndex = (bidderSeat % 2 === 0) ? 0 : 1;
+    const bidderTeamIndex = this.game.team_of(bidderSeat);
 
     const bidderPoints = this.game.team_points[bidderTeamIndex];
     const totalPossible = GAME_MODE === 'T42' ? 42 : 51;
-    const pointsAwarded = this.game.team_points[0] + this.game.team_points[1];
+    const pointsAwarded = this.game.team_points.reduce((a,b) => a+b, 0);
     const pointsRemaining = totalPossible - pointsAwarded;
     const maxBidderCanGet = bidderPoints + pointsRemaining;
     if(maxBidderCanGet < this.current_bid) return "SET";
@@ -1257,7 +1257,7 @@ class SessionV6_4g{
       return this.game.tricks_team[bidderSeat].length >= this.current_bid;
     }
     const bidderSeat = this.bid_winner_seat !== undefined ? this.bid_winner_seat : 0;
-    const bidderTeamIndex = (bidderSeat % 2 === 0) ? 0 : 1;
+    const bidderTeamIndex = this.game.team_of(bidderSeat);
     const bidderPoints = this.game.team_points[bidderTeamIndex];
     return bidderPoints >= this.current_bid;
   }
@@ -1266,7 +1266,7 @@ class SessionV6_4g{
   _nello_caught_point(){
     if(this.contract !== "NELLO") return false;
     const bidderSeat = this.bid_winner_seat !== undefined ? this.bid_winner_seat : 0;
-    const bidderTeamIndex = (bidderSeat % 2 === 0) ? 0 : 1;
+    const bidderTeamIndex = this.game.team_of(bidderSeat);
     const bidderTricks = this.game.tricks_team[bidderTeamIndex].length;
     return bidderTricks > 0;
   }
@@ -1331,8 +1331,11 @@ class SessionV6_4g{
 
       const marksAtStake=this.bid_marks;
       const bidderSeat = this.bid_winner_seat !== undefined ? this.bid_winner_seat : 0;
-      const bidderTeamIndex = (bidderSeat % 2 === 0) ? 0 : 1;
-      const defenderTeamIndex = 1 - bidderTeamIndex;
+      const bidderTeamIndex = this.game.team_of(bidderSeat);
+      // For TN51 (3 teams), defenders share marks — award to highest-scoring non-bidder team
+      const defenderTeamIndex = GAME_MODE === 'TN51'
+        ? [0,1,2].filter(t => t !== bidderTeamIndex).reduce((best, t) => this.game.team_points[t] > this.game.team_points[best] ? t : best)
+        : (1 - bidderTeamIndex);
       const bidderTeamNum = bidderTeamIndex + 1;
       const defenderTeamNum = defenderTeamIndex + 1;
       const bidderPoints = this.game.team_points[bidderTeamIndex];
@@ -1359,12 +1362,14 @@ class SessionV6_4g{
         }
       }
 
-      if (GAME_MODE === 'MOON') {
-        const maxMark = Math.max(this.team_marks[0], this.team_marks[1], this.team_marks[2] || 0);
+      if (GAME_MODE === 'MOON' || GAME_MODE === 'TN51') {
+        const teamCount = GAME_MODE === 'MOON' ? 3 : 3;
+        const marks = this.team_marks.slice(0, teamCount);
+        const maxMark = Math.max(...marks);
         if (maxMark >= this.marks_to_win) {
-          const marks = [this.team_marks[0], this.team_marks[1], this.team_marks[2] || 0];
           const winner = marks.indexOf(maxMark);
-          this.status += ` Player ${winner+1} wins the game!`;
+          const label = GAME_MODE === 'MOON' ? `Player ${winner+1}` : `Team ${winner+1}`;
+          this.status += ` ${label} wins the game!`;
         }
       } else if(Math.max(this.team_marks[0], this.team_marks[1]) >= this.marks_to_win){
         let winner;
@@ -1372,7 +1377,7 @@ class SessionV6_4g{
           winner = (this.team_marks[0] > this.team_marks[1]) ? 0 : 1;
         } else {
           // Tie: bidding team wins (standard 42 rule)
-          const bidderTeam = this.bid_winner_seat !== undefined ? (this.bid_winner_seat % 2) : 0;
+          const bidderTeam = this.bid_winner_seat !== undefined ? this.game.team_of(this.bid_winner_seat) : 0;
           winner = bidderTeam;
         }
         this.status += ` Team ${winner+1} wins the game!`;
@@ -1906,7 +1911,7 @@ function acceptLayDown() {
   if (!layDownState) return;
 
   // Award all remaining tricks to the bidder's team
-  const bidderTeam = GAME_MODE === 'MOON' ? layDownState.seat : (layDownState.seat % 2);
+  const bidderTeam = session.game.team_of(layDownState.seat);
   const hand = layDownState.hand;
 
   // V12.10.20: Fix lay-down scoring
@@ -2177,7 +2182,7 @@ function initOffTracker() {
   if (session.contract === 'NELLO') return;
 
   const bidderSeat = session.bid_winner_seat;
-  const bidderTeam = GAME_MODE === 'MOON' ? bidderSeat : (bidderSeat % 2); // Moon: individual, not team-based
+  const bidderTeam = GAME_MODE === 'MOON' ? bidderSeat : (GAME_MODE === 'TN51' ? (bidderSeat % 3) : (bidderSeat % 2)); // Moon: individual, TN51: 3 teams
   const trumpSuit = session.game.trump_suit;
   const trumpMode = session.game.trump_mode;
   const maxPip = session.game.max_pip;
@@ -2595,7 +2600,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   if(_dbg.enabled){
     const _earlyLed = !isLead ? gameState._led_suit_for_trick() : null;
     _dbg.seat = p;
-    _dbg.myTeam = GAME_MODE === 'MOON' ? p : (p % 2);
+    _dbg.myTeam = GAME_MODE === 'MOON' ? p : (GAME_MODE === 'TN51' ? (p % 3) : (p % 2));
     _dbg.trickNum = gameState.trick_number;
     _dbg.isLead = isLead;
     _dbg.ledPip = _earlyLed === -1 ? 'TRUMP' : (_earlyLed !== null ? _earlyLed : null);
@@ -2627,9 +2632,10 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   const trumpMode = gameState.trump_mode;
   const isNello = contract === "NELLO";
   const maxPip = gameState.max_pip;
-  const myTeam = GAME_MODE === 'MOON' ? p : (p % 2);
   const isMoon = GAME_MODE === 'MOON';
-  const isSameTeam = (seat) => isMoon ? seat === p : (seat % 2) === myTeam;
+  const isTN51 = GAME_MODE === 'TN51';
+  const myTeam = isMoon ? p : (isTN51 ? (p % 3) : (p % 2));
+  const isSameTeam = (seat) => isMoon ? seat === p : (isTN51 ? (seat % 3) === myTeam : (seat % 2) === myTeam);
   const isOpponent = (seat) => seat !== p && !isSameTeam(seat);
   const trickNum = gameState.trick_number; // 0-indexed: how many tricks completed so far
   const totalTricks = gameState.hand_size || 6;
@@ -2657,7 +2663,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   if(trick.length > 0){
     const winnerSeat = gameState._determine_trick_winner();
     currentWinner = winnerSeat;
-    partnerWinning = GAME_MODE !== 'MOON' && (winnerSeat % 2) === myTeam && winnerSeat !== p;
+    partnerWinning = GAME_MODE !== 'MOON' && isSameTeam(winnerSeat) && winnerSeat !== p;
     if(isNello) bidderWinning = !isSameTeam(winnerSeat);
   }
 
@@ -3334,7 +3340,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   //  BID SAFETY — how many points do we still need?
   // ═══════════════════════════════════════════════════════════════════
   const bidderSeat = gameState.bid_winner_seat !== undefined ? gameState.bid_winner_seat : 0;
-  const isBidderTeam = isMoon ? (p === bidderSeat) : (myTeam === (bidderSeat % 2));
+  const bidderTeamIdx = isMoon ? bidderSeat : (isTN51 ? (bidderSeat % 3) : (bidderSeat % 2));
+  const isBidderTeam = isMoon ? (p === bidderSeat) : (myTeam === bidderTeamIdx);
   const iAmBidder = p === bidderSeat;
   const iAmBidderPartner = isBidderTeam && !iAmBidder; // on bidder's team but not the bidder
   const currentBid = bid || 34; // passed from session.current_bid
@@ -3347,7 +3354,6 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   const maxPointsLeft = isMoon ? tricksLeft : (tricksLeft + totalCountRemaining);
   const bidIsDoomed = isBidderTeam && pointsNeeded > maxPointsLeft; // mathematically impossible
   // Defensive awareness: track bidder's progress toward making/failing bid
-  const bidderTeamIdx = isMoon ? bidderSeat : (bidderSeat % 2);
   const bidderScore = gameState.team_points[bidderTeamIdx] || 0;
   const bidderNeedsMore = currentBid - bidderScore;
   const bidderIsClose = !isBidderTeam && bidderNeedsMore > 0 && bidderNeedsMore <= 10;
@@ -4222,7 +4228,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
 
         // ── offTracker: Catcher protection (opponent) / Misdirection (partner) ──
         if (offTracker && offTracker.trumpMode === 'PIP') {
-          const isBidderOpponent = isMoon ? (offTracker.bidderTeam !== p) : ((p % 2) !== offTracker.bidderTeam);
+          const isBidderOpponent = isMoon ? (offTracker.bidderTeam !== p) : (myTeam !== offTracker.bidderTeam);
           const suspicion = getOffSuspicion();
           if (suspicion && suspicion.length > 0) {
             const topSuspect = suspicion[0];
@@ -4430,7 +4436,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       }
       // offTracker: When forced to play low, prefer discarding non-catcher tiles
       if(lowIdx >= 0){
-        if(offTracker && offTracker.trumpMode === 'PIP' && (isMoon ? (offTracker.bidderTeam !== p) : ((p % 2) !== offTracker.bidderTeam))){
+        if(offTracker && offTracker.trumpMode === 'PIP' && (isMoon ? (offTracker.bidderTeam !== p) : (myTeam !== offTracker.bidderTeam))){
           const suspicion = getOffSuspicion();
           if(suspicion && suspicion.length > 0 && suspicion[0].suspicion >= 40){
             // Find the lowest non-catcher tile in suit
@@ -4527,7 +4533,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         }
       }
       // offTracker: When can't win, protect catchers
-      if(offTracker && offTracker.trumpMode === 'PIP' && (isMoon ? (offTracker.bidderTeam !== p) : ((p % 2) !== offTracker.bidderTeam))){
+      if(offTracker && offTracker.trumpMode === 'PIP' && (isMoon ? (offTracker.bidderTeam !== p) : (myTeam !== offTracker.bidderTeam))){
         const suspicion = getOffSuspicion();
         if(suspicion && suspicion.length > 0 && suspicion[0].suspicion >= 40){
           let safeLow = lowIdx, safeRank = Infinity;
@@ -10700,8 +10706,8 @@ function mpResumeFromSavedState(savedState) {
   // Restore engine state
   session.game.hands = snap.hands;
   session.game.current_trick = snap.current_trick || [];
-  session.game.tricks_team = snap.tricks_team || (GAME_MODE === 'MOON' ? [[],[],[]] : [[],[]]);
-  session.game.team_points = snap.team_points || (GAME_MODE === 'MOON' ? [0,0,0] : [0,0]);
+  session.game.tricks_team = snap.tricks_team || ((GAME_MODE === 'MOON' || GAME_MODE === 'TN51') ? [[],[],[]] : [[],[]]);
+  session.game.team_points = snap.team_points || ((GAME_MODE === 'MOON' || GAME_MODE === 'TN51') ? [0,0,0] : [0,0]);
   session.game.trump_suit = snap.trump_suit;
   session.game.trump_mode = snap.trump_mode;
   session.game.trick_number = snap.trick_number || 0;
@@ -10713,7 +10719,7 @@ function mpResumeFromSavedState(savedState) {
   session.game.force_double_trump = snap.force_double_trump || false;
 
   session.phase = snap.phase || PHASE_PLAYING;
-  session.team_marks = snap.team_marks || (GAME_MODE === 'MOON' ? [0,0,0] : [0,0]);
+  session.team_marks = snap.team_marks || ((GAME_MODE === 'MOON' || GAME_MODE === 'TN51') ? [0,0,0] : [0,0]);
   session.marks_to_win = snap.marks_to_win || savedState.marksToWin || 7;
   session.contract = snap.contract || 'NORMAL';
   session.current_bid = snap.current_bid || 0;
@@ -10965,7 +10971,7 @@ function mpReconcileAfterResume() {
           if (session.game._sanitized_trick().length >= session.game.active_players.length) {
             // Complete the trick in the engine
             const winner = session.game._determine_trick_winner();
-            const winTeam = winner % 2;
+            const winTeam = session.game.team_of(winner);
             const trickTiles = session.game.current_trick.slice();
             session.game.tricks_team[winTeam].push(trickTiles);
             // Count points
@@ -11262,8 +11268,9 @@ function ppRotateBoard(viewingSeat) {
     if (el) {
       el.textContent = 'P' + (seat + 1);  // Show real player number
       // Update team color
-      el.classList.remove('team1', 'team2');
-      el.classList.add(seat % 2 === 0 ? 'team1' : 'team2');
+      el.classList.remove('team1', 'team2', 'team3');
+      const teamNum = GAME_MODE === 'TN51' ? (seat % 3) + 1 : (seat % 2 === 0 ? 1 : 2);
+      el.classList.add('team' + teamNum);
     }
   }
 
@@ -12633,10 +12640,11 @@ function showNelloOpponentSelection(marks = 1){
   // Get bidder seat and determine their teammates (both sit out)
   const bidderSeat = session.bid_winner_seat !== undefined ? session.bid_winner_seat : 0;
 
-  // Teammates are same parity (same team) but not the bidder
+  // Teammates are same team but not the bidder
+  const bidderTeamIdx = session.game.team_of(bidderSeat);
   const teammates = [];
   for(let s = 0; s < session.game.player_count; s++){
-    if(s !== bidderSeat && (s % 2) === (bidderSeat % 2)){
+    if(s !== bidderSeat && session.game.team_of(s) === bidderTeamIdx){
       teammates.push(s);
     }
   }
@@ -12645,14 +12653,14 @@ function showNelloOpponentSelection(marks = 1){
   // Update teammates display
   document.getElementById('nelloTeammatesDisplay').textContent = teammatePlayerNums.join(' & ');
 
-  // Build opponent options (opponents are on the other team)
+  // Build opponent options (opponents are on other teams)
   const grid = document.getElementById('nelloOpponentGrid');
   grid.innerHTML = '';
 
-  // Opponents are seats with different parity than bidder
+  // Opponents are seats on different teams than bidder
   const opponentSeats = [];
   for(let s = 0; s < session.game.player_count; s++){
-    if((s % 2) !== (bidderSeat % 2)){
+    if(session.game.team_of(s) !== bidderTeamIdx){
       opponentSeats.push(s);
     }
   }
@@ -12706,11 +12714,11 @@ function _executeNelloSetup(opponent, marks){
   // Get bidder seat and teammates (both partners on bidder's team sit out)
   const bidderSeat = session.bid_winner_seat !== undefined ? session.bid_winner_seat : 0;
 
-  // In 6-player: teams are by parity. Bidder's teammates are same parity.
-  // Teammates: the other 2 seats on bidder's team
+  // Bidder's teammates (same team, not bidder)
+  const bidderTeamIdx2 = session.game.team_of(bidderSeat);
   const teammates = [];
   for(let s = 0; s < session.game.player_count; s++){
-    if(s !== bidderSeat && (s % 2) === (bidderSeat % 2)){
+    if(s !== bidderSeat && session.game.team_of(s) === bidderTeamIdx2){
       teammates.push(s);
     }
   }
@@ -12720,7 +12728,7 @@ function _executeNelloSetup(opponent, marks){
   const activePlayers = [bidderSeat];
   for(let s = 0; s < session.game.player_count; s++){
     // Add opponents who are NOT sitting out
-    if((s % 2) !== (bidderSeat % 2) && s !== opponent){
+    if(session.game.team_of(s) !== bidderTeamIdx2 && s !== opponent){
       activePlayers.push(s);
     }
   }
@@ -12834,18 +12842,19 @@ function cancelNelloOpponent(){
 
 // AI Nello setup - AI picks an opponent to sit out
 function setupAINello(bidderSeat, marks = 1){
-  // Bidder's teammates (same parity, not bidder)
+  // Bidder's teammates (same team, not bidder)
+  const bidderTeamIdx3 = session.game.team_of(bidderSeat);
   const teammates = [];
   for(let s = 0; s < session.game.player_count; s++){
-    if(s !== bidderSeat && (s % 2) === (bidderSeat % 2)){
+    if(s !== bidderSeat && session.game.team_of(s) === bidderTeamIdx3){
       teammates.push(s);
     }
   }
 
-  // Opponents are on the opposite team (different parity)
+  // Opponents are on different teams
   const opponentSeats = [];
   for(let s = 0; s < session.game.player_count; s++){
-    if((s % 2) !== (bidderSeat % 2)){
+    if(session.game.team_of(s) !== bidderTeamIdx3){
       opponentSeats.push(s);
     }
   }
@@ -12856,7 +12865,7 @@ function setupAINello(bidderSeat, marks = 1){
   // Active players: bidder + 2 remaining opponents (3 players total)
   const activePlayers = [bidderSeat];
   for(let s = 0; s < session.game.player_count; s++){
-    if((s % 2) !== (bidderSeat % 2) && s !== sitOutOpponent){
+    if(session.game.team_of(s) !== bidderTeamIdx3 && s !== sitOutOpponent){
       activePlayers.push(s);
     }
   }
@@ -14878,7 +14887,7 @@ let _pickClickHandlers = new Map(); // For cleanup
 
 // Build pick order based on game mode and dealer seat
 function _getPickOrder(dealer, playerCount) {
-  const dealerTeam = dealer % 2;
+  const dealerTeam = GAME_MODE === 'TN51' ? (dealer % 3) : (dealer % 2);
   if (GAME_MODE === 'MOON') {
     // Moon (3 players): non-dealer pick simultaneously, dealer gets rest
     const opponents = [];
@@ -14895,7 +14904,8 @@ function _getPickOrder(dealer, playerCount) {
   const partners = [];
   for (let i = 1; i < playerCount; i++) {
     const seat = (dealer + i) % playerCount;
-    if (seat % 2 !== dealerTeam) {
+    const seatTeam = GAME_MODE === 'TN51' ? (seat % 3) : (seat % 2);
+    if (seatTeam !== dealerTeam) {
       opponents.push(seat);
     } else if (seat !== dealer) {
       partners.push(seat);
@@ -16329,7 +16339,7 @@ async function handlePlayer1Click(spriteSlotIndexOrElement){
   const trick = session.game.current_trick || [];
   if(trick.length > 0){
     const winnerSeat = session.game._determine_trick_winner();
-    currentWinner = { seat: winnerSeat, team: winnerSeat % 2 === 0 ? 1 : 2 };
+    currentWinner = { seat: winnerSeat, team: session.game.team_of(winnerSeat) + 1 };
   }
 
   const prePlayContext = { legalTiles, currentWinner };
@@ -17818,7 +17828,7 @@ async function ppAIPlayLoop() {
       if (trick.length > 0) {
         try {
           const ws = session.game._determine_trick_winner();
-          currentWinner = { seat: ws, team: ws % 2 === 0 ? 1 : 2 };
+          currentWinner = { seat: ws, team: session.game.team_of(ws) + 1 };
         } catch(e) {}
       }
 
@@ -18483,7 +18493,7 @@ async function aiPlayTurn(){
       const trick = session.game.current_trick || [];
       if(trick.length > 0){
         const winnerSeat = session.game._determine_trick_winner();
-        currentWinner = { seat: winnerSeat, team: winnerSeat % 2 === 0 ? 1 : 2 };
+        currentWinner = { seat: winnerSeat, team: session.game.team_of(winnerSeat) + 1 };
       }
 
       const prePlayContext = { legalTiles, currentWinner };
@@ -21750,6 +21760,10 @@ let currentTrickPlays = [];
 function _tileStr(t){ return t ? `${t[0]}-${t[1]}` : null; }
 function _tilesStr(arr){ return (arr||[]).map(t => _tileStr(t)); }
 function _partnerSeats(seat){
+  if(GAME_MODE === 'TN51'){
+    const team = seat % 3;
+    return [0,1,2,3,4,5].filter(s => s !== seat && (s % 3) === team);
+  }
   if(seat % 2 === 0) return [0,2,4].filter(s => s !== seat);
   return [1,3,5].filter(s => s !== seat);
 }
@@ -21778,12 +21792,12 @@ function logHandStart(trumpMode, trumpSuit, contract, bid, bidderSeat, hands, de
       trumpDisplay: trumpDisplay,
       bid: bid,
       bidderSeat: bidderSeat,
-      bidderTeam: bidderSeat !== null ? (bidderSeat % 2 === 0 ? 1 : 2) : null
+      bidderTeam: bidderSeat !== null ? (session.game.team_of(bidderSeat) + 1) : null
     },
     scoresBeforeHand: scoresBeforeHand || { team1: 0, team2: 0 },
     hands: hands ? hands.map((h, seat) => ({
       seat: seat,
-      team: seat % 2 === 0 ? 1 : 2,
+      team: session.game.team_of(seat) + 1,
       tiles: _tilesStr(h)
     })) : null,
     timestamp: new Date().toISOString()
@@ -21794,7 +21808,7 @@ function logHandStart(trumpMode, trumpSuit, contract, bid, bidderSeat, hands, de
     entry.moon_widow = session._dealSnapshot.moon_widow;
     entry.preSwapHands = session._dealSnapshot.hands.map((h, seat) => ({
       seat: seat,
-      team: seat % 2 === 0 ? 1 : 2,
+      team: session.game.team_of(seat) + 1,
       tiles: _tilesStr(h)
     }));
     session._dealSnapshot = null; // consumed
@@ -21812,7 +21826,7 @@ function logTrickStart(leaderSeat, ledPip){
     handId: handNumber,
     trickId: trickNumber,
     leaderSeat: leaderSeat,
-    leaderTeam: leaderSeat % 2 === 0 ? 1 : 2,
+    leaderTeam: session.game.team_of(leaderSeat) + 1,
     ledPip: ledPip,
     timestamp: new Date().toISOString()
   };
@@ -21885,7 +21899,7 @@ function logTrickEnd(winnerSeat, points){
     handId: handNumber,
     trickId: trickNumber,
     winnerSeat: winnerSeat,
-    winnerTeam: winnerSeat % 2 === 0 ? 1 : 2,
+    winnerTeam: session.game.team_of(winnerSeat) + 1,
     pointsInTrick: points,
     playsString: playsString,
     trickEndState: trickEndState,
@@ -22619,8 +22633,9 @@ function ppOpenSetupModal() {
 
   for (let seat = 0; seat < session.game.player_count; seat++) {
     const p = seat + 1;
-    const team = seat % 2 === 0 ? 1 : 2;
-    const teamColor = team === 1 ? '#3b82f6' : '#ef4444';
+    const team = session.game.team_of(seat) + 1;
+    const teamColors = ['#3b82f6', '#ef4444', '#22c55e'];
+    const teamColor = teamColors[team - 1] || '#3b82f6';
     const checked = ppHumanSeats.has(seat) ? 'checked' : '';
 
     const div = document.createElement('div');
@@ -23178,7 +23193,7 @@ document.getElementById('ppHandoffBtn').addEventListener('click', () => {
 
         // Full mode: check for early set / bid made
         if (!isPartial) {
-          const bidderTeamIndex = isMoon ? bidWinnerSeat : (bidWinnerSeat % 2 === 0 ? 0 : 1);
+          const bidderTeamIndex = sim.team_of(bidWinnerSeat);
           const bidderPoints = sim.team_points[bidderTeamIndex];
           const totalAwarded = sim.team_points.reduce((a,b) => a+b, 0);
           const maxPts = isMoon ? 21 : 51;
@@ -23216,7 +23231,7 @@ document.getElementById('ppHandoffBtn').addEventListener('click', () => {
     }
 
     // Evaluate bid outcome
-    const bidderTeamIndex = isMoon ? bidWinnerSeat : (bidWinnerSeat % 2 === 0 ? 0 : 1);
+    const bidderTeamIndex = sim.team_of(bidWinnerSeat);
     const bidderPoints = sim.team_points[bidderTeamIndex];
 
     let bidMade = false;

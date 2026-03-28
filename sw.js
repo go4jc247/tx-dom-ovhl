@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v15.0.0 — Phase 5+: NT trump evaluation, count arithmetic, bidder defuse, duck
+// Version: v15.1.0 — Phase 6: TN51 3-team fix (all team calculations use team_of())
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v15.0.0';
+const CACHE_NAME = 'tx-dom-v15.1.0';
 const urlsToCache = [
   './index.html',
   // CSS
