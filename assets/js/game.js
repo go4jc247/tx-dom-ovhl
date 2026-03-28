@@ -1439,6 +1439,12 @@ function evaluateHandForBid(hand) {
     // Moon has 9 tricks, bid = tricks you'll win. Min bid 4, max 7.
     // Bid 7 = Shoot the Moon (all 7 tricks, scored at ±21 points).
     // With 9 tiles in hand + widow swap, hands tend to be stronger.
+    // SCORE AWARENESS: when score is negative, be MORE cautious (failing digs deeper hole).
+    // When score is low and far from 21, may need to bid more aggressively to catch up.
+    const _myMoonScore = (session && session.team_marks) ? (session.team_marks[session.game.current_player] || 0) : 0;
+    const _moonScoreNegative = _myMoonScore < 0;
+    const _moonNeedsCatchUp = _myMoonScore < 5 && _myMoonScore >= 0; // low positive, needs aggressive play
+    const _moonBidCaution = _moonScoreNegative ? 1 : 0; // extra caution level when negative
     for (let pip = maxPip; pip >= 0; pip--) {
       const trumpTiles = hand.filter(t => t[0] === pip || t[1] === pip);
       const hasDouble = trumpTiles.some(t => t[0] === pip && t[1] === pip);
@@ -1453,12 +1459,14 @@ function evaluateHandForBid(hand) {
       const ntUncovered = ntOffs.filter(t => !ntDblPips.has(t[0]) && !ntDblPips.has(t[1])).length;
       // Shoot the Moon (bid 7): very strong hand required
       // RISK: failing a 7-bid subtracts 7 from your score — extremely punishing
+      // When score is negative, require EXTRA strength (failing = deeper hole)
       // Need 6+ trumps with top 2, or 5 trumps with ALL sides locked down
-      if (trumpTiles.length >= 6 && hasSecond) {
+      if (trumpTiles.length >= 6 && hasSecond && (!_moonScoreNegative || trumpTiles.length >= 7)) {
         return { action: "bid", bid: 7, marks: 2 };
       }
       // 5 trumps: only shoot if ALL non-trump tiles are covered by doubles AND we have 3rd trump
-      if (trumpTiles.length >= 5 && hasSecond && hasThird && ntUncovered === 0 && ntDoubles.length >= 2) {
+      // When negative: skip this — 5 trumps isn't safe enough when already behind
+      if (!_moonScoreNegative && trumpTiles.length >= 5 && hasSecond && hasThird && ntUncovered === 0 && ntDoubles.length >= 2) {
         return { action: "bid", bid: 7, marks: 2 };
       }
       // 5 trumps with 2nd but weaker coverage: bid 6 instead of 7 (safer)
@@ -1492,7 +1500,9 @@ function evaluateHandForBid(hand) {
     }
     // Moon: 7+ doubles → Shoot the Moon with doubles trump (very safe)
     // 6 doubles: bid 6 not 7 — losing even 1 trick with a 7-bid costs 7 points
-    if (doubles.length >= 7) return { action: "bid", bid: 7, marks: 2 };
+    // When negative: require 8+ doubles for STM (extra cautious)
+    if (doubles.length >= 7 && !_moonScoreNegative) return { action: "bid", bid: 7, marks: 2 };
+    if (doubles.length >= 8) return { action: "bid", bid: 7, marks: 2 }; // 8+ always safe
     // Moon: 5-6 doubles → bid 6
     if (doubles.length >= 5) return { action: "bid", bid: 6, marks: 1 };
     if (doubles.length >= 4) {
@@ -3672,16 +3682,38 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
 
     if(isLead){
       if(iAmBidder){
-        // BIDDER leading: play lowest non-double to minimize chance of winning
-        let lowNDIdx = -1, lowNDVal = Infinity, lowIdx = legal[0], lowVal = Infinity;
+        // BIDDER leading: strategic low lead — prefer suits where we have fewer cards
+        // (voiding suits = safety), avoid suits where we hold dangerous high cards,
+        // and prefer suits where opponents are void (can't follow = we can't lose)
+        let bestIdx = legal[0], bestScore = -Infinity;
         for(const idx of legal){
           const tile = hand[idx], val = tile[0]+tile[1], dbl = tile[0]===tile[1];
-          if(val < lowVal){ lowVal = val; lowIdx = idx; }
-          if((!dbl || _nelloDbls) && val < lowNDVal){ lowNDVal = val; lowNDIdx = idx; }
+          let score = 0;
+          // Base: prefer low pip-sum tiles
+          score -= val * 3;
+          // Doubles are dangerous in Nello (they WIN their suit) — heavy penalty
+          if(dbl && !_nelloDbls) score -= 40;
+          // Void-creation bonus: prefer tiles in suits where we have few remaining cards
+          const suitPip = Math.max(tile[0], tile[1]);
+          const suitCount = hand.filter(h => h !== tile && (h[0] === suitPip || h[1] === suitPip)).length;
+          if(suitCount === 0) score += 15; // voiding this suit = future safety
+          else if(suitCount === 1) score += 8;
+          // Danger assessment: avoid leading suits where we hold high cards (they'll be forced later)
+          let maxRemainingInSuit = 0;
+          for(const h of hand){
+            if(h === tile) continue;
+            if(h[0] === suitPip || h[1] === suitPip){
+              const hVal = h[0] + h[1];
+              if(hVal > maxRemainingInSuit) maxRemainingInSuit = hVal;
+            }
+          }
+          if(maxRemainingInSuit >= 8) score -= 5; // high cards left in this suit = risky
+          // Prefer suits where the double has already been played (safer to lead into)
+          const sInfo = suitInfo[suitPip];
+          if(sInfo && sInfo.winnerPlayed) score += 8;
+          if(score > bestScore){ bestScore = score; bestIdx = idx; }
         }
-        return lowNDIdx >= 0
-          ? makeResult(lowNDIdx, "Nel-O bidder: lead lowest")
-          : makeResult(lowIdx, "Nel-O bidder: lead lowest");
+        return makeResult(bestIdx, "Nel-O bidder: strategic low lead");
       }
 
       if(iAmOpponent){
@@ -3914,22 +3946,30 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         }
         return makeResult(lowIdx, "Nel-O opp: bidder losing, play low (save high)");
       }
-      // Bidder is winning — play highest to try to beat them
+      // Bidder is winning — play LOWEST card that beats the bidder (conserve high cards)
+      // Fallback to highest if nothing beats bidder
+      let lowestWinIdx = -1, lowestWinRank = Infinity;
       let highIdx = legal[0], highRank = -1;
       for(const idx of legal){
         const tile = hand[idx];
         if(_nDoublesLed){
-          if(tile[0] === tile[1] && tile[0] > highRank){ highRank = tile[0]; highIdx = idx; }
+          if(tile[0] === tile[1]){
+            if(tile[0] > highRank){ highRank = tile[0]; highIdx = idx; }
+            if(tile[0] > bidderRank && tile[0] < lowestWinRank){ lowestWinRank = tile[0]; lowestWinIdx = idx; }
+          }
         } else if(nLedSuit !== null && nLedSuit >= 0){
           const r = gameState._suit_rank(tile, nLedSuit);
           const rank = r[0] * 100 + r[1];
           if(rank > highRank){ highRank = rank; highIdx = idx; }
+          if(rank > bidderRank && rank < lowestWinRank){ lowestWinRank = rank; lowestWinIdx = idx; }
         } else {
           const val = tile[0]+tile[1];
           if(val > highRank){ highRank = val; highIdx = idx; }
+          if(val > bidderRank && val < lowestWinRank){ lowestWinRank = val; lowestWinIdx = idx; }
         }
       }
-      return makeResult(highIdx, "Nel-O opp: overtake bidder");
+      if(lowestWinIdx >= 0) return makeResult(lowestWinIdx, "Nel-O opp: lowest card to beat bidder (conserve)");
+      return makeResult(highIdx, "Nel-O opp: highest to try to beat bidder");
     }
     {
       // Partner of bidder follow — play low to help bidder avoid winning
@@ -4082,6 +4122,74 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         if(bestLeadScore >= 0){
           const winnable = bestLeadScore >= 1000;
           return makeResult(bestLeadIdx, "Final trick: exact count" + (winnable ? " (guaranteed win)" : " (minimize loss)"));
+        }
+      }
+    }
+
+    // ── 2-TRICK LOOKAHEAD: simulate both remaining tricks for optimal play order ──
+    // When exactly 2 tricks remain and we're leading, each opponent has exactly 2 tiles.
+    // Try each lead option: simulate who wins trick 1, then who wins trick 2.
+    // Choose the lead that maximizes our team's total wins + count captured.
+    if(tricksLeft === 2 && legal.length === 2){
+      const oppHands = []; // {seat, tiles: [tile1, tile2]}
+      let canSimulate = true;
+      for(let s = 0; s < gameState.player_count; s++){
+        if(s === p || !gameState.active_players.includes(s)) continue;
+        const oh = gameState.hands[s];
+        if(oh && oh.length === 2) oppHands.push({seat: s, tiles: [oh[0], oh[1]]});
+        else canSimulate = false;
+      }
+      if(canSimulate && oppHands.length > 0){
+        let bestIdx2T = legal[0], bestScore2T = -Infinity;
+        // Helper: check if tile A beats tile B when suit is led
+        const _beats = (tileA, tileB, ledSuit) => {
+          const aIsTrump = gameState._is_trump_tile(tileA);
+          const bIsTrump = gameState._is_trump_tile(tileB);
+          if(aIsTrump && !bIsTrump) return true;
+          if(!aIsTrump && bIsTrump) return false;
+          if(aIsTrump && bIsTrump) return getTrumpRankNum(tileA) > getTrumpRankNum(tileB);
+          // Both non-trump: check if B follows suit
+          const bFollows = tileB[0] === ledSuit || tileB[1] === ledSuit;
+          if(!bFollows) return true; // B can't follow, A wins by default
+          const aR = gameState._suit_rank(tileA, ledSuit);
+          const bR = gameState._suit_rank(tileB, ledSuit);
+          return (aR[0] * 100 + aR[1]) > (bR[0] * 100 + bR[1]);
+        };
+        const _tileCount = (t) => { const s = t[0]+t[1]; return s===5?5:s===10?10:0; };
+        for(const idx of legal){
+          const myTile1 = hand[idx];
+          const myTile2 = hand[idx === legal[0] ? legal[1] : legal[0]];
+          const ledSuit1 = myTile1[0]===myTile1[1] ? (trumpMode==='DOUBLES'?-1:myTile1[0]) : Math.max(myTile1[0],myTile1[1]);
+          // Simulate trick 1: does our lead win?
+          let trick1Win = true;
+          for(const opp of oppHands){
+            // Opponent plays best tile to beat us (or lowest if can't)
+            for(const ot of opp.tiles){
+              if(_beats(ot, myTile1, ledSuit1)){ trick1Win = false; break; }
+            }
+            if(!trick1Win) break;
+          }
+          // Score: winning trick 1 is valuable; count captured matters
+          let score = trick1Win ? 100 : 0;
+          score += trick1Win ? _tileCount(myTile1) : -_tileCount(myTile1);
+          // Trick 2: if we won trick 1, we lead tile 2
+          if(trick1Win){
+            const ledSuit2 = myTile2[0]===myTile2[1] ? (trumpMode==='DOUBLES'?-1:myTile2[0]) : Math.max(myTile2[0],myTile2[1]);
+            let trick2Win = true;
+            for(const opp of oppHands){
+              for(const ot of opp.tiles){
+                if(_beats(ot, myTile2, ledSuit2)){ trick2Win = false; break; }
+              }
+              if(!trick2Win) break;
+            }
+            score += trick2Win ? 100 : 0;
+            score += trick2Win ? _tileCount(myTile2) : -_tileCount(myTile2);
+          }
+          if(score > bestScore2T){ bestScore2T = score; bestIdx2T = idx; }
+        }
+        if(bestScore2T > -Infinity){
+          const wins = bestScore2T >= 200 ? 2 : bestScore2T >= 100 ? 1 : 0;
+          return makeResult(bestIdx2T, "2-trick lookahead: win " + wins + "/2 tricks");
         }
       }
     }

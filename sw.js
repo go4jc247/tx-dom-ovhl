@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.21.0 — fix Moon failed bid scoring (subtract bid from score, can go negative)
+// Version: v17.22.0 — Nello AI improvements, Moon score-aware bidding, 2-trick lookahead
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.21.0';
+const CACHE_NAME = 'tx-dom-v17.22.0';
 const urlsToCache = [
   './index.html',
   // CSS
