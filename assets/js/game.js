@@ -19196,6 +19196,10 @@ function renderAll(){
     enablePlayer1Clicks();
     updatePlayer1ValidStates();
     showHint();
+  } else if(phase === PHASE_NEED_TRUMP || phase === PHASE_NEED_BID || phase === PHASE_MOON_WIDOW){
+    // Don't disable clicks during trump selection, bidding, or widow swap —
+    // these phases use their own click routing (trumpSelectionActive / biddingPreviewActive / _widowSwapMode)
+    waitingForPlayer1 = false;
   } else {
     waitingForPlayer1 = false;
     disablePlayer1Clicks();

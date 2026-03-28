@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.27.0 — Moon bidder lead strategy
+// Version: v17.28.0 — Fix tap-to-sort during trump selection
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.27.0';
+const CACHE_NAME = 'tx-dom-v17.28.0';
 const urlsToCache = [
   './index.html',
   // CSS
