@@ -16153,12 +16153,43 @@ function clearHint(){
 function processAIBid(seat) {
   const hand = session.game.hands[seat] || [];
   const evaluation = evaluateHandForBid(hand);
+
+  // POSITION-AWARE BIDDING: late bidders with no competition bid more aggressively
+  // If everyone has passed and we're near the end, bid with weaker hands (rescue bid)
+  if (evaluation.action !== "bid" && biddingState.bidderOrder) {
+    const myIdx = biddingState.bidderOrder.indexOf(seat);
+    const totalBidders = biddingState.bidderOrder.length;
+    const passesBeforeMe = biddingState.passCount || 0;
+    const isLateBidder = myIdx >= totalBidders - 2; // last 2 bidders
+    const nobodyBidYet = !biddingState.highBid || biddingState.highBid === 0;
+
+    if (isLateBidder && nobodyBidYet && passesBeforeMe >= totalBidders - 2) {
+      // Rescue bid: evaluate with relaxed criteria — 3 trumps with double is enough
+      const maxPip = session.game.max_pip;
+      const minBid = GAME_MODE === 'MOON' ? 4 : (GAME_MODE === 'T42' ? 30 : 34);
+      for (let pip = maxPip; pip >= 0; pip--) {
+        const trumpTiles = hand.filter(t => t[0] === pip || t[1] === pip);
+        const hasDouble = trumpTiles.some(t => t[0] === pip && t[1] === pip);
+        if (trumpTiles.length >= 3 && hasDouble) {
+          // Rescue bid at minimum
+          const rescueEval = { action: "bid", bid: minBid, marks: 1, rescue: true };
+          // Fall through to normal bid processing with rescue eval
+          return processAIBidWithEval(seat, rescueEval);
+        }
+      }
+    }
+  }
+
   if (evaluation.action !== "bid") {
     biddingState.passCount++;
     biddingState.bids.push({ seat, playerNumber: seatToPlayer(seat), bid: "pass" });
     return { action: "pass" };
   }
 
+  return processAIBidWithEval(seat, evaluation);
+}
+
+function processAIBidWithEval(seat, evaluation) {
   const evalMarks = evaluation.marks || 1;
   const maxBid = GAME_MODE === 'MOON' ? 7 : (GAME_MODE === 'T42' ? 42 : 51);
   let bidMarks = evalMarks;
@@ -16182,6 +16213,14 @@ function processAIBid(seat) {
       biddingState.passCount++;
       biddingState.bids.push({ seat, playerNumber: seatToPlayer(seat), bid: "pass" });
       return { action: "pass" };
+    }
+  }
+
+  // Competitive outbid: if our natural bid ties the leader, bump by 1 if we have a strong hand
+  if (bidAmount === biddingState.highBid && bidMarks === (biddingState.highMarks || 1) && evalMarks >= 1) {
+    const maxBidForMode = GAME_MODE === 'MOON' ? 7 : (GAME_MODE === 'T42' ? 42 : 51);
+    if (bidAmount < maxBidForMode) {
+      bidAmount += 1; // outbid by minimum increment
     }
   }
 
