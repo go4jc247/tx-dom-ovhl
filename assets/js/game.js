@@ -4927,6 +4927,12 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       else if(minCnt <= 2){ score += 8; _bd.voidBonus = 8; }
       _bd.suitCounts = cntA+'|'+cntB;
 
+      // When partner is winning, prefer throwing count (it's free points for our team)
+      if(partnerWinning && isLastInTrick && myCount > 0){
+        score += myCount * 3; // strong incentive to throw count to partner
+        _bd.partnerCountBonus = myCount * 3;
+      }
+
       // Don't give opponents our count (but if bid is doomed, dump count to minimize loss)
       if(bidIsDoomed && isBidderTeam){
         // Bid is lost — dump high count to get rid of it before opponents grab tricks
