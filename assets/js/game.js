@@ -1472,6 +1472,14 @@ function evaluateHandForBid(hand) {
       if (trumpTiles.length >= 4 && hasSecond && hasThird && ntUncovered === 0) {
         return { action: "bid", bid: 6, marks: 1 };
       }
+      // 4 trumps with double + 2nd + 1 side double → bid 4 (solid but not spectacular)
+      if (trumpTiles.length >= 4 && hasSecond && ntDoubles.length >= 1) {
+        return { action: "bid", bid: 4, marks: 1 };
+      }
+      // 3 trumps with double + 2nd + 3rd + 2 side doubles → bid 5 (tight but strong)
+      if (trumpTiles.length >= 3 && hasSecond && hasThird && ntDoubles.length >= 2) {
+        return { action: "bid", bid: 5, marks: 1 };
+      }
     }
     // Moon: 6+ doubles → Shoot the Moon with doubles trump
     if (doubles.length >= 6) return { action: "bid", bid: 7, marks: 2 };
