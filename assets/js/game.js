@@ -4636,6 +4636,12 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         return makeResult(anyTrumpIdx, canSetBid && !isBidderTeam ? "Trump in (setting bid)" : "Trump in to win");
       }
     }
+    // DEFENSIVE SACRIFICE: on defense with trump control, trump 0-count tricks to get the lead
+    // This lets us lead into count-rich suits on the next trick
+    if(!isBidderTeam && canSetBid && !isMoon && winTrumpIdx >= 0 && weHaveTrumpControl
+      && countElsewhere >= 10 && tricksLeft >= 2){
+      return makeResult(winTrumpIdx, "Defense sacrifice: trump to get lead for count capture");
+    }
     // Endgame desperation: trump in even if we can't beat existing trump
     // to prevent opponents from scoring count and to use remaining trumps
     if(mustWin && anyTrumpIdx >= 0 && !partnerHasTrumpInTrick){
