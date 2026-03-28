@@ -5016,16 +5016,29 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           }
         }
 
-        // PARTNER VOID PENALTY: avoid leading suits our partner is void in
+        // PARTNER VOID AWARENESS: context-dependent response to partner voids
         if(!isMoon){
           const partners = _partnerSeats(p);
           let partnerVoid = false;
+          let partnerHasTrumpStill = false;
           for(const ps of partners){
-            if(voidIn[ps] && voidIn[ps].has(ledSuit)){ partnerVoid = true; break; }
+            if(voidIn[ps] && voidIn[ps].has(ledSuit)){ partnerVoid = true; }
+            // Check if this partner likely has trump remaining
+            if(!trumpVoidConfirmed[ps] && (trumpVoidLikely[ps] || 0) < 0.5){
+              partnerHasTrumpStill = true;
+            }
           }
           if(partnerVoid){
-            score -= 15;
-            _breakdown.partnerVoidPenalty = -15;
+            if(!isBidderTeam && partnerHasTrumpStill){
+              // DEFENSIVE: partner void + partner has trump = GOOD (they can trump in!)
+              // This sets up partner to trump the bidder's play on this suit
+              score += 12;
+              _breakdown.partnerVoidTrumpIn = 12;
+            } else {
+              // BIDDER TEAM: partner void = bad (opponents can exploit it)
+              score -= 15;
+              _breakdown.partnerVoidPenalty = -15;
+            }
           }
         }
 
