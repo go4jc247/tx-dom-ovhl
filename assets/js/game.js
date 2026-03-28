@@ -2552,7 +2552,7 @@ function detectLayDownHand(gameState, seat) {
 
   // Build played set
   const playedSet = new Set();
-  const teamCount = GAME_MODE === 'MOON' ? 3 : 2;
+  const teamCount = (GAME_MODE === 'MOON' || GAME_MODE === 'TN51') ? 3 : 2;
   for (let team = 0; team < teamCount; team++) {
     for (const record of (gameState.tricks_team[team] || [])) {
       for (let s = 0; s < gameState.player_count; s++) {
@@ -20623,7 +20623,7 @@ function renderBoneyard2(){
   // Determine played tiles and trump state
   const playedTiles = new Set();
   if(session && session.game){
-    const _teamCount = GAME_MODE === 'MOON' ? 3 : 2;
+    const _teamCount = (GAME_MODE === 'MOON' || GAME_MODE === 'TN51') ? 3 : 2;
     for(let team = 0; team < _teamCount; team++){
       for(const record of (session.game.tricks_team[team] || [])){
         for(let seat = 0; seat < record.length; seat++){
