@@ -4742,6 +4742,31 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         return makeResult(bestIdx, "Lead: early trump (forcing opponent trumps)");
       }
 
+      // P3B: DEFENSIVE TRUMP EXHAUSTION — mid/late game trump pull for defenders
+      // When the bidder has very few trumps left (1-2), pulling them now strips the bidder's
+      // ability to trump into future tricks. Worth sacrificing a mid-level trump for this.
+      // Different from P3: works mid-to-late game, doesn't require canSetBid, targets bidder exhaustion.
+      if(!isBidderTeam && pullableTrumps.length >= 2 && trumpsInHand.length >= 2
+        && !shouldSaveLastTrump && !partnersHoldRemainingTrumps
+        && !opponentsVoidInTrump && trumpTilesRemaining.length > 0 && trumpTilesRemaining.length <= 2
+        && trickNum >= 2 && !bidIsSafe){
+        // Estimate: with ≤2 trumps remaining outside our hand and bidder NOT confirmed void,
+        // the bidder likely holds 1-2 of them. Pulling now exhausts their trump supply.
+        const bidderConfirmedVoid = trumpVoidConfirmed[bidderSeat];
+        if(!bidderConfirmedVoid){
+          // Find our lowest non-count trump to sacrifice
+          let exhaustIdx = pullableTrumps[0], exhaustScore = -Infinity;
+          for(const idx of pullableTrumps){
+            const tile = hand[idx];
+            const pipSum = tile[0] + tile[1];
+            const isCount = (pipSum === 5 || pipSum === 10);
+            let score = -pipSum + (isCount ? (pipSum === 10 ? -100 : -50) : 0);
+            if(score > exhaustScore){ exhaustScore = score; exhaustIdx = idx; }
+          }
+          return makeResult(exhaustIdx, "Defense: exhaust bidder's last " + trumpTilesRemaining.length + " trump(s)");
+        }
+      }
+
       // P4: Sacrifice low trump to get partner in the lead
       // When: partners hold remaining trumps, we have no non-trump doubles to guarantee wins,
       // and we have 2+ trumps (can afford to sacrifice one).
@@ -5673,6 +5698,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         }
       }
       // Defensive count avoidance: when opponent is winning and we can't beat, play lowest non-count
+      // ENHANCED: also consider void potential — prefer tiles that move us toward voiding a suit
+      // (creates future trump-in opportunities when we have trump)
       if(!partnerWinning && legal.length > 1){
         let bestLowIdx = lowIdx, bestLowScore = Infinity;
         for(const idx of legal){
@@ -5680,7 +5707,19 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           if((t[0] === ledPip || t[1] === ledPip) && !gameState._is_trump_tile(t)){
             const ps = t[0] + t[1];
             const isCount = (ps === 5 || ps === 10);
-            const sc = ps + (isCount ? 100 : 0); // heavily penalize count tiles
+            let sc = ps + (isCount ? 100 : 0); // heavily penalize count tiles
+            // Void potential: if playing this tile gets us closer to voiding a suit AND we have trump
+            if(trumpsInHand.length > 0 && !isCount){
+              const otherPip = (t[0] === ledPip) ? t[1] : t[0];
+              // Count how many tiles we have in the other pip's suit (as led suit)
+              let otherSuitCnt = 0;
+              for(const h of hand){
+                if(Math.max(h[0], h[1]) === otherPip && !gameState._is_trump_tile(h)) otherSuitCnt++;
+              }
+              // Bonus for being near-void in a suit (fewer tiles = more attractive to dump)
+              if(otherSuitCnt <= 1) sc -= 8; // near-void: strong incentive
+              else if(otherSuitCnt <= 2) sc -= 4; // getting closer to void
+            }
             if(sc < bestLowScore){ bestLowScore = sc; bestLowIdx = idx; }
           }
         }
@@ -6224,6 +6263,20 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           const densityBonus = Math.min(info.tilesLeft * 2, 8);
           score += densityBonus;
           _bd.voidDensityBonus = densityBonus;
+        }
+      }
+
+      // DEFENSIVE VOID-IN-BIDDER-STRENGTH: when defender has trump and can void a suit
+      // where the bidder is STRONG (high signal), that void creates trump-in opportunities
+      // on the bidder's best suit — very disruptive to their game plan
+      if(!isBidderTeam && trumpsInHand.length > 0 && minCnt <= 1 && !isMoon){
+        const voidTargetPip = (cntA <= cntB) ? pA : pB;
+        // Check if bidder has shown strength in this suit (oppSuitSignal tracks bidder plays)
+        const bidderStrength = oppSuitSignal[voidTargetPip] || 0;
+        if(bidderStrength >= 10){
+          const strengthBonus = Math.min(Math.floor(bidderStrength / 2), 12);
+          score += strengthBonus;
+          _bd.voidBidderStrength = strengthBonus;
         }
       }
 
@@ -7254,7 +7307,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.38.0';  // v17.38.0: 3rd-seat count max, follow improvements
+const MP_VERSION = 'v17.39.0';  // v17.39.0: defensive trump exhaustion, void-in-bidder-strength dump, follow void awareness
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
