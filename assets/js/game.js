@@ -7909,6 +7909,11 @@ function getActivePlaceholderConfig(){ return GAME_MODE === 'MOON' ? PLACEHOLDER
 
 function initGameMode(mode){
   GAME_MODE = mode;
+  // Reset scoring variables to avoid stale data from previous mode
+  team1Score = 0; team2Score = 0; team3Score = 0;
+  team1Marks = 0; team2Marks = 0; team3Marks = 0;
+  team1TricksWon = 0; team2TricksWon = 0; team3TricksWon = 0;
+  moonPlayerTricksWon = [0, 0, 0];
   if(mode === 'MOON'){
     session = new SessionV6_4g(3, 6, 7, 21); // 3 players, double-6, 7 tiles, 21 points to win
     PLAY_ORDER = [1, 2, 3];
@@ -7947,7 +7952,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.80.0';  // v17.80.0: comprehensive Moon count-tile exemptions (suitInfo, dump, follow, doubles)
+const MP_VERSION = 'v17.81.0';  // v17.81.0: initGameMode score reset, TN51 scoreBar DOM efficiency
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
@@ -15634,19 +15639,22 @@ function updateScoreDisplay(){
     if(tn51Bar){
       tn51Bar.style.display = 'flex';
       // Update labels for TN51 (Team 1/2/3 instead of P1/P2/P3, Marks instead of Bid)
-      var cols = tn51Bar.children;
-      var tn51Labels = ['Team 1','Team 2','Team 3'];
-      for(var ci=0;ci<3;ci++){
-        if(!cols[ci]) continue;
-        var lbl=cols[ci].querySelector('div');
-        if(lbl) lbl.textContent=tn51Labels[ci];
-        // Change "Bid:" to "Marks:" in the info line
-        var infoDiv=cols[ci].querySelectorAll('div')[2];
-        if(infoDiv){
-          var bidSpan=infoDiv.querySelector('[id^="moonP"][id$="Bid"]');
-          var trkSpan=infoDiv.querySelector('[id^="moonP"][id$="Tricks"]');
-          if(bidSpan && trkSpan) infoDiv.innerHTML='Marks: <span id="'+bidSpan.id+'">'+team1Marks+'</span> | Tricks: <span id="'+trkSpan.id+'">0</span>';
+      // Only rewrite innerHTML on first call to avoid DOM churn
+      if(!tn51Bar._tn51Initialized){
+        var cols = tn51Bar.children;
+        var tn51Labels = ['Team 1','Team 2','Team 3'];
+        for(var ci=0;ci<3;ci++){
+          if(!cols[ci]) continue;
+          var lbl=cols[ci].querySelector('div');
+          if(lbl) lbl.textContent=tn51Labels[ci];
+          var infoDiv=cols[ci].querySelectorAll('div')[2];
+          if(infoDiv){
+            var bidSpan=infoDiv.querySelector('[id^="moonP"][id$="Bid"]');
+            var trkSpan=infoDiv.querySelector('[id^="moonP"][id$="Tricks"]');
+            if(bidSpan && trkSpan) infoDiv.innerHTML='Marks: <span id="'+bidSpan.id+'">0</span> | Tricks: <span id="'+trkSpan.id+'">0</span>';
+          }
         }
+        tn51Bar._tn51Initialized = true;
       }
       // Score (points this hand)
       var t1s = document.getElementById('moonP1Score');
