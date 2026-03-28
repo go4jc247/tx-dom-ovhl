@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.14.0 — second-seat count protection
+// Version: v17.15.0 — opponent suit signals, trump-in count protection, TN51 defender coordination
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.14.0';
+const CACHE_NAME = 'tx-dom-v17.15.0';
 const urlsToCache = [
   './index.html',
   // CSS

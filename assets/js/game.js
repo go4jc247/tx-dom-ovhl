@@ -3452,6 +3452,47 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   }
 
   // ═══════════════════════════════════════════════════════════════════
+  //  OPPONENT SUIT SIGNAL TRACKING
+  // ═══════════════════════════════════════════════════════════════════
+  // Track which suits opponents have LED (chosen freely, not followed).
+  // Leading a suit signals strength — the leader likely holds high cards in it.
+  // Used in lead selection: avoid leading into opponent strength, prefer their weak suits.
+  const oppSuitSignal = {}; // pip → strength score (higher = opponent showed more strength)
+  if(!isMoon){ // only for team games
+    // Check completed tricks — the leader of each trick chose that suit freely
+    for(let team = 0; team < (gameState.tricks_team || []).length; team++){
+      for(const record of (gameState.tricks_team[team] || [])){
+        // record[0] is the leader of the trick (first to play)
+        // In tricks_team, the first non-null entry is the trick leader
+        let leaderSeat = -1, leaderTile = null;
+        for(let seat = 0; seat < record.length; seat++){
+          if(record[seat]){
+            leaderSeat = seat;
+            leaderTile = record[seat];
+            break;
+          }
+        }
+        if(leaderSeat < 0 || isSameTeam(leaderSeat) || leaderSeat === p) continue; // only opponents
+        if(!leaderTile || gameState._is_trump_tile(leaderTile)) continue; // skip trump leads
+        const ledPip = Math.max(leaderTile[0], leaderTile[1]);
+        const isDouble = leaderTile[0] === leaderTile[1];
+        // Leading a suit = strong signal; leading the double = very strong
+        const strength = isDouble ? 25 : 12;
+        oppSuitSignal[ledPip] = (oppSuitSignal[ledPip] || 0) + strength;
+      }
+    }
+    // Also check who led the current trick (if any plays exist and we're not the leader)
+    if(trick.length > 0 && Array.isArray(trick[0])){
+      const [leaderSeat, leaderTile] = trick[0];
+      if(leaderSeat !== p && !isSameTeam(leaderSeat) && leaderTile && !gameState._is_trump_tile(leaderTile)){
+        const ledPip = Math.max(leaderTile[0], leaderTile[1]);
+        const isDouble = leaderTile[0] === leaderTile[1];
+        oppSuitSignal[ledPip] = (oppSuitSignal[ledPip] || 0) + (isDouble ? 25 : 12);
+      }
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
   //  TRUMP CONTROL DETECTION
   // ═══════════════════════════════════════════════════════════════════
   // We have trump control if ALL opponents are void in trump (confirmed or highly likely)
@@ -4560,6 +4601,12 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
               score += Math.min(partnerSuitSignal[ledSuit], sigCap);
             }
 
+            // Opponent suit signal: avoid leading suits opponents showed strength in
+            if(!isMoon && oppSuitSignal[ledSuit]){
+              const oppPenalty = Math.min(oppSuitSignal[ledSuit], 20);
+              score -= oppPenalty; // opponents led this suit = they're strong in it
+            }
+
             // Bidder's partner: when bidder needs points, prefer count-heavy suits
             if(iAmBidderPartner && !isMoon && (bidderNeedsMore > 15 || (bidderIsClose && info.countRemaining >= 5))){
               score += info.countRemaining; // bonus for leading into count-rich suits
@@ -4830,6 +4877,13 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           const partnerBonus = Math.min(partnerSuitSignal[ledSuit], sigCapC);
           score += partnerBonus;
           _breakdown.partnerSuitReturn = partnerBonus;
+        }
+
+        // OPPONENT SUIT SIGNAL: avoid leading suits opponents led (they're strong there)
+        if(!isMoon && oppSuitSignal[ledSuit]){
+          const oppPenalty = Math.min(oppSuitSignal[ledSuit], 25);
+          score -= oppPenalty;
+          _breakdown.oppSuitStrength = -oppPenalty;
         }
 
         score -= ledSuit;
@@ -5336,9 +5390,11 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       // In TN51 (3 teams), another defender winning = bidder losing, no need to overtake
       const winnerIsDefender = trickWinnerSeatF >= 0 && !isSameTeam(trickWinnerSeatF)
         && (isMoon || (bidderTeamIdx !== undefined && (isTN51 ? (trickWinnerSeatF % 3) !== bidderTeamIdx : (trickWinnerSeatF % 2) !== bidderTeamIdx)));
-      if(winnerIsDefender && !isBidderTeam && trickCountF === 0){
-        // Another defender already winning this no-count trick — save our trump
-        if(lowTrumpF >= 0) return makeResult(lowTrumpF, "Trump led: defender winning, save trump");
+      if(winnerIsDefender && !isBidderTeam){
+        // Another defender already winning — bidder is losing either way
+        // In TN51 (3 teams): defender teams should cooperate to set the bidder
+        // Save our trump regardless of count in trick (count goes to defender, not bidder)
+        if(lowTrumpF >= 0) return makeResult(lowTrumpF, "Trump led: defender winning" + (trickCountF > 0 ? " (" + trickCountF + "pts)" : "") + ", save trump");
       }
       // On defense trying to set bid: overtake (unless defender already winning above)
       if(canSetBid && !isBidderTeam){
@@ -5500,8 +5556,32 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       // COUNT-DRIVEN URGENCY: on offense, always trump in when we need count points to make bid
       // Even on 0-count tricks, winning trick = 1 point closer to bid
       // But don't waste trump if partner is already winning this trick
+      // SECOND-SEAT COUNT PROTECTION: if our best winning trump is a count tile and
+      // opponents behind us could over-trump, prefer a non-count trump instead
       if(isBidderTeam && pointsNeeded > 0 && tricksLeft <= pointsNeeded + 1 && !partnerWinning){
-        return makeResult(winTrumpIdx, "Trump in: need " + pointsNeeded + "pts, can't afford to lose tricks");
+        if(!isLastInTrick && winTrumpCountVal > 0 && !opponentsVoidInTrump){
+          // Our winning trump is a count tile — check if we have a non-count alternative
+          let nonCountWinIdx = -1, nonCountWinRank = Infinity;
+          for(const idx of legal){
+            const tile = hand[idx];
+            if(!gameState._is_trump_tile(tile)) continue;
+            const r = getTrumpRankNum(tile);
+            if(r <= highestTrickTrump) continue; // can't win
+            const ps = tile[0] + tile[1];
+            if(ps !== 5 && ps !== 10 && r < nonCountWinRank){
+              nonCountWinRank = r; nonCountWinIdx = idx;
+            }
+          }
+          if(nonCountWinIdx >= 0){
+            return makeResult(nonCountWinIdx, "Trump in (non-count): protect " + winTrumpCountVal + "-count trump");
+          }
+          // No non-count winning trump available — use the count trump but only if desperate
+          if(tricksLeft <= 2){
+            return makeResult(winTrumpIdx, "Trump in (count, desperate): need " + pointsNeeded + "pts, final tricks");
+          }
+        } else {
+          return makeResult(winTrumpIdx, "Trump in: need " + pointsNeeded + "pts, can't afford to lose tricks");
+        }
       }
       // TRUMP RATIO CONSERVATION: on defense, save trumps for higher-value tricks
       // When trumps are scarce relative to remaining tricks, don't waste on 0-count tricks
@@ -5519,6 +5599,21 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           if(anyTrumpIdx >= 0) return makeResult(anyTrumpIdx, "Conserve: forced trump (no non-trump), play lowest");
         }
       } else if(winTrumpIdx >= 0){
+        // SECOND-SEAT COUNT PROTECTION: prefer non-count trump when not last and opponents behind
+        if(!isLastInTrick && winTrumpCountVal > 0 && !opponentsVoidInTrump){
+          let _ncWinIdx = -1, _ncWinRank = Infinity;
+          for(const idx of legal){
+            const tile = hand[idx];
+            if(!gameState._is_trump_tile(tile)) continue;
+            const r = getTrumpRankNum(tile);
+            if(r <= highestTrickTrump) continue;
+            const ps = tile[0] + tile[1];
+            if(ps !== 5 && ps !== 10 && r < _ncWinRank){ _ncWinRank = r; _ncWinIdx = idx; }
+          }
+          if(_ncWinIdx >= 0){
+            return makeResult(_ncWinIdx, (canSetBid && !isBidderTeam ? "Trump in (setting bid)" : "Trump in") + " — non-count to protect " + winTrumpCountVal + "pts");
+          }
+        }
         return makeResult(winTrumpIdx, canSetBid && !isBidderTeam ? "Trump in (setting bid)" : "Trump in to win");
       }
     }
