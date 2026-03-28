@@ -3696,11 +3696,16 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       // If our lowest trump outranks all remaining trumps, we'd win our own trick (pointless).
       // Don't do this with only 1 trump (save it as get-back-in card).
       if(partnersHoldRemainingTrumps && nonTrumpDoubles.length === 0 && otherTrumps.length >= 2){
-        // Find lowest non-double trump in our hand
-        let lowIdx = otherTrumps[0], lowR = Infinity;
+        // Find lowest non-double trump, preferring non-count tiles
+        let lowIdx = otherTrumps[0], lowR = Infinity, lowIsCount = true;
         for(const idx of otherTrumps){
           const r = getTrumpRankNum(hand[idx]);
-          if(r < lowR){ lowR = r; lowIdx = idx; }
+          const ps = hand[idx][0] + hand[idx][1];
+          const isCount = (ps === 5 || ps === 10);
+          // Prefer non-count trumps; among same count status, pick lowest rank
+          if((!isCount && lowIsCount) || (isCount === lowIsCount && r < lowR)){
+            lowR = r; lowIdx = idx; lowIsCount = isCount;
+          }
         }
         // Check: can any remaining trump (held by partner) beat our lowest?
         const highestPartnerTrump = trumpTilesRemaining.length > 0
