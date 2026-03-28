@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.44.0 — double lead partner count synergy
+// Version: v17.45.0 — Moon trump conservation fix
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.44.0';
+const CACHE_NAME = 'tx-dom-v17.45.0';
 const urlsToCache = [
   './index.html',
   // CSS

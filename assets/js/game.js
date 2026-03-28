@@ -6105,7 +6105,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       const _trumpRatio = tricksLeft > 0 ? trumpsInHand.length / tricksLeft : 1;
       // Don't conserve if bidder is close to making — we need every trick to defend
       const bidderNearMaking = bidderNeedsMore <= tricksLeft + 5;
-      const _shouldConserve = !isBidderTeam && trickCount === 0 && !isEndgame && !bidderIsClose && !canSetBid
+      // Moon: never conserve based on count — every trick is worth 1 point regardless of count
+      const _shouldConserve = !isMoon && !isBidderTeam && trickCount === 0 && !isEndgame && !bidderIsClose && !canSetBid
         && !bidderNearMaking
         && (shouldSaveLastTrump || (_trumpRatio <= 0.5 && trumpsInHand.length <= 2));
       if(_shouldConserve){
@@ -6144,7 +6145,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       // Same trump ratio conservation for first-trump play
       const _trumpRatio2 = tricksLeft > 0 ? trumpsInHand.length / tricksLeft : 1;
       const bidderNearMaking2 = bidderNeedsMore <= tricksLeft + 5;
-      const _shouldConserve2 = !isBidderTeam && trickCount === 0 && !isEndgame && !bidderIsClose && !canSetBid
+      const _shouldConserve2 = !isMoon && !isBidderTeam && trickCount === 0 && !isEndgame && !bidderIsClose && !canSetBid
         && !bidderNearMaking2
         && (shouldSaveLastTrump || (_trumpRatio2 <= 0.5 && trumpsInHand.length <= 2));
       if(_shouldConserve2){
@@ -7366,7 +7367,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.44.0';  // v17.44.0: double lead partner count synergy
+const MP_VERSION = 'v17.45.0';  // v17.45.0: Moon trump conservation fix
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
