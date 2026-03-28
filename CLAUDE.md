@@ -11,6 +11,17 @@ These are not suggestions. They are hard rules for this project.
 
 ---
 
+## 📡 OWNER COMMUNICATION — CHECK EVERY SESSION
+
+- The owner (John) may leave messages via the **SAYA tech support chat file** in this repo.
+- **At the start of every session**, check the SAYA chat JSON file for any new messages from "John".
+- If John has left a message, **read it and follow any instructions** before starting other work.
+- To reply to John, **add a response message to the same JSON file** using sender "Saya" / sender_id "saya-claude".
+- If John says to communicate with him directly through SAYA tx ovhl, use that chat file as the primary communication channel.
+- Increment the message `id` and `ts` by 60 seconds from the last entry for each new message.
+
+---
+
 ## SCOPE — Where Claude Is Allowed to Work
 
 - ✅ Working directory: `/Users/jp/tx-dom-ovhl/` ONLY
