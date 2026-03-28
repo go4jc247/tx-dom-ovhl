@@ -4731,16 +4731,26 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       // PICK safest trump: avoid count tiles (pipSum=5 or 10), then prefer low value
       if(pullableTrumps.length > 0 && iHaveHighestTrump && !shouldSaveLastTrump && !partnersHoldRemainingTrumps
         && trumpTilesRemaining.length > 0 && !opponentsVoidInTrump){
+        // ENDGAME COUNT TRUMP: when bidder team needs count and few tricks remain,
+        // leading count trumps is GOOD — guaranteed win + guaranteed count capture.
+        // Early game: avoid count trumps (save for later when we need them).
+        const needCountUrgently = isBidderTeam && pointsNeeded > 0 && tricksLeft <= pointsNeeded + 2;
         let bestIdx = pullableTrumps[0], bestScore = -Infinity;
         for(const idx of pullableTrumps){
           const tile = hand[idx];
           const pipSum = tile[0] + tile[1];
           const isCount = (pipSum === 5 || pipSum === 10);
-          // Prefer non-count trumps; 10-count much worse than 5-count to lead
-          let score = -pipSum + (isCount ? (pipSum === 10 ? -100 : -50) : 0);
+          let score;
+          if(needCountUrgently && isCount){
+            // Endgame urgency: count trumps become PREFERRED (guaranteed count capture)
+            score = pipSum * 2; // 10-count = 20, 5-count = 10 — higher is better
+          } else {
+            // Normal: avoid count trumps; prefer low value
+            score = -pipSum + (isCount ? (pipSum === 10 ? -100 : -50) : 0);
+          }
           if(score > bestScore){ bestScore = score; bestIdx = idx; }
         }
-        return makeResult(bestIdx, "Lead: safe trump (pulling remaining trumps)");
+        return makeResult(bestIdx, needCountUrgently ? "Lead: count trump pull (need " + pointsNeeded + "pts, guaranteed capture)" : "Lead: safe trump (pulling remaining trumps)");
       }
 
       // P3: Trump aggression — lead trump even without highest
@@ -7331,7 +7341,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.40.0';  // v17.40.0: bidder-out-of-trump free capture lead
+const MP_VERSION = 'v17.41.0';  // v17.41.0: endgame count trump lead for bidder
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
