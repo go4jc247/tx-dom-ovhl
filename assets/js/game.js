@@ -4262,6 +4262,17 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       score -= Math.floor(pipSum * 0.5);
       _bd.sumPenalty = -Math.floor(pipSum * 0.5);
 
+      // "Dead" tile bonus: if the double of this suit has been played,
+      // this tile can never win its suit — safe to dump
+      if(!gameState._is_trump_tile(tile) && tile[0] !== tile[1]){
+        const highPip = Math.max(tile[0], tile[1]);
+        const info2 = suitInfo[highPip];
+        if(info2 && info2.winnerPlayed){
+          score += 5; // this tile's double is gone — it's expendable
+          _bd.deadTileBonus = 5;
+        }
+      }
+
       // Save trumps (especially the last one!)
       if(gameState._is_trump_tile(tile)){
         score -= 20;
