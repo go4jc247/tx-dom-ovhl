@@ -4037,6 +4037,54 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       };
     }
 
+    // ── MOON BIDDER LEAD: systematically win tricks with guaranteed winners ──
+    // Moon bidder plays alone against 2 opponents — must maximize trick wins.
+    // Strategy: lead trump doubles first (guaranteed), then pull trump, then walk doubles.
+    if(isMoon && iAmBidder && !bidIsSafe){
+      // Priority 1: Lead trump doubles — guaranteed wins that pull opponents' trump
+      if(trumpDoubles.length > 0){
+        // Prefer non-count trump doubles first
+        let bestTdIdx = trumpDoubles[0], bestTdScore = -Infinity;
+        for(const idx of trumpDoubles){
+          const ps = hand[idx][0] + hand[idx][1];
+          const isCount = (ps === 5 || ps === 10);
+          let sc = hand[idx][0] * 10 - (isCount ? 5 : 0); // high doubles first, avoid count
+          if(sc > bestTdScore){ bestTdScore = sc; bestTdIdx = idx; }
+        }
+        return makeResult(bestTdIdx, "Moon bidder: lead trump double (guaranteed win)");
+      }
+      // Priority 2: Pull trump if we have the highest
+      if(pullableTrumps.length > 0 && iHaveHighestTrump && trumpTilesRemaining.length > 0){
+        let bestPullIdx = pullableTrumps[0], bestPullScore = -Infinity;
+        for(const idx of pullableTrumps){
+          const ps = hand[idx][0] + hand[idx][1];
+          const isCount = (ps === 5 || ps === 10);
+          let sc = getTrumpRankNum(hand[idx]) - (isCount ? 50 : 0);
+          if(sc > bestPullScore){ bestPullScore = sc; bestPullIdx = idx; }
+        }
+        return makeResult(bestPullIdx, "Moon bidder: pull trump (highest remaining)");
+      }
+      // Priority 3: Lead non-trump doubles — guaranteed suit wins
+      if(nonTrumpDoubles.length > 0){
+        let bestNtdIdx = nonTrumpDoubles[0], bestNtdPip = -1;
+        for(const idx of nonTrumpDoubles){
+          // Lead highest double first (opponents more likely void = less competition)
+          if(hand[idx][0] > bestNtdPip){ bestNtdPip = hand[idx][0]; bestNtdIdx = idx; }
+        }
+        return makeResult(bestNtdIdx, "Moon bidder: lead non-trump double (suit control)");
+      }
+      // Priority 4: Lead covered offs (tiles where we've already played the double)
+      // These "walk" since the double (suit winner) is out
+      for(const idx of nonTrumpSingles){
+        const hp = Math.max(hand[idx][0], hand[idx][1]);
+        const si = suitInfo[hp];
+        if(si && si.winnerPlayed){
+          return makeResult(idx, "Moon bidder: walk covered off (double already played)");
+        }
+      }
+      // Fall through to normal lead logic for uncovered offs / remaining tiles
+    }
+
     // ── MOON OPPONENT LEAD: maximize trick wins to deny the bidder ──
     // In Moon, there are no partners — every non-bidder must win tricks independently.
     // When the bidder is on pace for all tricks, lead suits where bidder is likely void
