@@ -3304,7 +3304,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       if(isTrump) continue;
       const highPip = Math.max(t[0], t[1]);
       const isDouble = t[0] === t[1];
-      const strength = isDouble ? 20 : 5;
+      const lowPip = Math.min(t[0], t[1]);
+      const strength = isDouble ? 20 : (highPip === lowPip + 1 ? 8 : 5);
       partnerSuitSignal[highPip] = (partnerSuitSignal[highPip] || 0) + strength;
     }
   }
@@ -4350,7 +4351,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
 
         // PARTNER SUIT RETURN: prefer suits where partner showed strength
         if(!isMoon && partnerSuitSignal[ledSuit]){
-          const partnerBonus = Math.min(partnerSuitSignal[ledSuit], 20); // cap at 20
+          const sigCapC = (iAmBidderPartner && bidderNeedsMore > 10) ? 25 : 20;
+          const partnerBonus = Math.min(partnerSuitSignal[ledSuit], sigCapC);
           score += partnerBonus;
           _breakdown.partnerSuitReturn = partnerBonus;
         }
@@ -4772,8 +4774,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       if(lowTrumpF >= 0) return makeResult(lowTrumpF, "Trump led, partner winning — play low trump");
     }
 
-    // Last in trick: always win if count in trick
-    if(isLastInTrick && winTrumpF >= 0 && trickCountF > 0){
+    // Last in trick: win if count in trick (but not if partner already winning)
+    if(isLastInTrick && winTrumpF >= 0 && trickCountF > 0 && !partnerWinningTrumpF){
       return makeResult(winTrumpF, "Trump led, last: win for " + trickCountF + "pts");
     }
 
@@ -4793,6 +4795,14 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
 
     // Can't beat — play lowest trump (preserve higher ones)
     if(lowTrumpF >= 0) return makeResult(lowTrumpF, "Trump led: can't beat, play low trump");
+
+    // Void in trump — dump lowest value tile
+    let voidDumpIdx = legal[0], voidDumpVal = Infinity;
+    for(const idx of legal){
+      const v = hand[idx][0] + hand[idx][1];
+      if(v < voidDumpVal){ voidDumpVal = v; voidDumpIdx = idx; }
+    }
+    return makeResult(voidDumpIdx, "Trump led but void: dump lowest");
   }
 
   // ── Off-suit: trump in ──
