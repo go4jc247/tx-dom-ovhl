@@ -4321,11 +4321,16 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
               score += 20; // strong walker setup
             }
 
-            // Partner void check: don't lead into suits partner can't follow
+            // Partner/bidder void check: don't lead into suits teammates can't follow
             if(!isMoon){
               for(let ps = 0; ps < gameState.player_count; ps++){
                 if(!isSameTeam(ps) || ps === p) continue;
-                if(voidIn[ps].has(ledSuit)){ score -= 25; break; } // partner void — bad lead
+                if(voidIn[ps].has(ledSuit)){
+                  // Bidder void is worse — they'd waste trump control on our lead
+                  const penalty = (ps === bidderSeat && iAmBidderPartner) ? -35 : -25;
+                  score += penalty;
+                  break;
+                }
               }
             }
 
