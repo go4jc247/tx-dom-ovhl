@@ -4222,8 +4222,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
             // Check if WE hold this double — if so it's safe (walker pair)
             const weHoldThisDouble = hand.some(h => h[0] === ledSuit && h[1] === ledSuit);
             if(weHoldThisDouble){
-              score += 8; // We can walk this suit safely
-              _breakdown.walkerBonus = 8;
+              score += 25; // Walker pair: guaranteed safe lead
+              _breakdown.walkerBonus = 25;
             } else {
               score -= 30;
               score -= info.winnerCount * 2;
@@ -4236,7 +4236,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           }
           // Without trump control, count tiles are very exposed — opponents can trump in
           // Harsher penalty when opponents are void (will trump our count)
-          const countPenMult = (oppsVoid > 0 && !opponentsVoidInTrump) ? 5 : 3;
+          const countPenMult = (oppsVoid > 0 && !opponentsVoidInTrump) ? (3 + oppsVoid * 2) : 3;
           score -= myCount * countPenMult;
           _breakdown.myCountPenalty = -(myCount * countPenMult);
           if(!info.winnerPlayed){
@@ -4287,6 +4287,19 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
               score += Math.floor(info.countRemaining * 0.8);
               _breakdown.setBidCountBonus = Math.floor(info.countRemaining * 0.8);
             }
+          }
+        }
+
+        // PARTNER VOID PENALTY: avoid leading suits our partner is void in
+        if(!isMoon){
+          const partners = _partnerSeats(p);
+          let partnerVoid = false;
+          for(const ps of partners){
+            if(voidIn[ps] && voidIn[ps].has(ledSuit)){ partnerVoid = true; break; }
+          }
+          if(partnerVoid){
+            score -= 15;
+            _breakdown.partnerVoidPenalty = -15;
           }
         }
 
