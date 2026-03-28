@@ -3137,6 +3137,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   // ═══════════════════════════════════════════════════════════════════
   //  BID SAFETY — how many points do we still need?
   // ═══════════════════════════════════════════════════════════════════
+  const bidderSeat = gameState.bid_winner_seat !== undefined ? gameState.bid_winner_seat : 0;
+  const isBidderTeam = isMoon ? (p === bidderSeat) : (myTeam === (bidderSeat % 2));
   const currentBid = bid || 34; // passed from session.current_bid
   const ourScore = gameState.team_points[myTeam] || 0;
   const pointsNeeded = currentBid - ourScore;
@@ -3645,6 +3647,16 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           // If opponents are void in this suit AND void in trump, they can't threaten
           if(oppsVoid > 0 && opponentsVoidInTrump){ score += 10; _breakdown.oppVoidSafe = +10; }
           _breakdown.oppsVoidInSuit = oppsVoid;
+
+          // DEFENSIVE LEAD: When we're on defense, prefer suits where the bidder is void
+          // This forces the bidder to trump (wasting trump) or lose the trick
+          if(!isBidderTeam && !isMoon){
+            const bidderVoidInSuit = voidIn[bidderSeat] && voidIn[bidderSeat].has(ledSuit);
+            if(bidderVoidInSuit){
+              score += 15; // bonus: force bidder to trump or discard
+              _breakdown.bidderVoidBonus = 15;
+            }
+          }
         }
 
         score -= ledSuit;
@@ -3722,6 +3734,19 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     // Use non-trump tiles if available; only fall back to trumps if ALL tiles are trump
     const pwCandidates = pwNonTrumps.length > 0 ? pwNonTrumps : pwTrumps;
 
+    // Check how many opponents still have to play after us
+    const playersRemaining = gameState.player_count - trick.length - 1;
+    let oppsRemaining = 0;
+    // Count opponent seats that haven't played yet
+    for(let s = 0; s < gameState.player_count; s++){
+      if(isSameTeam(s) || s === p) continue;
+      const alreadyPlayed = trick.some(play => Array.isArray(play) && play[0] === s);
+      if(!alreadyPlayed) oppsRemaining++;
+    }
+    // Safe to throw count: no opponents left OR partner has trump (can't be beaten by suit)
+    const partnerHasTrump = trick.some(play => Array.isArray(play) && play[0] !== p && isSameTeam(play[0]) && gameState._is_trump_tile(play[1]));
+    const safeToThrowCount = oppsRemaining === 0 || partnerHasTrump;
+
     let countIdx = -1, countVal = 0, lowIdx = pwCandidates[0], lowVal = Infinity;
     for(const idx of pwCandidates){
       const tile = hand[idx];
@@ -3731,7 +3756,11 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       }
       if(pipSum < lowVal){ lowVal = pipSum; lowIdx = idx; }
     }
-    if(countIdx >= 0) return makeResult(countIdx, "Partner winning, throw count (" + countVal + "pts)");
+    if(countIdx >= 0 && safeToThrowCount) return makeResult(countIdx, "Partner winning (safe), throw count (" + countVal + "pts)");
+    if(countIdx >= 0 && !safeToThrowCount){
+      // Opponents still to play — only throw small count, save 10-pt tiles
+      if(countVal === 5) return makeResult(countIdx, "Partner winning (risky), throw small count");
+    }
     return makeResult(lowIdx, "Partner winning, play low");
   }
 
@@ -3805,7 +3834,17 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       }
     }
     if(highIdx >= 0 && highRank > winnerRank){
-      return makeResult(highIdx, "Following suit, play high to win");
+      // Play the LOWEST card that still wins (preserve double/higher cards for later)
+      let bestWinIdx = highIdx, bestWinRank = Infinity;
+      for(const idx of legal){
+        const tile = hand[idx];
+        if((tile[0] === ledPip || tile[1] === ledPip) && !gameState._is_trump_tile(tile)){
+          const r = gameState._suit_rank(tile, ledPip);
+          const rank = r[0] * 100 + r[1];
+          if(rank > winnerRank && rank < bestWinRank){ bestWinRank = rank; bestWinIdx = idx; }
+        }
+      }
+      return makeResult(bestWinIdx, "Following suit, lowest winning card");
     }
     if(lowIdx >= 0){
       // offTracker: When can't win, protect catchers
@@ -3887,10 +3926,34 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     }
 
     if(winTrumpIdx >= 0){
-      return makeResult(winTrumpIdx, "Trump in to win");
+      // SMART TRUMP CONSERVATION: On defense with low-value trick, consider saving trump
+      // But always trump in if: we're the bidder's team, endgame, or trick has count
+      const trickCount = trick.reduce((sum, play) => {
+        if(!Array.isArray(play) || !play[1]) return sum;
+        const ps = play[1][0] + play[1][1];
+        return sum + ((ps === 5) ? 5 : (ps === 10) ? 10 : 0);
+      }, 0);
+      // isBidderTeam defined above in BID SAFETY section
+      if(!isBidderTeam && trickCount === 0 && !isEndgame && shouldSaveLastTrump){
+        // Low-value trick on defense with last trump — save it for a count-heavy trick
+        // Fall through to dump logic
+      } else {
+        return makeResult(winTrumpIdx, "Trump in to win");
+      }
     }
     if(anyTrumpIdx >= 0 && highestTrickTrump < 0){
-      return makeResult(anyTrumpIdx, "Trump in to win");
+      // Same conservation logic for first trump play
+      const trickCount = trick.reduce((sum, play) => {
+        if(!Array.isArray(play) || !play[1]) return sum;
+        const ps = play[1][0] + play[1][1];
+        return sum + ((ps === 5) ? 5 : (ps === 10) ? 10 : 0);
+      }, 0);
+      // isBidderTeam defined above in BID SAFETY section
+      if(!isBidderTeam && trickCount === 0 && !isEndgame && shouldSaveLastTrump){
+        // Save last trump for higher-value trick
+      } else {
+        return makeResult(anyTrumpIdx, "Trump in to win");
+      }
     }
     // Endgame desperation: trump in even if we can't beat existing trump
     // to prevent opponents from scoring count and to use remaining trumps
