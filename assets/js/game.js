@@ -3944,7 +3944,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
 
     // ── DEFENSIVE TAP: lead any tile into bidder's void to exhaust trump ──
     // When we have no doubles in the bidder's void suits, lead low non-count singles
-    if(!isBidderTeam && !weHaveTrumpControl && nonTrumpSingles.length > 0 && !canRelax){
+    if(!isBidderTeam && !weHaveTrumpControl && nonTrumpSingles.length > 0){
       const bidderVoids = voidIn[bidderSeat] || new Set();
       if(bidderVoids.size > 0){
         let bestTapIdx = -1, bestTapScore = -Infinity;
@@ -3976,7 +3976,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       for(const idx of nonTrumpDoubles){
         const pip = hand[idx][0];
         const info = suitInfo[pip];
-        if(!info || info.countRemaining <= 0) continue;
+        if(!info) continue;
         const pipSum = hand[idx][0] + hand[idx][1];
         const myCount = (pipSum === 5) ? 5 : (pipSum === 10) ? 10 : 0;
         // Score: count remaining in suit + own count value + bonus if bidder is void (can't capture)
@@ -3984,7 +3984,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         const desperation = Math.max(0.5, Math.min(1.5, (35 - bidderNeedsMore) / 20));
         let score = Math.round(info.countRemaining * 2 * desperation) + myCount;
         const bidderVoidHere = voidIn[bidderSeat] && voidIn[bidderSeat].has(pip);
-        if(bidderVoidHere) score += 10; // bidder can't follow, must trump or lose
+        if(bidderVoidHere) score += 10; // bidder can't follow, must trump or lose — valuable even without count
         if(score > bestCapScore){ bestCapScore = score; bestCapIdx = idx; }
       }
       if(bestCapIdx >= 0 && bestCapScore >= 10){
