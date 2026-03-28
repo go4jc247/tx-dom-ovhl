@@ -1807,8 +1807,14 @@ function aiChooseTrump(hand, bidAmount) {
     }
     score += coveredOffs * 7; // covered offs are safe side tricks (walker pairs)
     // Uncovered off penalty: non-trump non-double tiles without a covering double are risky
+    // Count tiles in uncovered offs are extra dangerous — losing a 10-count is devastating
     const uncoveredOffs = nonTrumpTiles.filter(t => t[0] !== t[1] && !ntDoublePips.has(t[0]) && !ntDoublePips.has(t[1]));
-    score -= uncoveredOffs.length * 4;
+    for (const t of uncoveredOffs) {
+      const uSum = t[0] + t[1];
+      score -= 4; // base uncovered penalty
+      if (uSum === 10) score -= 5; // 10-count in uncovered off = very exposed
+      else if (uSum === 5) score -= 3; // 5-count in uncovered off = somewhat exposed
+    }
 
     // Count tile awareness: penalty if our trump tiles are count tiles
     // (10-count: pip sum = 10; 5-count: pip sum = 5)
@@ -3648,6 +3654,14 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
             score -= 50;
           }
 
+          // Prefer suits with more remaining tiles — bidder more likely to still hold cards
+          const sInfo = suitInfo[suitPip];
+          if(sInfo && sInfo.tilesLeft > 0) score += sInfo.tilesLeft * 3;
+
+          // Avoid leading our only card in a suit (save for later forcing plays)
+          const mySuitCount = hand.filter(t => Math.max(t[0],t[1]) === suitPip || Math.min(t[0],t[1]) === suitPip).length;
+          if(mySuitCount === 1 && tricksLeft > 2) score -= 5;
+
           if(score > bestScore){ bestScore = score; bestIdx = idx; }
         }
         return makeResult(bestIdx, "Nel-O opp: lead high to trap bidder");
@@ -4521,6 +4535,22 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
             // Only penalize if double still in play (opponent with double could beat us)
             if(!info.winnerPlayed) score -= myCount * 2;
             else score -= Math.floor(myCount * 0.5); // very safe with trump control + double out
+
+            // Off-tracker: bidder's partner protects off suit, opponents target it
+            if(offTracker && (offTracker.trumpMode === 'PIP' || offTracker.trumpMode === 'DOUBLES')){
+              const isBidderOpp = isMoon ? (offTracker.bidderTeam !== p) : (myTeam !== offTracker.bidderTeam);
+              const suspB = getOffSuspicion();
+              if(suspB && suspB.length > 0){
+                const topB = suspB[0];
+                if(!isBidderOpp && !iAmBidder && topB.suspicion >= 40 && ledSuit === topB.pip){
+                  // PARTNER: don't lead the off suit — protect bidder's weak point
+                  score -= 20;
+                } else if(isBidderOpp && topB.suspicion >= 50 && ledSuit === topB.pip){
+                  // OPPONENT with trump control: lead the suspected off suit to flush catcher
+                  score += 15;
+                }
+              }
+            }
 
             // Prefer lower tiles (let partner play higher)
             score -= pipSum;

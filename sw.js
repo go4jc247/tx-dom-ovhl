@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.10.0 — exact card counting, DFM lead/trump, DOUBLES count hunt
+// Version: v17.11.0 — off-tracker Phase B, uncovered count penalty, Nello suit forcing
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.10.0';
+const CACHE_NAME = 'tx-dom-v17.11.0';
 const urlsToCache = [
   './index.html',
   // CSS
