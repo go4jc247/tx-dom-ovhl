@@ -3141,6 +3141,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   // ═══════════════════════════════════════════════════════════════════
   const bidderSeat = gameState.bid_winner_seat !== undefined ? gameState.bid_winner_seat : 0;
   const isBidderTeam = isMoon ? (p === bidderSeat) : (myTeam === (bidderSeat % 2));
+  const iAmBidder = p === bidderSeat;
+  const iAmBidderPartner = isBidderTeam && !iAmBidder; // on bidder's team but not the bidder
   const currentBid = bid || 34; // passed from session.current_bid
   const ourScore = gameState.team_points[myTeam] || 0;
   const pointsNeeded = currentBid - ourScore;
@@ -3504,7 +3506,9 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     }
 
     // ── PHASE A: TRUMP PULLING (before we have trump control) ──
-    if(!weHaveTrumpControl){
+    // Skip aggressive trump pulling if bid is already safe (canRelax) and we're bidder team
+    // Save trumps for defense against opponent count grabs
+    if(!weHaveTrumpControl && !(canRelax && isBidderTeam)){
 
       // P1: Lead trump double — guaranteed win, pulls opponents' trump
       if(trumpDoubles.length > 0){
