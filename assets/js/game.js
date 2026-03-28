@@ -1741,6 +1741,8 @@ function evaluateHandForBid(hand) {
 }
 
 function aiChooseTrump(hand, bidAmount) {
+  const isMoon = GAME_MODE === 'MOON';
+  const isTN51 = GAME_MODE === 'TN51';
   const doubles = [];
   const blanks = [];
 
@@ -7818,7 +7820,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.68.0';  // v17.68.0: TN51 fixes — isThirdSeat dynamic, bid fallback, trump void probability
+const MP_VERSION = 'v17.69.0';  // v17.69.0: CRITICAL — isMoon undefined in aiChooseTrump, Moon trump selection now works
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables

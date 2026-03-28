@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.68.0 — TN51: isThirdSeat dynamic, bid fallback, trump void probability
+// Version: v17.69.0 — CRITICAL: isMoon fix in aiChooseTrump, Moon trump selection
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.68.0';
+const CACHE_NAME = 'tx-dom-v17.69.0';
 const urlsToCache = [
   './index.html',
   // CSS
