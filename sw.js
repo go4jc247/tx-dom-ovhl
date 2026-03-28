@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.11.0 — off-tracker Phase B, uncovered count penalty, Nello suit forcing
+// Version: v17.12.0 — partner overbid fix, walker sequencing, defensive trump, dump count
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.11.0';
+const CACHE_NAME = 'tx-dom-v17.12.0';
 const urlsToCache = [
   './index.html',
   // CSS
