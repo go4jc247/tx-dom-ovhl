@@ -1614,9 +1614,7 @@ function aiChooseTrump(hand, bidAmount) {
     }
   }
 
-  if (doubles.length >= 4) {
-    return "DOUBLES";
-  }
+  // DOUBLES evaluated below alongside pip suits (not early-returned)
 
   let bestSuit = null;
   let bestScore = -Infinity;
@@ -1711,6 +1709,36 @@ function aiChooseTrump(hand, bidAmount) {
     if (score > bestScore) {
       bestScore = score;
       bestSuit = pip;
+    }
+  }
+
+  // ── Score DOUBLES trump alongside pip suits ──
+  if (doubles.length >= 3) {
+    let doublesScore = 0;
+    // Each double is a guaranteed trump trick (ranked by pip value)
+    doublesScore += doubles.length * 15;
+    // Bonus for overwhelming trump count
+    if (doubles.length >= 5) doublesScore += 12;
+    else if (doubles.length >= 4) doublesScore += 6;
+    // In DOUBLES mode, non-double tiles have no suit double to protect them
+    // Penalty for exposed count tiles in non-trump hands
+    const nonDoubles = hand.filter(t => t[0] !== t[1]);
+    for (const t of nonDoubles) {
+      const sum = t[0] + t[1];
+      if (sum === 10) doublesScore -= 3;
+      else if (sum === 5) doublesScore -= 2;
+    }
+    // Void awareness: count suits we're void in (excluding doubles)
+    const ndSuits = new Set();
+    for (const t of nonDoubles) { ndSuits.add(t[0]); ndSuits.add(t[1]); }
+    let doublesVoids = 0;
+    for (let s = 0; s <= maxPip; s++) {
+      if (!ndSuits.has(s)) doublesVoids++;
+    }
+    doublesScore += doublesVoids * 5;
+    // Compare DOUBLES vs best pip suit
+    if (doublesScore > bestScore) {
+      return "DOUBLES";
     }
   }
 
@@ -3136,6 +3164,44 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   }
 
   // ═══════════════════════════════════════════════════════════════════
+  //  PARTNER SUIT SIGNAL TRACKING
+  // ═══════════════════════════════════════════════════════════════════
+  // Track which suits partner has shown strength in (played high cards or won tricks)
+  // Used in Phase C lead selection to "return" partner's strong suit
+  const partnerSuitSignal = {}; // pip → strength score (higher = partner showed more strength)
+  if(!isMoon){ // only for team games
+    for(let team = 0; team < (gameState.tricks_team || []).length; team++){
+      for(const record of (gameState.tricks_team[team] || [])){
+        for(let seat = 0; seat < record.length; seat++){
+          if(seat === p || !isSameTeam(seat)) continue; // only partner
+          const t = record[seat];
+          if(!t) continue;
+          const isTrump = gameState._is_trump_tile(t);
+          if(isTrump) continue; // skip trump plays — they don't signal suit preference
+          const highPip = Math.max(t[0], t[1]);
+          const lowPip = Math.min(t[0], t[1]);
+          const isDouble = t[0] === t[1];
+          // Partner played a high card or double in this suit = strong signal
+          const strength = isDouble ? 20 : (highPip === lowPip + 1 ? 8 : 5); // double > sequential > other
+          partnerSuitSignal[highPip] = (partnerSuitSignal[highPip] || 0) + strength;
+        }
+      }
+    }
+    // Also check current trick for partner signals
+    for(const play of trick){
+      if(!Array.isArray(play)) continue;
+      const [seat, t] = play;
+      if(seat === p || !isSameTeam(seat)) continue;
+      const isTrump = gameState._is_trump_tile(t);
+      if(isTrump) continue;
+      const highPip = Math.max(t[0], t[1]);
+      const isDouble = t[0] === t[1];
+      const strength = isDouble ? 20 : 5;
+      partnerSuitSignal[highPip] = (partnerSuitSignal[highPip] || 0) + strength;
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
   //  TRUMP CONTROL DETECTION
   // ═══════════════════════════════════════════════════════════════════
   // We have trump control if ALL opponents are void in trump (confirmed or highly likely)
@@ -3910,6 +3976,13 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
               _breakdown.setBidCountBonus = Math.floor(info.countRemaining * 0.8);
             }
           }
+        }
+
+        // PARTNER SUIT RETURN: prefer suits where partner showed strength
+        if(!isMoon && partnerSuitSignal[ledSuit]){
+          const partnerBonus = Math.min(partnerSuitSignal[ledSuit], 20); // cap at 20
+          score += partnerBonus;
+          _breakdown.partnerSuitReturn = partnerBonus;
         }
 
         score -= ledSuit;
