@@ -3241,6 +3241,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
 
     // Following in Nello
     if(bidderWinning){
+      // Bidder is currently winning (bad!) — play highest to try to let someone overtake
       let highIdx = legal[0], highVal = 0;
       for(const idx of legal){
         const val = hand[idx][0]+hand[idx][1];
@@ -3248,7 +3249,38 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       }
       return makeResult(highIdx, "Nel-O: bidder winning, play high to rescue");
     }
+    if(iAmBidder){
+      // NELLO BIDDER following: play HIGHEST card that still LOSES
+      // This dumps dangerous high cards while safely under the current winner
+      const winnerSeat = gameState._determine_trick_winner();
+      let winnerRank = -1;
+      for(const play of trick){
+        if(!Array.isArray(play)) continue;
+        if(play[0] === winnerSeat && play[1]){
+          const wr = gameState._suit_rank(play[1], ledPip);
+          winnerRank = wr[0] * 100 + wr[1];
+        }
+      }
+      let bestDumpIdx = -1, bestDumpRank = -1;
+      let lowIdx = legal[0], lowVal = Infinity;
+      for(const idx of legal){
+        const tile = hand[idx];
+        const val = tile[0] + tile[1];
+        if(val < lowVal){ lowVal = val; lowIdx = idx; }
+        // Check if this tile would lose (rank < winner)
+        if((tile[0] === ledPip || tile[1] === ledPip) && !gameState._is_trump_tile(tile)){
+          const r = gameState._suit_rank(tile, ledPip);
+          const rank = r[0] * 100 + r[1];
+          if(rank < winnerRank && rank > bestDumpRank){
+            bestDumpRank = rank; bestDumpIdx = idx;
+          }
+        }
+      }
+      if(bestDumpIdx >= 0) return makeResult(bestDumpIdx, "Nel-O bidder: highest losing card (dump danger)");
+      return makeResult(lowIdx, "Nel-O bidder: play low (no safe dump)");
+    }
     {
+      // Partner or general follow — play low
       let lowNDIdx = -1, lowNDVal = Infinity, lowIdx = legal[0], lowVal = Infinity;
       for(const idx of legal){
         const tile = hand[idx], val = tile[0]+tile[1], dbl = tile[0]===tile[1];
