@@ -6372,6 +6372,10 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         score -= (20 + rankPenalty);
         _bd.trumpPenalty = -(20 + rankPenalty);
         if(isLastTrump){ score -= 30; _bd.lastTrumpPenalty = -30; }
+        // COUNT TRUMP PROTECTION: count trumps carry extra value (winning with them = count captured)
+        // When forced to dump trump, prefer non-count trumps; if count, prefer 5 over 10
+        if(myCount === 10){ score -= 12; _bd.countTrumpProtect = -12; }
+        else if(myCount === 5){ score -= 6; _bd.countTrumpProtect = -6; }
       }
 
       _dumpCandidates.push({
@@ -7232,7 +7236,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.35.0';  // v17.35.0: Moon opp lead, count/trump awareness
+const MP_VERSION = 'v17.36.0';  // v17.36.0: Count trump protection, dump improvements
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables

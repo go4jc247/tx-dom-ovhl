@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.35.0 — Moon opponent lead improvements, count/trump awareness
+// Version: v17.36.0 — Count trump protection in dump logic
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.35.0';
+const CACHE_NAME = 'tx-dom-v17.36.0';
 const urlsToCache = [
   './index.html',
   // CSS
