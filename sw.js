@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.83.0 — Signal cap alignment, partner void trump-aware, Phase B/C consistency
+// Version: v17.84.0 — Bidding: NT evaluation path, doubles count exposure, TN51 midBid
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.83.0';
+const CACHE_NAME = 'tx-dom-v17.84.0';
 const urlsToCache = [
   './index.html',
   // CSS

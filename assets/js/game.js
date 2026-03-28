@@ -1425,7 +1425,7 @@ function evaluateHandForBid(hand) {
   const blanks = [];
   const maxBid = GAME_MODE === 'MOON' ? 7 : (GAME_MODE === 'T42' ? 42 : 51);
   const minBid = GAME_MODE === 'MOON' ? 4 : (GAME_MODE === 'T42' ? 30 : 34);
-  const midBid = GAME_MODE === 'MOON' ? 5 : (GAME_MODE === 'T42' ? 36 : 39);
+  const midBid = GAME_MODE === 'MOON' ? 5 : (GAME_MODE === 'T42' ? 36 : 42);
   const maxPip = session.game.max_pip;
 
   for (const tile of hand) {
@@ -1587,8 +1587,21 @@ function evaluateHandForBid(hand) {
 
     // PATTERN D: 4+ doubles with at most 1 uncovered off → mid bid
     // TN51 (6-tile hands): 3+ doubles is proportionally as strong
+    // Downgrade if uncovered off is a count tile (risk losing 5-10 points)
     const doublesForMid = handSize <= 6 ? 3 : 4;
     if (doubles.length >= doublesForMid && uncoveredOffs <= 1) {
+      let uncoveredCountExposure = 0;
+      for (const t of nonDoubles) {
+        const hp = Math.max(t[0], t[1]);
+        if (!doublePips.has(hp)) {
+          const ps = t[0] + t[1];
+          if (ps === 10) uncoveredCountExposure += 10;
+          else if (ps === 5) uncoveredCountExposure += 5;
+        }
+      }
+      if (uncoveredCountExposure >= 10) {
+        return { action: "bid", bid: minBid, marks: 1 }; // downgrade: exposed 10-count
+      }
       return { action: "bid", bid: midBid, marks: 1 };
     }
 
@@ -1734,6 +1747,27 @@ function evaluateHandForBid(hand) {
       if (allCovered && ntTiles.length > 0) {
         return { action: "bid", bid: minBid, marks: 1 };
       }
+    }
+  }
+
+  // NO-TRUMP EVALUATION: hands with 3+ spread doubles + covered offs are NT-viable
+  // These hands may not meet any single-suit pip threshold but are strong in NT
+  if (doubles.length >= 3 && !isMoon) {
+    const ntDblPips = new Set(doubles.map(d => d[0]));
+    const nonDoubles = hand.filter(t => t[0] !== t[1]);
+    let ntCovered = 0, ntUncovered = 0;
+    for (const t of nonDoubles) {
+      const hp = Math.max(t[0], t[1]);
+      if (ntDblPips.has(hp)) ntCovered++;
+      else ntUncovered++;
+    }
+    // 3+ doubles with at most 1 uncovered off = strong NT hand
+    if (ntUncovered <= 1 && doubles.length >= 3) {
+      return { action: "bid", bid: minBid, marks: 1 };
+    }
+    // 4+ doubles with at most 2 uncovered offs
+    if (ntUncovered <= 2 && doubles.length >= 4) {
+      return { action: "bid", bid: midBid, marks: 1 };
     }
   }
 
@@ -8001,7 +8035,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.83.0';  // v17.83.0: signal cap alignment, partner void trump-aware, Phase B/C consistency
+const MP_VERSION = 'v17.84.0';  // v17.84.0: NT bid evaluation, doubles count exposure, TN51 midBid proportional fix
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
@@ -19407,7 +19441,7 @@ function processAIBid(seat) {
     // Moon has only 3 players — early-position suppression is too aggressive (forces rescue bids)
     const isEarlyBidder = GAME_MODE !== 'MOON' && myIdx <= 1 && totalBidders >= 4; // first 2 of 4+ bidders
     const minBid = GAME_MODE === 'MOON' ? 4 : (GAME_MODE === 'T42' ? 30 : 34);
-    const midBid = GAME_MODE === 'MOON' ? 5 : (GAME_MODE === 'T42' ? 36 : 39);
+    const midBid = GAME_MODE === 'MOON' ? 5 : (GAME_MODE === 'T42' ? 36 : 42);
     if (isEarlyBidder && evaluation.bid <= minBid && (evaluation.marks || 1) === 1) {
       // Minimum-bid hand in early position — pass and let partner evaluate
       // Only suppress true min-bid hands, not mid/max bids (those are strong enough to open)
