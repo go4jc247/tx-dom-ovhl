@@ -4157,8 +4157,17 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     }
 
     // If partner already trumped and is winning, DON'T over-trump — throw count or play low
+    // BUT: check if opponents can still over-trump partner (they haven't played yet)
     if(partnerHasTrumpInTrick && !opponentHasTrumpInTrick){
-      // Partner's trump is winning — treat as partner winning
+      // Check: can opponents still over-trump?
+      let oppsYetToPlay = 0;
+      for(let s = 0; s < gameState.player_count; s++){
+        if(isSameTeam(s) || s === p) continue;
+        const alreadyPlayed = trick.some(play => Array.isArray(play) && play[0] === s);
+        if(!alreadyPlayed) oppsYetToPlay++;
+      }
+      const oppsMayOvertrump = oppsYetToPlay > 0 && !opponentsVoidInTrump;
+
       let countIdx = -1, countVal = 0, lowIdx = legal[0], lowVal = Infinity;
       for(const idx of legal){
         const tile = hand[idx];
@@ -4168,7 +4177,13 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         }
         if(pipSum < lowVal){ lowVal = pipSum; lowIdx = idx; }
       }
-      if(countIdx >= 0) return makeResult(countIdx, "Partner trumped, throw count (" + countVal + "pts)");
+      // If opponents might over-trump, don't throw 10-count (only throw 5)
+      if(countIdx >= 0 && !oppsMayOvertrump){
+        return makeResult(countIdx, "Partner trumped (safe), throw count (" + countVal + "pts)");
+      }
+      if(countIdx >= 0 && oppsMayOvertrump && countVal === 5){
+        return makeResult(countIdx, "Partner trumped (risky), throw small count");
+      }
       return makeResult(lowIdx, "Partner trumped, play low");
     }
 
