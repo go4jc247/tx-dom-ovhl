@@ -4941,6 +4941,29 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     }
 
     // ── PHASE B: WE HAVE TRUMP CONTROL — play doubles, try partner-in-lead ──
+    // BIDDER'S PARTNER: lead trump back to bidder even when WE don't have trump control.
+    // The bidder chose the trump suit — they likely hold high trumps. By leading a low trump,
+    // we help pull opponent trumps so bidder's off-suit winners can walk later.
+    // Only in early/mid game (≤4 tricks played) when bidder hasn't shown void in trump.
+    const bidderLikelyHasTrump = !trumpVoidConfirmed[bidderSeat] && (trumpVoidLikely[bidderSeat] || 0) < 0.3;
+    if(iAmBidderPartner && !isMoon && !weHaveTrumpControl && !bidIsSafe && bidderNeedsMore > 0
+      && bidderLikelyHasTrump && trumpsInHand.length >= 1 && trickNum <= 3
+      && trumpTilesRemaining.length > 0 && pullableTrumps.length >= 1){
+      // Lead our lowest non-count trump — bidder's high trump should win the trick
+      let _bpIdx = pullableTrumps[0], _bpBest = Infinity;
+      for(const idx of pullableTrumps){
+        const tile = hand[idx];
+        const ps = tile[0] + tile[1];
+        const isCount = (ps === 5 || ps === 10);
+        const sc = getTrumpRankNum(tile) + (isCount ? 200 : 0);
+        if(sc < _bpBest){ _bpBest = sc; _bpIdx = idx; }
+      }
+      // Sanity: don't lead if we hold the HIGHEST remaining trump (we're better off pulling ourselves)
+      if(!iHaveHighestTrump){
+        return makeResult(_bpIdx, "Partner: lead low trump back to bidder (bidder likely has control)");
+      }
+    }
+
     // BIDDER'S PARTNER TRUMP PULL: when we have trump control and bidder needs points,
     // pull remaining opponent trumps to clear the way for bidder's off-suit winners
     if(iAmBidderPartner && !isMoon && weHaveTrumpControl && !bidIsSafe && bidderNeedsMore > 0 && trumpTilesRemaining.length > 0){
@@ -6504,6 +6527,20 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         }
       }
 
+      // PRESERVE PARTNER'S SIGNALED SUIT: if partner has shown strength in a suit,
+      // keep tiles in that suit (we may want to lead it later so partner can win tricks)
+      if(!isMoon && isBidderTeam){
+        for(const pip of [pA, pB]){
+          const partnerStr = partnerSuitSignal[pip] || 0;
+          if(partnerStr >= 8){
+            // Penalty for dumping tiles in partner's strong suit
+            const keepBonus = -Math.min(Math.floor(partnerStr / 2), 10);
+            score += keepBonus;
+            _bd.partnerSuitKeep = keepBonus;
+          }
+        }
+      }
+
       // DEFENDER BID-SAFE COUNTER: when bidder team already made their bid,
       // defenders should aggressively grab count and deny free points
       if(bidIsSafe && !isBidderTeam && !isMoon){
@@ -7531,7 +7568,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.57.0';  // v17.57.0: count hunt walkers + threshold fix
+const MP_VERSION = 'v17.58.0';  // v17.58.0: partner cooperation — lead trump back to bidder + preserve partner suit in dump
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
