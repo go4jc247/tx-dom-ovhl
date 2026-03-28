@@ -3316,6 +3316,15 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   const isEndgame = tricksLeft <= 2;
   const mustWin = isEndgame && !bidIsSafe; // must win remaining tricks to make bid
   const canRelax = bidIsSafe && tricksLeft >= 2; // bid is safe, play conservatively
+  // COUNT-POINT ARITHMETIC: in endgame, compute if count tiles in hand are enough to make bid
+  // countNeeded = how many count points we need beyond base trick wins
+  // If we hold enough count, we need fewer trick wins; if we don't, we need ALL remaining tricks
+  const basePointsPerTrick = isMoon ? 1 : 1; // each trick = 1 point base
+  const countNeeded = isBidderTeam ? Math.max(0, pointsNeeded - tricksLeft) : 0;
+  // Can our held count tiles cover the gap?
+  const countCanCover = countInOurHand >= countNeeded;
+  // If count can cover the gap, we just need to win the tricks we play count in (not ALL tricks)
+  const mustWinCountTricks = isBidderTeam && !bidIsSafe && countNeeded > 0 && !countCanCover;
 
   // ═══════════════════════════════════════════════════════════════════
   //  LAST TRUMP PROTECTION
@@ -3809,9 +3818,11 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       }
     }
 
-    // ── ENDGAME COUNT HUNT: bidder must win and needs count ──
-    // When must-win and still need count points, prefer leading suits with remaining count
-    if(mustWin && isBidderTeam && !bidIsDoomed && pointsNeeded > 0 && nonTrumpDoubles.length > 0){
+    // ── ENDGAME COUNT HUNT: bidder needs count points to make bid ──
+    // Trigger: must-win OR when count alone can close the gap (even before endgame)
+    const countHuntActive = isBidderTeam && !bidIsDoomed && pointsNeeded > 0
+      && (mustWin || (countNeeded > 0 && tricksLeft <= 3));
+    if(countHuntActive && nonTrumpDoubles.length > 0){
       let bestCountDbl = -1, bestCountScore = -Infinity;
       for(const idx of nonTrumpDoubles){
         const pip = hand[idx][0];
@@ -4772,8 +4783,10 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           if(!trick.some(play => Array.isArray(play) && play[0] === s)) _oppsStillToPlay++;
         }
         // More opponents remaining = higher risk of losing count
+        // EXTRA protection when we need these count points to make bid
         const countMult = oppWinning ? 5 : (3 + _oppsStillToPlay);
-        const countPenalty = myCount * countMult;
+        const countProtect = mustWinCountTricks ? 2 : 1; // double penalty if we need count to bid
+        const countPenalty = myCount * countMult * countProtect;
         score -= countPenalty;
         _bd.countPenalty = -countPenalty;
       }
