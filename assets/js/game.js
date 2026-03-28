@@ -1435,26 +1435,47 @@ function evaluateHandForBid(hand) {
   // MOON-SPECIFIC bidding patterns (9-tile hands, 3 players, max pip 6)
   if (GAME_MODE === 'MOON') {
     // Moon has 9 tricks, bid = tricks you'll win. Min bid 4, max 7.
+    // Bid 7 = Shoot the Moon (all 7 tricks, scored at ±21 points).
     // With 9 tiles in hand + widow swap, hands tend to be stronger.
-    // Pattern: 5+ trumps with double → bid 5
     for (let pip = maxPip; pip >= 0; pip--) {
       const trumpTiles = hand.filter(t => t[0] === pip || t[1] === pip);
       const hasDouble = trumpTiles.some(t => t[0] === pip && t[1] === pip);
-      if (trumpTiles.length >= 5 && hasDouble) {
-        const hasSecond = trumpTiles.some(t =>
-          (t[0] === pip && t[1] === pip - 1) || (t[0] === pip - 1 && t[1] === pip));
-        if (hasSecond) return { action: "bid", bid: 6, marks: 1 };
+      if (!hasDouble) continue;
+      const hasSecond = trumpTiles.some(t =>
+        (t[0] === pip && t[1] === pip - 1) || (t[0] === pip - 1 && t[1] === pip));
+      const hasThird = pip > 1 && trumpTiles.some(t =>
+        (t[0] === pip && t[1] === pip - 2) || (t[0] === pip - 2 && t[1] === pip));
+      const ntDoubles = doubles.filter(d => d[0] !== pip);
+      const ntDblPips = new Set(ntDoubles.map(d => d[0]));
+      const ntOffs = hand.filter(t => t[0] !== t[1] && t[0] !== pip && t[1] !== pip);
+      const ntUncovered = ntOffs.filter(t => !ntDblPips.has(t[0]) && !ntDblPips.has(t[1])).length;
+      // Shoot the Moon (bid 7): 6+ trumps with double + 2nd, or 5 trumps with all sides covered
+      if (trumpTiles.length >= 6 && hasSecond) {
+        return { action: "bid", bid: 7, marks: 2 };
+      }
+      if (trumpTiles.length >= 5 && hasSecond && ntUncovered === 0 && ntDoubles.length >= 1) {
+        return { action: "bid", bid: 7, marks: 2 };
+      }
+      // Bid 6: 5+ trumps with double + 2nd
+      if (trumpTiles.length >= 5 && hasSecond) {
+        return { action: "bid", bid: 6, marks: 1 };
+      }
+      // Bid 5: 5+ trumps with double (no 2nd)
+      if (trumpTiles.length >= 5) {
         return { action: "bid", bid: 5, marks: 1 };
       }
       // 4 trumps with double + 2nd + other doubles → bid 5
-      if (trumpTiles.length >= 4 && hasDouble) {
-        const hasSecond = trumpTiles.some(t =>
-          (t[0] === pip && t[1] === pip - 1) || (t[0] === pip - 1 && t[1] === pip));
-        const ntDoubles = doubles.filter(d => d[0] !== pip);
-        if (hasSecond && ntDoubles.length >= 2) return { action: "bid", bid: 5, marks: 1 };
+      if (trumpTiles.length >= 4 && hasSecond && ntDoubles.length >= 2) {
+        return { action: "bid", bid: 5, marks: 1 };
+      }
+      // 4 trumps with double + 2nd + 3rd + sides covered → bid 6
+      if (trumpTiles.length >= 4 && hasSecond && hasThird && ntUncovered === 0) {
+        return { action: "bid", bid: 6, marks: 1 };
       }
     }
-    // Moon: 4+ doubles → strong Nello-style or doubles-trump hand
+    // Moon: 6+ doubles → Shoot the Moon with doubles trump
+    if (doubles.length >= 6) return { action: "bid", bid: 7, marks: 2 };
+    // Moon: 5+ doubles → bid 6
     if (doubles.length >= 5) return { action: "bid", bid: 6, marks: 1 };
     if (doubles.length >= 4) {
       const dblPips = new Set(doubles.map(d => d[0]));
