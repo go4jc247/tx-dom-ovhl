@@ -4439,6 +4439,15 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           }
         }
       }
+      // BIDDER OFF-SUIT DEFUSE: if off-tracker suspects this suit is our "off",
+      // win with a HIGHER card to show strength and reduce suspicion
+      if(iAmBidder && offTracker && offTracker.trumpMode === 'PIP'){
+        const suspicion = getOffSuspicion();
+        if(suspicion && suspicion.length > 0 && suspicion[0].pip === ledPip && suspicion[0].suspicion >= 50){
+          // Play highest winning card (not lowest) to signal strength in this suit
+          return makeResult(highIdx, "Following suit: defuse off-tracker (play high in suspected off)");
+        }
+      }
       return makeResult(bestWinIdx, "Following suit, lowest winning card");
     }
     if(lowIdx >= 0){
