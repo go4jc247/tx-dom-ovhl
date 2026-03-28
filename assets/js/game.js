@@ -1627,6 +1627,17 @@ function evaluateHandForBid(hand) {
     if (trumpCount >= 4 && hasDoubleTrump && ntUncoveredOffs <= 1) {
       return { action: "bid", bid: minBid, marks: 1 };
     }
+
+    // 5+ sequential trumps WITHOUT double — still very strong trump control
+    // The double is the only card that can beat you, and you overwhelm the suit
+    if (trumpCount >= 5 && hasSecondTrump && hasThirdTrump && !hasDoubleTrump) {
+      return { action: "bid", bid: minBid, marks: 1 };
+    }
+
+    // 4+ sequential trumps (no double) + 2+ side doubles — decent hand
+    if (trumpCount >= 4 && hasSecondTrump && !hasDoubleTrump && nonTrumpDoubles.length >= 2) {
+      return { action: "bid", bid: minBid, marks: 1 };
+    }
   }
 
   // VOID HAND ESCALATION: if all non-trump non-double tiles are covered offs,
