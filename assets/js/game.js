@@ -3739,7 +3739,9 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           let score = 0;
 
           // Doubles are strong leads — bidder must follow in that suit
-          if(dbl && !_nelloDbls) score += 20;
+          // Scale by pip value: high doubles ([6,6]) are much stronger against Nello
+          // than low doubles ([0,0]) — fewer tiles for bidder to duck under
+          if(dbl && !_nelloDbls) score += 12 + tile[0] * 2;
 
           // Prefer high-value tiles (more likely to force bidder to win)
           score += val * 2;
@@ -6207,10 +6209,17 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         else if(suitStrength <= 8){ score += 4; _bd.moonWeakSuitDump = 4; }
         // Keep tiles in suits where we're STRONG (many tiles, high values)
         if(suitTileCount >= 3 && suitStrength >= 15){ score -= 8; _bd.moonStrongSuitKeep = -8; }
-        // For Moon bidder: keep low tiles that help avoid winning (reverse priority)
+        // For Moon bidder: dump LOW tiles (useless for winning future tricks)
+        // Keep HIGH tiles and tiles in strong suits for winning later
         if(iAmBidder){
-          score += pipSum; // prefer dumping HIGH tiles (they'd win tricks we don't want)
-          _bd.moonBidderDumpHigh = pipSum;
+          score -= pipSum; // prefer KEEPING high tiles (they help win future tricks)
+          _bd.moonBidderKeepHigh = -pipSum;
+          // VOID-CREATION COORDINATION: when Moon bidder has trumps, voiding a suit
+          // creates future trump-in opportunities to win tricks we'd otherwise lose
+          if(trumpsInHand.length >= 2 && suitTileCount === 1){
+            score += 10; // dumping last tile in suit = instant void for trump-in
+            _bd.moonBidderVoidCreate = 10;
+          }
         }
       }
 
@@ -6255,6 +6264,30 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       if(opponentsNeedCount && myCount === 0){
         score += 12; // bonus for dumping count-free tiles (hides our count)
         _bd.countHideBonus = 12;
+      }
+
+      // BIDDER DESPERATE STATE: when bidder is close to making their bid,
+      // adjust dump priorities based on team allegiance
+      if(bidderIsClose && !isMoon){
+        if(!isBidderTeam){
+          // Defender: bidder only needs ≤10 more — every count point matters
+          // Extra penalty for dumping count that could help them make it
+          if(myCount > 0 && !partnerWinning){
+            const desperatePenalty = myCount === 10 ? 15 : 8;
+            score -= desperatePenalty;
+            _bd.bidderDesperatePenalty = -desperatePenalty;
+          }
+          // Bonus for dumping non-count (starve the bidder)
+          if(myCount === 0){
+            score += 5;
+            _bd.bidderDesperateStarve = 5;
+          }
+        } else if(isBidderTeam && partnerWinning && myCount > 0 && pointsNeeded > 0){
+          // Bidder team desperate: throw count to winning partner more aggressively
+          const urgencyBonus = tricksLeft <= 3 ? myCount * 2 : myCount;
+          score += urgencyBonus;
+          _bd.bidderDesperateThrow = urgencyBonus;
+        }
       }
 
       // SUIT WIN PROBABILITY: preserve tiles in depleted suits (likely to win later)

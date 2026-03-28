@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.31.0 — Moon opponent general lead strategy
+// Version: v17.32.0 — Bidder desperate dump, Nello double scaling, Moon bidder dump fix
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.31.0';
+const CACHE_NAME = 'tx-dom-v17.32.0';
 const urlsToCache = [
   './index.html',
   // CSS
