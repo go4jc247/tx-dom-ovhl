@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.8.0 — Nello bidding, DOUBLES trump bias, walker pairs, Moon shoot-the-moon defense
+// Version: v17.9.0 — TN51 3-team fixes, trump selection, void detection, off-tracker
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.8.0';
+const CACHE_NAME = 'tx-dom-v17.9.0';
 const urlsToCache = [
   './index.html',
   // CSS
