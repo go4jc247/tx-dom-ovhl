@@ -3993,7 +3993,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           for(const h of hand){ if(Math.max(h[0], h[1]) === tilePip) suitCount++; }
           // Dump from suits where we have many tiles (strong) — score higher = more dumpable
           // Dump low tiles first, and prefer suits where bidder is void (less useful to keep)
-          const bidderVoidHere = voidIn[bidderSeat] && voidIn[bidderSeat][tilePip];
+          const bidderVoidHere = voidIn[bidderSeat] && voidIn[bidderSeat].has(tilePip);
           let dScore = suitCount * 5 - val + (bidderVoidHere ? 10 : 0);
           if(dScore > bestDumpScore){ bestDumpScore = dScore; dumpIdx = idx; }
         }
@@ -4261,7 +4261,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
 
           if(score > bestScore){ bestScore = score; bestIdx = idx; }
         }
-        if(bestScore > 5){
+        if(bestScore > -Infinity && bestIdx >= 0){
           return makeResult(bestIdx, "Moon opp: strategic lead (score " + bestScore + ")");
         }
       }
@@ -5789,14 +5789,25 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       if(isMoon && iAmBidder && !bidIsSafe && tricksLeft <= 3){
         return makeResult(highIdx, "Moon endgame: must win every trick");
       }
-      // MOON OPPONENT: aggressively win when bidder is on pace for all tricks
-      // Shoot-the-moon (bid 7): be aggressive from trick 0 — one lost trick = -21pts for bidder
-      if(isMoon && !iAmBidder && canSetBid){
+      // MOON OPPONENT IN-SUIT FOLLOW: no partners in Moon — play aggressively for individual scoring
+      if(isMoon && !iAmBidder){
         const bidderTricksWon = gameState.team_points[bidderTeamIdx] || 0;
         const bidderOnPace = bidderTricksWon >= trickNum;
         const isShootMoon = session && session.moon_shoot;
-        if(bidderOnPace && (isShootMoon || tricksLeft <= 4)){
+        // When bidder is on pace or shoot-the-moon: always play highest to block
+        if(canSetBid && (bidderOnPace || isShootMoon || tricksLeft <= 4)){
           return makeResult(highIdx, "Moon opp: block bidder" + (isShootMoon ? " (shoot the moon)" : ""));
+        }
+        // When bidder is NOT on pace: still try to win for individual points
+        // But if another opponent is already beating the bidder, conserve
+        const bidderWinning = winnerSeat === bidderSeat;
+        if(bidderWinning){
+          // Bidder is currently winning — play highest to take the trick
+          return makeResult(highIdx, "Moon opp: overtake bidder (individual scoring)");
+        }
+        // Another opponent is winning — conserve, play lowest
+        if(lowIdx >= 0){
+          return makeResult(lowIdx, "Moon opp: other opp beating bidder, conserve");
         }
       }
       // DUCK: if partner plays after us and likely has the double (higher card),
@@ -7666,7 +7677,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.62.0';  // v17.62.0: endgame/dump — canRelax margin, count-aware oppPlay, partner count delivery
+const MP_VERSION = 'v17.63.0';  // v17.63.0: Nello Set bug fix, Moon opponent in-suit follow, Moon lead threshold
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables

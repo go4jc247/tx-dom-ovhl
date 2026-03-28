@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.62.0 — endgame/dump: canRelax margin, oppPlay count, partner count
+// Version: v17.63.0 — Nello Set bug, Moon opponent follow, Moon lead threshold
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.62.0';
+const CACHE_NAME = 'tx-dom-v17.63.0';
 const urlsToCache = [
   './index.html',
   // CSS
