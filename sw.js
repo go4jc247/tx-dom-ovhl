@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.61.0 — bidding: Moon order, count awareness, TN51 Nello, early-pos fix
+// Version: v17.62.0 — endgame/dump: canRelax margin, oppPlay count, partner count
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.61.0';
+const CACHE_NAME = 'tx-dom-v17.62.0';
 const urlsToCache = [
   './index.html',
   // CSS

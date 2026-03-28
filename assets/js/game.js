@@ -3676,7 +3676,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   const mustWin = (isEndgame && !bidIsSafe) || (!bidIsSafe && isBidderTeam && pointsNeeded >= tricksLeft);
   // Bid safe but opponents still have dangerous count? Don't relax yet
   // Moon: no count points, so the count gate doesn't apply
-  const canRelax = bidIsSafe && tricksLeft >= 2 && (isMoon || !(totalCountRemaining >= 10 && pointsNeeded >= -5));
+  // Only relax when margin exceeds half the remaining count — keep fighting for count margin
+  const canRelax = bidIsSafe && tricksLeft >= 2 && (isMoon || pointsNeeded < -(totalCountRemaining / 2));
   // COUNT-POINT ARITHMETIC: in endgame, compute if count tiles in hand are enough to make bid
   // countNeeded = how many count points we need beyond base trick wins
   // If we hold enough count, we need fewer trick wins; if we don't, we need ALL remaining tricks
@@ -4371,20 +4372,28 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         };
         const _tileCount = (t) => { const s = t[0]+t[1]; return s===5?5:s===10?10:0; };
         // Helper: determine which tile opponent plays against our lead
-        // Opponent plays their BEST tile that beats us, or lowest tile if can't
+        // Opponent plays their BEST tile that beats us — prefers non-count winners
+        // If can't win, plays lowest non-count tile (save count for team)
         const _oppPlay = (oppTiles, myLead, ledSuit) => {
-          let bestBeatIdx = -1, bestBeatRank = -1;
-          let worstIdx = 0, worstVal = Infinity;
+          let bestBeatIdx = -1, bestBeatRank = -1, bestBeatIsCount = true;
+          let worstIdx = 0, worstVal = Infinity, worstIsCount = true;
           for(let ti = 0; ti < oppTiles.length; ti++){
             const ot = oppTiles[ti];
             const val = ot[0] + ot[1];
-            if(val < worstVal){ worstVal = val; worstIdx = ti; }
+            const isCount = (val === 5 || val === 10);
+            // For "can't win" dump: prefer non-count, then lowest
+            if((!isCount && worstIsCount) || (isCount === worstIsCount && val < worstVal)){
+              worstVal = val; worstIdx = ti; worstIsCount = isCount;
+            }
             if(_beats(ot, myLead, ledSuit)){
               const rank = gameState._is_trump_tile(ot) ? getTrumpRankNum(ot) + 10000 : val;
-              if(rank > bestBeatRank){ bestBeatRank = rank; bestBeatIdx = ti; }
+              // Prefer non-count winners (save count for partner's tricks)
+              const preferThis = (!isCount && bestBeatIsCount)
+                || (isCount === bestBeatIsCount && rank > bestBeatRank);
+              if(preferThis){ bestBeatRank = rank; bestBeatIdx = ti; bestBeatIsCount = isCount; }
             }
           }
-          return bestBeatIdx >= 0 ? bestBeatIdx : worstIdx; // play best winner, else lowest
+          return bestBeatIdx >= 0 ? bestBeatIdx : worstIdx;
         };
 
         for(const idx of legal){
@@ -6529,16 +6538,30 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
 
       // When partner is winning, prefer throwing count (it's free points for our team)
       if(partnerWinning && myCount > 0){
-        if(isLastInTrick){
+        // Check how many opponents remain AFTER us (not all opponents — already-played ones can't overtake)
+        let _oppsAfterDump = 0;
+        for(let s = 0; s < gameState.player_count; s++){
+          if(isSameTeam(s) || s === p || !gameState.active_players.includes(s)) continue;
+          if(!trick.some(play => Array.isArray(play) && play[0] === s)) _oppsAfterDump++;
+        }
+        const _dumpOppsSafe = _oppsAfterDump === 0 || opponentsVoidInTrump;
+        if(isLastInTrick || _oppsAfterDump === 0){
           score += myCount * 3; // guaranteed: no opponents left to beat partner
           _bd.partnerCountBonus = myCount * 3;
-        } else if(opponentsVoidInTrump){
+        } else if(_dumpOppsSafe){
           // Opponents can't over-trump — safe to throw count even if not last
-          score += myCount * 2;
-          _bd.partnerCountBonus = myCount * 2;
+          score += myCount * 2.5;
+          _bd.partnerCountBonus = myCount * 2.5;
         } else {
-          // Risky: opponents might still overtake, but 5-count is low risk
-          if(myCount === 5){ score += 5; _bd.partnerCountBonus = 5; }
+          // Opponents still behind — 5-count is moderate risk, 10-count only if 2nd-to-last
+          if(myCount === 5){
+            const fiveBonus = _oppsAfterDump <= 1 ? 8 : 5;
+            score += fiveBonus; _bd.partnerCountBonus = fiveBonus;
+          }
+          // 10-count: only throw if just 1 opponent remains (acceptable risk)
+          if(myCount === 10 && _oppsAfterDump <= 1){
+            score += 5; _bd.partnerCountBonus = 5;
+          }
         }
       }
 
@@ -7643,7 +7666,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.61.0';  // v17.61.0: bidding overhaul — Moon bid order fix, count-tile awareness, TN51 Nello, Moon early-pos
+const MP_VERSION = 'v17.62.0';  // v17.62.0: endgame/dump — canRelax margin, count-aware oppPlay, partner count delivery
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
