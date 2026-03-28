@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v16.6.0 — Phase 10b: Nello doubles-suit, Moon endgame, walker pairs
+// Version: v16.7.0 — Phase 10c: Nello widow swap, covered-offs, Moon endgame
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v16.6.0';
+const CACHE_NAME = 'tx-dom-v16.7.0';
 const urlsToCache = [
   './index.html',
   // CSS
