@@ -3894,6 +3894,70 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       };
     }
 
+    // ── FINAL TRICK EXACT CARD COUNTING ──
+    // When it's the last trick and we're leading, each opponent has exactly 1 tile.
+    // We can determine the optimal lead by checking if our tile beats all opponents' tiles.
+    if(tricksLeft <= 1 && legal.length === 1){
+      // Only 1 legal tile — play it (no choice, but skip complex analysis)
+    } else if(tricksLeft <= 1){
+      // Reconstruct opponent hands: each active opponent holds exactly 1 tile
+      // (all other tiles have been played or are in our hand)
+      const oppTiles = []; // {seat, tile}
+      for(let s = 0; s < gameState.player_count; s++){
+        if(s === p || !gameState.active_players.includes(s)) continue;
+        const oh = gameState.hands[s];
+        if(oh && oh.length === 1) oppTiles.push({seat: s, tile: oh[0]});
+      }
+      if(oppTiles.length > 0){
+        // Try each legal tile as lead and simulate who wins
+        let bestLeadIdx = legal[0], bestLeadScore = -Infinity;
+        for(const idx of legal){
+          const myTile = hand[idx];
+          const myLedSuit = myTile[0] === myTile[1]
+            ? (trumpMode === 'DOUBLES' ? -1 : myTile[0])  // double: trump in DOUBLES, else its pip
+            : Math.max(myTile[0], myTile[1]);
+          const myIsTrump = gameState._is_trump_tile(myTile);
+          const myRank = myIsTrump ? getTrumpRankNum(myTile) + 10000
+            : (myTile[0] === myTile[1] ? 900 + myTile[0] : gameState._suit_rank(myTile, myLedSuit)[0] * 100 + gameState._suit_rank(myTile, myLedSuit)[1]);
+
+          // Check if any opponent can beat us
+          let iWin = true;
+          for(const opp of oppTiles){
+            const ot = opp.tile;
+            const oppIsTrump = gameState._is_trump_tile(ot);
+            const oppFollows = ot[0] === myLedSuit || ot[1] === myLedSuit || (myLedSuit === -1 && oppIsTrump);
+            if(!oppFollows && !oppIsTrump) continue; // can't follow, can't trump → can't win
+            let oppRank;
+            if(oppIsTrump && !myIsTrump){
+              iWin = false; break; // opponent trumps our non-trump lead
+            } else if(oppIsTrump && myIsTrump){
+              oppRank = getTrumpRankNum(ot);
+              if(oppRank > getTrumpRankNum(myTile)){ iWin = false; break; }
+            } else if(oppFollows){
+              const or2 = gameState._suit_rank(ot, myLedSuit);
+              const oppR = or2[0] * 100 + or2[1];
+              if(ot[0] === ot[1] && ot[0] === myLedSuit){ iWin = false; break; } // opp has the double
+              if(oppR > (gameState._suit_rank(myTile, myLedSuit)[0] * 100 + gameState._suit_rank(myTile, myLedSuit)[1])){ iWin = false; break; }
+            }
+          }
+
+          const myPipSum = myTile[0] + myTile[1];
+          const myCount = (myPipSum === 5) ? 5 : (myPipSum === 10) ? 10 : 0;
+          // Score: winning is paramount, then maximize count captured
+          let score = iWin ? 1000 : 0;
+          if(iWin && isBidderTeam) score += myCount; // our count stays with us
+          if(!iWin && !isBidderTeam) score += 500; // defense: losing is fine if we deny bidder
+          if(!iWin) score -= myCount * 3; // don't give away count to opponents
+
+          if(score > bestLeadScore){ bestLeadScore = score; bestLeadIdx = idx; }
+        }
+        if(bestLeadScore >= 0){
+          const winnable = bestLeadScore >= 1000;
+          return makeResult(bestLeadIdx, "Final trick: exact count" + (winnable ? " (guaranteed win)" : " (minimize loss)"));
+        }
+      }
+    }
+
     // ── COVERED OFF ENDGAME STRATEGY (V10_78) ──
     // Detects hands of doubles + covered offs and plays optimal order:
     // NT: regular doubles (low→high) → covering doubles → offs (as walkers)
@@ -4160,9 +4224,12 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     const countHuntActive = isBidderTeam && !bidIsDoomed && pointsNeeded > 0
       && (mustWin || (countNeeded > 0 && tricksLeft <= 3)
         || (countInOurHand >= pointsNeeded && tricksLeft <= 5 && weHaveTrumpControl));
-    if(countHuntActive && nonTrumpDoubles.length > 0){
+    // In DOUBLES mode, all doubles are trump — include trump doubles as count hunt candidates
+    const countHuntDoubles = trumpMode === 'DOUBLES'
+      ? [...nonTrumpDoubles, ...trumpDoubles] : nonTrumpDoubles;
+    if(countHuntActive && countHuntDoubles.length > 0){
       let bestCountDbl = -1, bestCountScore = -Infinity;
-      for(const idx of nonTrumpDoubles){
+      for(const idx of countHuntDoubles){
         const pip = hand[idx][0];
         const info = suitInfo[pip];
         if(!info) continue;
