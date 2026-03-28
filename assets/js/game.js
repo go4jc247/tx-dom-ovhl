@@ -1289,8 +1289,8 @@ class SessionV6_4g{
           this.team_marks[bidderSeat] += 21;
           this.status = `Shoot the Moon! P${bidderSeat+1} took all 7 tricks. +21 points!`;
         } else {
-          // Shoot the moon fail: -21 points
-          this.team_marks[bidderSeat] -= 21;
+          // Shoot the moon fail: -21 points (floor at 0)
+          this.team_marks[bidderSeat] = Math.max(0, this.team_marks[bidderSeat] - 21);
           // Other players score their tricks
           for(let s = 0; s < 3; s++){
             if(s !== bidderSeat) this.team_marks[s] += this.game.tricks_team[s].length;
@@ -3322,7 +3322,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       // Strategy activates when hand is mostly doubles + covered offs
       // and bid is high (>=42 in T42 or >= 42 in TN51) OR it's No Trumps
       const isNT = trumpMode === 'NONE';
-      const isHighBid = (bid >= 42) || isNT;
+      const isHighBid = (bid >= 36) || isNT;
       const handMostlyManaged = totalManaged >= legal.length - 2; // allow up to 2 unmanaged tiles
 
       if (coveredOffs.length >= 1 && uncoveredOffs.length <= 2 && isHighBid && handMostlyManaged) {
@@ -11783,10 +11783,10 @@ function _executeNelloSetup(opponent, marks){
       session.game.nello_doubles_suit = nelloDoublesSuitActive;
       if(nelloDoublesSuitActive) setStatus('Nello: Doubles are their own suit');
     } else {
-      const _ndHand = session.game.hands[_ndBidder] || [];
-      nelloDoublesSuitActive = aiChooseNelloDoublesMode(_ndHand);
-      session.game.nello_doubles_suit = nelloDoublesSuitActive;
-      if(nelloDoublesSuitActive) setStatus('Nello: Doubles are their own suit');
+      // Remote human player — don't auto-decide; wait for their choice
+      _needNelloDoublesPopup = false;
+      nelloDoublesSuitActive = false;
+      session.game.nello_doubles_suit = false;
     }
   } else {
     nelloDoublesSuitActive = false;
