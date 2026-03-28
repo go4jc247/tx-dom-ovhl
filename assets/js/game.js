@@ -1723,6 +1723,43 @@ function aiChooseTrump(hand, bidAmount) {
     }
   }
 
+  // ── Score NO TRUMP (NONE) alongside pip suits ──
+  // NT is strong with many doubles spread across different suits + covered offs
+  // In NT, each double is the guaranteed winner of its suit (no trumping possible)
+  if (doubles.length >= 3) {
+    let ntScore = 0;
+    // Each double wins its suit outright
+    ntScore += doubles.length * 12;
+    // Count covered offs (non-double tiles where we hold that suit's double)
+    const ntDoublePips = new Set(doubles.map(d => d[0]));
+    let ntCoveredOffs = 0;
+    for (const t of hand) {
+      if (t[0] === t[1]) continue;
+      const highPip = Math.max(t[0], t[1]);
+      if (ntDoublePips.has(highPip)) ntCoveredOffs++;
+    }
+    ntScore += ntCoveredOffs * 8; // covered offs are near-guaranteed in NT
+    // Bonus for diverse doubles (spread across suits = control more suits)
+    ntScore += ntDoublePips.size * 3;
+    // Penalty for uncovered singles (no double for their suit = risky)
+    const uncovered = hand.filter(t => {
+      if (t[0] === t[1]) return false;
+      const hp = Math.max(t[0], t[1]);
+      return !ntDoublePips.has(hp);
+    });
+    ntScore -= uncovered.length * 5;
+    // Count exposure penalty (NT has no trump to capture count)
+    for (const t of uncovered) {
+      const sum = t[0] + t[1];
+      if (sum === 10) ntScore -= 4;
+      else if (sum === 5) ntScore -= 2;
+    }
+    // Threshold: NT must clearly beat best pip suit (NT is riskier overall)
+    if (ntScore > bestScore + 5) {
+      return "NONE";
+    }
+  }
+
   // ── Score DOUBLES trump alongside pip suits ──
   if (doubles.length >= 3) {
     let doublesScore = 0;
