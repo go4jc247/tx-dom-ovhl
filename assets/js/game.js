@@ -4096,6 +4096,17 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       score -= myCount * 3;
       _bd.countPenalty = -(myCount * 3);
 
+      // Strategic void: prefer voiding suits with remaining count tiles
+      // so we can trump in later to steal count
+      if(minCnt <= 1 && trumpsInHand.length > 0){
+        const voidPip = (cntA <= cntB) ? pA : pB;
+        const info = suitInfo[voidPip];
+        if(info && info.countRemaining > 0){
+          score += Math.min(info.countRemaining, 10); // bonus for count-rich void
+          _bd.countVoidBonus = Math.min(info.countRemaining, 10);
+        }
+      }
+
       // Prefer lower pip sum
       score -= Math.floor(pipSum * 0.5);
       _bd.sumPenalty = -Math.floor(pipSum * 0.5);
