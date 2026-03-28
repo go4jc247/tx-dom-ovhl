@@ -12773,7 +12773,7 @@ function mpResumeFromSavedState(savedState) {
 
   // Restore session
   const snap = savedState.session;
-  const pc = snap.active_players ? Math.max(...snap.active_players) + 1 : mpPlayerCount();
+  const pc = (snap.active_players && snap.active_players.length > 0) ? Math.max(...snap.active_players) + 1 : mpPlayerCount();
   const maxPip = mpMaxPip();
   const handSize = mpHandSize();
 
