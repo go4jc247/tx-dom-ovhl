@@ -3904,8 +3904,12 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           if(!bidderVoids.has(pip)) continue;
           const pipSum = tile[0] + tile[1];
           const myCount = (pipSum === 5) ? 5 : (pipSum === 10) ? 10 : 0;
-          // Prefer non-count, low-value tiles (minimize risk)
+          // Prefer non-count, low-value tiles in depleted suits
+          const tapInfo = suitInfo[pip];
           let score = 20 - pipSum - myCount * 5;
+          // Bonus for suits with fewer tiles (more likely to force repeated trumping)
+          if(tapInfo && tapInfo.tilesLeft <= 2) score += 8;
+          else if(tapInfo && tapInfo.tilesLeft <= 4) score += 4;
           if(score > bestTapScore){ bestTapScore = score; bestTapIdx = idx; }
         }
         if(bestTapIdx >= 0 && bestTapScore >= 0){
@@ -17144,13 +17148,14 @@ function processAIBid(seat) {
       // Rescue bid: evaluate with relaxed criteria — 3 trumps with double is enough
       const maxPip = session.game.max_pip;
       const minBid = GAME_MODE === 'MOON' ? 4 : (GAME_MODE === 'T42' ? 30 : 34);
+      const doubles = hand.filter(t => t[0] === t[1]);
       for (let pip = maxPip; pip >= 0; pip--) {
         const trumpTiles = hand.filter(t => t[0] === pip || t[1] === pip);
         const hasDouble = trumpTiles.some(t => t[0] === pip && t[1] === pip);
-        if (trumpTiles.length >= 3 && hasDouble) {
-          // Rescue bid at minimum
+        // Rescue: 3+ trumps with double, OR 2 trumps with double + 2 side doubles
+        const sideDoubles = doubles.filter(d => d[0] !== pip).length;
+        if ((trumpTiles.length >= 3 && hasDouble) || (trumpTiles.length >= 2 && hasDouble && sideDoubles >= 2)) {
           const rescueEval = { action: "bid", bid: minBid, marks: 1, rescue: true };
-          // Fall through to normal bid processing with rescue eval
           return processAIBidWithEval(seat, rescueEval);
         }
       }
