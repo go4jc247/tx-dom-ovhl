@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v14.2.0 — AI Phase 3: bidIsDoomed, canSetBid, position bidding, count awareness
+// Version: v14.3.0 — AI Phase 3 complete: 26 commits, full strategy overhaul
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v14.2.0';
+const CACHE_NAME = 'tx-dom-v14.3.0';
 const urlsToCache = [
   './index.html',
   // CSS
