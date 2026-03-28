@@ -3741,8 +3741,17 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     if(!weHaveTrumpControl && !(canRelax && isBidderTeam)){
 
       // P1: Lead trump double — guaranteed win, pulls opponents' trump
+      // Prefer non-count doubles first to preserve count for scoring
       if(trumpDoubles.length > 0){
-        return makeResult(trumpDoubles[0], "Lead: trump double (pulls trumps)");
+        let bestDblIdx = trumpDoubles[0], bestDblScore = Infinity;
+        for(const idx of trumpDoubles){
+          const pip = hand[idx][0];
+          const pipSum = pip + pip;
+          const count = (pipSum === 5) ? 5 : (pipSum === 10) ? 10 : 0;
+          const score = count * 10 + pip; // low score = lead first (non-count, low pip)
+          if(score < bestDblScore){ bestDblScore = score; bestDblIdx = idx; }
+        }
+        return makeResult(bestDblIdx, "Lead: trump double (low-value first)");
       }
 
       // P2: Lead trump IF we have the highest remaining
