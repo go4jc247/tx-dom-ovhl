@@ -5030,7 +5030,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       // But if the double is already played, no need to preserve it
       const suitInf = suitInfo[ledPip];
       const doubleStillOut = suitInf && !suitInf.winnerPlayed;
-      let bestWinIdx = highIdx, bestWinRank = Infinity, bestWinIsDouble = true, bestWinIsCount = true;
+      let bestWinIdx = highIdx, bestWinRank = Infinity, bestWinIsDouble = true, bestWinCountVal = 10;
       for(const idx of legal){
         const tile = hand[idx];
         if((tile[0] === ledPip || tile[1] === ledPip) && !gameState._is_trump_tile(tile)){
@@ -5038,21 +5038,21 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           const rank = r[0] * 100 + r[1];
           const isDbl = tile[0] === tile[1];
           const ps = tile[0] + tile[1];
-          const isCount = (ps === 5 || ps === 10);
+          const countVal = (ps === 5) ? 5 : (ps === 10) ? 10 : 0;
           if(rank > winnerRank){
             // Prefer non-doubles to preserve walking doubles (only if double still in play)
-            // Also prefer non-count tiles to preserve scoring points
+            // Also prefer non-count tiles; among count tiles, prefer playing 5-count (preserve 10-count)
             let preferThis;
             if(doubleStillOut){
               preferThis = (!isDbl && bestWinIsDouble)
-                || (isDbl === bestWinIsDouble && !isCount && bestWinIsCount)
-                || (isDbl === bestWinIsDouble && isCount === bestWinIsCount && rank < bestWinRank);
+                || (isDbl === bestWinIsDouble && countVal < bestWinCountVal)
+                || (isDbl === bestWinIsDouble && countVal === bestWinCountVal && rank < bestWinRank);
             } else {
-              preferThis = (!isCount && bestWinIsCount)
-                || (isCount === bestWinIsCount && rank < bestWinRank);
+              preferThis = (countVal < bestWinCountVal)
+                || (countVal === bestWinCountVal && rank < bestWinRank);
             }
             if(preferThis){
-              bestWinRank = rank; bestWinIdx = idx; bestWinIsDouble = isDbl; bestWinIsCount = isCount;
+              bestWinRank = rank; bestWinIdx = idx; bestWinIsDouble = isDbl; bestWinCountVal = countVal;
             }
           }
         }
@@ -5151,23 +5151,23 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
     }
     const partnerWinningTrumpF = trickWinnerSeatF >= 0 && isSameTeam(trickWinnerSeatF);
 
-    // Find lowest winning trump and lowest trump overall (prefer non-count)
-    let winTrumpF = -1, winRankF = Infinity, winIsCountF = true;
-    let lowTrumpF = -1, lowRankF = Infinity, lowIsCountF = true;
+    // Find lowest winning trump and lowest trump overall (prefer non-count; among count, prefer 5 over 10)
+    let winTrumpF = -1, winRankF = Infinity, winCountValF = 10;
+    let lowTrumpF = -1, lowRankF = Infinity, lowCountValF = 10;
     for(const idx of legal){
       const tile = hand[idx];
       if(!gameState._is_trump_tile(tile)) continue;
       const r = getTrumpRankNum(tile);
       const ps = tile[0] + tile[1];
-      const isCount = (ps === 5 || ps === 10);
-      // Track lowest trump (prefer non-count)
-      if((!isCount && lowIsCountF) || (isCount === lowIsCountF && r < lowRankF)){
-        lowRankF = r; lowTrumpF = idx; lowIsCountF = isCount;
+      const countVal = (ps === 5) ? 5 : (ps === 10) ? 10 : 0;
+      // Track lowest trump (prefer non-count; among count, prefer playing 5 over 10)
+      if(countVal < lowCountValF || (countVal === lowCountValF && r < lowRankF)){
+        lowRankF = r; lowTrumpF = idx; lowCountValF = countVal;
       }
-      // Track lowest WINNING trump (prefer non-count)
+      // Track lowest WINNING trump (prefer non-count; among count, prefer playing 5 over 10)
       if(r > highestTrickTrumpF){
-        if((!isCount && winIsCountF) || (isCount === winIsCountF && r < winRankF)){
-          winRankF = r; winTrumpF = idx; winIsCountF = isCount;
+        if(countVal < winCountValF || (countVal === winCountValF && r < winRankF)){
+          winRankF = r; winTrumpF = idx; winCountValF = countVal;
         }
       }
     }
@@ -5257,24 +5257,24 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       }
     }
 
-    // Find lowest winning trump and lowest trump overall (prefer non-count trumps)
-    let winTrumpIdx = -1, winTrumpRank = Infinity, winTrumpIsCount = true;
-    let anyTrumpIdx = -1, anyTrumpRank = Infinity, anyTrumpIsCount = true;
+    // Find lowest winning trump and lowest trump overall (prefer non-count; among count, prefer 5 over 10)
+    let winTrumpIdx = -1, winTrumpRank = Infinity, winTrumpCountVal = 10;
+    let anyTrumpIdx = -1, anyTrumpRank = Infinity, anyTrumpCountVal = 10;
     const _trumpCandidates = [];
     for(const idx of legal){
       const tile = hand[idx];
       if(gameState._is_trump_tile(tile)){
         const r = getTrumpRankNum(tile);
         const ps = tile[0] + tile[1];
-        const isCount = (ps === 5 || ps === 10);
-        _trumpCandidates.push({ tile: tile[0]+'-'+tile[1], rank: r, canWin: r > highestTrickTrump, count: isCount });
-        // Prefer non-count; among same count status, pick lowest rank
-        if((!isCount && anyTrumpIsCount) || (isCount === anyTrumpIsCount && r < anyTrumpRank)){
-          anyTrumpRank = r; anyTrumpIdx = idx; anyTrumpIsCount = isCount;
+        const countVal = (ps === 5) ? 5 : (ps === 10) ? 10 : 0;
+        _trumpCandidates.push({ tile: tile[0]+'-'+tile[1], rank: r, canWin: r > highestTrickTrump, count: countVal > 0 });
+        // Prefer non-count; among count, prefer 5 over 10; then lowest rank
+        if(countVal < anyTrumpCountVal || (countVal === anyTrumpCountVal && r < anyTrumpRank)){
+          anyTrumpRank = r; anyTrumpIdx = idx; anyTrumpCountVal = countVal;
         }
         if(r > highestTrickTrump){
-          if((!isCount && winTrumpIsCount) || (isCount === winTrumpIsCount && r < winTrumpRank)){
-            winTrumpRank = r; winTrumpIdx = idx; winTrumpIsCount = isCount;
+          if(countVal < winTrumpCountVal || (countVal === winTrumpCountVal && r < winTrumpRank)){
+            winTrumpRank = r; winTrumpIdx = idx; winTrumpCountVal = countVal;
           }
         }
       }
