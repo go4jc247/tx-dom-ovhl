@@ -7341,7 +7341,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.41.0';  // v17.41.0: endgame count trump lead for bidder
+const MP_VERSION = 'v17.42.0';  // v17.42.0: Moon widow swap void awareness, endgame count trump
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
@@ -15285,17 +15285,23 @@ function aiWidowSwap(seat){
     // Skip void/trump bonuses for NELLO (no trumps, voids are neutral)
     if(!isNello){
       // Void bonuses: suits with 0 presence allow trump-in opportunities
+      // Moon bidder: voids are extra valuable (plays alone, every trick counts)
       var maxPip = session.game.max_pip || 6;
+      var isMoonBidder = GAME_MODE === 'MOON' && session.bid_winner_seat === session.game.current_player;
       for(var pip = 0; pip <= maxPip; pip++){
         if(tm === 'PIP' && pip === ts) continue; // trump suit can't be void bonus
         if(!voidPips[pip]){
-          score += 4; // void bonus
-          // Extra if suit has count tiles
+          score += isMoonBidder ? 8 : 4; // Moon bidder gets higher void bonus (trump-in = guaranteed trick)
+          // Extra if suit has count tiles remaining in the game
           for(var p2 = 0; p2 <= maxPip; p2++){
             if(p2 === pip) continue;
             var s = pip + p2;
-            if(s === 5 || s === 10){ score += 3; break; }
+            if(s === 5 || s === 10){ score += isMoonBidder ? 5 : 3; break; }
           }
+        }
+        // Near-void bonus: 1 tile in suit = easy to void after playing it
+        if(voidPips[pip] === 1){
+          score += isMoonBidder ? 4 : 2;
         }
       }
 

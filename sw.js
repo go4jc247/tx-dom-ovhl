@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.41.0 — endgame count trump lead for bidder
+// Version: v17.42.0 — Moon widow swap void awareness, near-void bonus
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.41.0';
+const CACHE_NAME = 'tx-dom-v17.42.0';
 const urlsToCache = [
   './index.html',
   // CSS
