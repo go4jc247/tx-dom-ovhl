@@ -4890,6 +4890,11 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           let score = (info.countRemaining + info.countInHand) * 3 + pip;
           // Check opponent voids — if opponents void and we have trump control, count is safe
           if(weHaveTrumpControl) score += 10;
+          // Penalize count-10 doubles without trump control (opponent could trump)
+          const dblSum = pip + pip;
+          if(!weHaveTrumpControl && (dblSum === 10 || dblSum === 5)){
+            score -= (dblSum === 10) ? 15 : 8; // big penalty for exposed count
+          }
           if(score > bestCountScore){ bestCountScore = score; bestCountDbl = idx; }
         }
         if(bestCountDbl >= 0 && bestCountScore > 8){
@@ -4945,6 +4950,34 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         if(bestWalkerIdx >= 0){
           return makeResult(bestWalkerIdx, "Count hunt: walk tile (highest in suit, double out)");
         }
+      }
+    }
+
+    // ── DEFENDER COUNT DENIAL: endgame lead to deny bidder count ──
+    // When bidder needs count and we're on defense in the endgame, lead from
+    // count-poor suits to deny the bidder opportunities to capture count.
+    if(!isMoon && !isBidderTeam && isEndgame && !canRelax && bidderNeedsMore > 0){
+      let bestDenyIdx = -1, bestDenyScore = -Infinity;
+      for(const idx of legal){
+        const tile = hand[idx];
+        if(gameState._is_trump_tile(tile)) continue; // save trumps
+        const pip = Math.max(tile[0], tile[1]);
+        const info = suitInfo[pip];
+        const pipSum = tile[0] + tile[1];
+        const myCount = (pipSum === 5) ? 5 : (pipSum === 10) ? 10 : 0;
+        let score = 0;
+        // Prefer leading suits with LOW count remaining (deny bidder count captures)
+        if(info) score -= info.countRemaining * 3;
+        // Penalize our own count tiles heavily
+        score -= myCount * 5;
+        // Prefer doubles (guaranteed win = we control who gets the trick)
+        if(tile[0] === tile[1]) score += 15;
+        // Prefer suits where bidder is void (they can't follow, can't get count)
+        if(voidIn[bidderSeat] && voidIn[bidderSeat].has(pip)) score += 10;
+        if(score > bestDenyScore){ bestDenyScore = score; bestDenyIdx = idx; }
+      }
+      if(bestDenyIdx >= 0){
+        return makeResult(bestDenyIdx, "Endgame defense: deny bidder count (" + bidderNeedsMore + "pts short)");
       }
     }
 
@@ -5319,6 +5352,16 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
                   score += 15;
                 }
               }
+            }
+
+            // Void creation: prefer playing from suits where we only have 1 tile
+            // Voiding creates future trump-in opportunities
+            const tilesInThisSuit = hand.filter(h => {
+              const hp = Math.max(h[0], h[1]);
+              return hp === ledSuit && !gameState._is_trump_tile(h);
+            }).length;
+            if(tilesInThisSuit === 1 && trumpsInHand.length > 0){
+              score += 8; // singleton: playing it voids us for future trump-ins
             }
 
             // Prefer lower tiles (let partner play higher)
@@ -7863,7 +7906,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.74.0';  // v17.74.0: don't trump partner's winning trick, dump count-awareness
+const MP_VERSION = 'v17.75.0';  // v17.75.0: lead logic — void creation, defender count denial, count-10 safety
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
