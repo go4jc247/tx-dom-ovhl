@@ -5566,7 +5566,10 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       if(isSameTeam(s) || s === p || !gameState.active_players.includes(s)) continue;
       if(!trick.some(play => Array.isArray(play) && play[0] === s)) _egOppsLeft++;
     }
-    const _egSafe = _egOppsLeft === 0 || opponentsVoidInTrump || isLastInTrick;
+    // Two safety tiers: "confirmed safe" for 10-count, "likely safe" for 5-count
+    const _egConfirmedSafe = _egOppsLeft === 0 || isLastInTrick
+      || (trumpTilesRemaining.length === 0 && trumpMode !== 'NONE'); // all trumps accounted for
+    const _egLikelySafe = _egConfirmedSafe || opponentsVoidInTrump; // includes probabilistic
     let bestCountIdx = -1, bestCountVal = 0;
     for(const idx of legal){
       const ps = hand[idx][0] + hand[idx][1];
@@ -5574,9 +5577,22 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       if(cnt > bestCountVal){ bestCountVal = cnt; bestCountIdx = idx; }
     }
     if(bestCountIdx >= 0 && bestCountVal > 0){
-      // Throw 10-count only when safe; always throw 5-count (low risk)
-      if(_egSafe || bestCountVal === 5){
-        return makeResult(bestCountIdx, "Last trick: throw count to partner (" + bestCountVal + "pts)");
+      // 10-count: only throw when CONFIRMED safe (no remaining opponent trumps)
+      // 5-count: throw when likely safe (acceptable risk)
+      if(bestCountVal === 10 && _egConfirmedSafe){
+        return makeResult(bestCountIdx, "Last trick: throw 10-count to partner (confirmed safe)");
+      }
+      if(bestCountVal === 5 && _egLikelySafe){
+        return makeResult(bestCountIdx, "Last trick: throw 5-count to partner");
+      }
+      // If we have both and 10 isn't safe, throw the 5 instead
+      if(bestCountVal === 10 && _egLikelySafe){
+        let fiveIdx = -1;
+        for(const idx of legal){
+          const ps = hand[idx][0] + hand[idx][1];
+          if(ps === 5){ fiveIdx = idx; break; }
+        }
+        if(fiveIdx >= 0) return makeResult(fiveIdx, "Last trick: throw 5-count (10 too risky)");
       }
     }
   }
