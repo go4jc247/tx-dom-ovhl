@@ -1644,7 +1644,7 @@ function aiChooseTrump(hand, bidAmount) {
 
   // Nello detection: AI calls Nello when hand is mostly low tiles
   // Only available when nelloDeclareMode is OFF (otherwise declared during bidding)
-  if (!nelloDeclareMode && GAME_MODE !== 'T42' && bidAmount >= 51) {
+  if (!nelloDeclareMode && bidAmount >= 51) {
     // Count tiles that are "low" (both pips <= 3)
     const lowTiles = hand.filter(t => t[0] <= 3 && t[1] <= 3);
     // Count tiles with a blank (0-x)
@@ -4102,7 +4102,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           const pip = hand[idx][0];
           const info = suitInfo[pip];
           if(!info) continue;
-          let score = 100 + info.countRemaining + pip;
+          let score = 100 + info.countRemaining + pip - (info.tilesLeft * 3);
           if(score > bestScore){ bestScore = score; bestIdx = idx; }
         }
         return makeResult(bestIdx, "Lead: double (trump control, safe win)");
@@ -4147,12 +4147,19 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
 
             // Partner suit signal: prefer suits partner showed strength in
             if(!isMoon && partnerSuitSignal[ledSuit]){
-              score += Math.min(partnerSuitSignal[ledSuit], 15);
+              const sigCap = (iAmBidderPartner && bidderNeedsMore > 10) ? 25 : 15;
+              score += Math.min(partnerSuitSignal[ledSuit], sigCap);
             }
 
-            // Bidder's partner: when bidder is close, prefer count-heavy suits
-            if(iAmBidderPartner && bidderIsClose && info.countRemaining >= 5){
+            // Bidder's partner: when bidder needs points, prefer count-heavy suits
+            if(iAmBidderPartner && !isMoon && (bidderNeedsMore > 15 || (bidderIsClose && info.countRemaining >= 5))){
               score += info.countRemaining; // bonus for leading into count-rich suits
+            }
+
+            // Walker pair: bonus when we hold the suit double (lead low, then walk)
+            const weHoldSuitDouble = hand.some(h => h[0] === ledSuit && h[1] === ledSuit);
+            if(weHoldSuitDouble && !info.winnerPlayed){
+              score += 20; // strong walker setup
             }
 
             // Partner void check: don't lead into suits partner can't follow
