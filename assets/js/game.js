@@ -1813,7 +1813,7 @@ function aiChooseTrump(hand, bidAmount) {
   if (doubles.length >= 3) {
     let ntScore = 0;
     // Each double wins its suit outright
-    ntScore += doubles.length * 12;
+    ntScore += doubles.length * 14;
     // Count covered offs (non-double tiles where we hold that suit's double)
     const ntDoublePips = new Set(doubles.map(d => d[0]));
     let ntCoveredOffs = 0;
@@ -4000,8 +4000,12 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         let bestTapIdx = -1, bestTapScore = -Infinity;
         for(const idx of nonTrumpSingles){
           const tile = hand[idx];
-          const pip = Math.max(tile[0], tile[1]);
-          if(!bidderVoids.has(pip)) continue;
+          // Check BOTH pips — tile [2,5] can tap bidder void in either pip 2 or pip 5
+          const pip0 = tile[0], pip1 = tile[1];
+          const void0 = bidderVoids.has(pip0), void1 = bidderVoids.has(pip1);
+          if(!void0 && !void1) continue;
+          // Use the void pip as the led suit; if both void, prefer the one with fewer tiles left
+          const pip = (void0 && void1) ? ((suitInfo[pip0] && suitInfo[pip1]) ? (suitInfo[pip0].tilesLeft <= suitInfo[pip1].tilesLeft ? pip0 : pip1) : pip0) : (void0 ? pip0 : pip1);
           const pipSum = tile[0] + tile[1];
           const myCount = (pipSum === 5) ? 5 : (pipSum === 10) ? 10 : 0;
           // Prefer non-count, low-value tiles in depleted suits
@@ -4520,8 +4524,9 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
               // consider leading it early while we still have trump control
               // (walking the off reduces suspicion by showing we "have" the suit)
               if (ledSuit === topSuspect.pip && tile[0] !== tile[1] && weHaveTrumpControl) {
-                score += 15; // Bonus: lead the off early to defuse tracking
-                _breakdown.bidderEvasion = 15;
+                const evasionBonus = topSuspect.suspicion >= 80 ? 25 : topSuspect.suspicion >= 70 ? 20 : 15;
+                score += evasionBonus;
+                _breakdown.bidderEvasion = evasionBonus;
               }
             } else if (!isBidderOpponent && !iAmBidder && topSuspect.suspicion >= 40) {
               // PARTNER: Misdirection — avoid leading the off suit to protect bidder
@@ -4727,9 +4732,18 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       }
     }
     if(highIdx >= 0 && highRank > winnerRank){
-      // MOON: always win when bid not safe and endgame (no partners to help)
-      if(isMoon && !bidIsSafe && tricksLeft <= 3){
+      // MOON BIDDER: always win when bid not safe and endgame (no partners to help)
+      if(isMoon && iAmBidder && !bidIsSafe && tricksLeft <= 3){
         return makeResult(highIdx, "Moon endgame: must win every trick");
+      }
+      // MOON OPPONENT: aggressively win when bidder is on pace for all tricks
+      // If bidder has won all tricks so far, opponents MUST block or bidder gets Moon
+      if(isMoon && !iAmBidder && canSetBid){
+        const bidderTricksWon = gameState.team_points[bidderTeamIdx] || 0;
+        const bidderOnPace = bidderTricksWon >= trickNum; // won every trick so far
+        if(bidderOnPace && tricksLeft <= 4){
+          return makeResult(highIdx, "Moon opp: block bidder from winning all tricks");
+        }
       }
       // DUCK: if partner plays after us and likely has the double (higher card),
       // duck to let partner win (they can then lead a strategic suit)
@@ -5081,6 +5095,14 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           if(v < _defLowVal){ _defLowVal = v; _defLowIdx = idx; }
         }
         return makeResult(_defLowIdx, "Defender already winning — save trump, dump low");
+      }
+    }
+
+    // MOON OPPONENT: always trump in when bidder is on pace for all tricks
+    if(isMoon && !iAmBidder && canSetBid && winTrumpIdx >= 0){
+      const bidderTricksWon2 = gameState.team_points[bidderTeamIdx] || 0;
+      if(bidderTricksWon2 >= trickNum){
+        return makeResult(winTrumpIdx, "Moon opp: trump in to block bidder (on pace for all tricks)");
       }
     }
 
