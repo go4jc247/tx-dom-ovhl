@@ -3546,6 +3546,36 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       }
     }
 
+    // ── BID IS DOOMED: damage control mode ──
+    // When bid is mathematically impossible, stop wasting trumps on pulling.
+    // Switch to leading safest non-trump to minimize opponent score gains.
+    if(bidIsDoomed && isBidderTeam){
+      // Lead low non-trumps to minimize damage — skip ALL trump pulling
+      if(nonTrumpSingles.length > 0){
+        let safestIdx = nonTrumpSingles[0], safestScore = Infinity;
+        for(const idx of nonTrumpSingles){
+          const tile = hand[idx];
+          const pipSum = tile[0] + tile[1];
+          const myCount = (pipSum === 5) ? 5 : (pipSum === 10) ? 10 : 0;
+          const score = myCount * 3 + pipSum; // minimize count given away
+          if(score < safestScore){ safestScore = score; safestIdx = idx; }
+        }
+        return makeResult(safestIdx, "Bid doomed: damage control (safe lead)");
+      }
+      if(nonTrumpDoubles.length > 0){
+        return makeResult(nonTrumpDoubles[0], "Bid doomed: damage control (double lead)");
+      }
+      // Only trumps left — lead lowest
+      if(otherTrumps.length > 0){
+        let lowIdx = otherTrumps[0], lowVal = Infinity;
+        for(const idx of otherTrumps){
+          const val = hand[idx][0]+hand[idx][1];
+          if(val < lowVal){ lowVal = val; lowIdx = idx; }
+        }
+        return makeResult(lowIdx, "Bid doomed: forced trump lead");
+      }
+    }
+
     // ── PHASE A: TRUMP PULLING (before we have trump control) ──
     // Skip aggressive trump pulling if bid is already safe (canRelax) and we're bidder team
     // Save trumps for defense against opponent count grabs
@@ -3914,6 +3944,29 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       };
     }
 
+    // LAST-IN-TRICK ADVANTAGE: When we're the last player, we know exactly what we need
+    // If we can win AND there's count in the trick, always win (no need to conserve)
+    if(isLastInTrick && highIdx >= 0 && highRank > winnerRank){
+      const trickCountFollow = trick.reduce((sum, play) => {
+        if(!Array.isArray(play) || !play[1]) return sum;
+        const ps = play[1][0] + play[1][1];
+        return sum + ((ps === 5) ? 5 : (ps === 10) ? 10 : 0);
+      }, 0);
+      if(trickCountFollow > 0 || canSetBid){
+        // We're last — guaranteed win with count, or we need to set the bid
+        let bestWinIdx2 = highIdx, bestWinRank2 = Infinity;
+        for(const idx of legal){
+          const tile = hand[idx];
+          if((tile[0] === ledPip || tile[1] === ledPip) && !gameState._is_trump_tile(tile)){
+            const r = gameState._suit_rank(tile, ledPip);
+            const rank = r[0] * 100 + r[1];
+            if(rank > winnerRank && rank < bestWinRank2){ bestWinRank2 = rank; bestWinIdx2 = idx; }
+          }
+        }
+        return makeResult(bestWinIdx2, "Last in trick: win for count/defense");
+      }
+    }
+
     if(winnerIsTrump){
       // offTracker: When forced to play low, prefer discarding non-catcher tiles
       if(lowIdx >= 0){
@@ -4039,12 +4092,12 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         return sum + ((ps === 5) ? 5 : (ps === 10) ? 10 : 0);
       }, 0);
       // isBidderTeam defined above in BID SAFETY section
-      // Always trump if: bidder's team, endgame, trick has count, or bid is close to being set
-      if(!isBidderTeam && trickCount === 0 && !isEndgame && shouldSaveLastTrump && !bidderIsClose){
+      // Always trump if: bidder's team, endgame, trick has count, bid is close, or we can set the bid
+      if(!isBidderTeam && trickCount === 0 && !isEndgame && shouldSaveLastTrump && !bidderIsClose && !canSetBid){
         // Low-value trick on defense with last trump — save it for a count-heavy trick
         // Fall through to dump logic
       } else {
-        return makeResult(winTrumpIdx, "Trump in to win");
+        return makeResult(winTrumpIdx, canSetBid && !isBidderTeam ? "Trump in (setting bid)" : "Trump in to win");
       }
     }
     if(anyTrumpIdx >= 0 && highestTrickTrump < 0){
@@ -4055,10 +4108,10 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         return sum + ((ps === 5) ? 5 : (ps === 10) ? 10 : 0);
       }, 0);
       // isBidderTeam defined above in BID SAFETY section
-      if(!isBidderTeam && trickCount === 0 && !isEndgame && shouldSaveLastTrump && !bidderIsClose){
+      if(!isBidderTeam && trickCount === 0 && !isEndgame && shouldSaveLastTrump && !bidderIsClose && !canSetBid){
         // Save last trump for higher-value trick
       } else {
-        return makeResult(anyTrumpIdx, "Trump in to win");
+        return makeResult(anyTrumpIdx, canSetBid && !isBidderTeam ? "Trump in (setting bid)" : "Trump in to win");
       }
     }
     // Endgame desperation: trump in even if we can't beat existing trump
@@ -4092,9 +4145,15 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       else if(minCnt <= 2){ score += 8; _bd.voidBonus = 8; }
       _bd.suitCounts = cntA+'|'+cntB;
 
-      // Don't give opponents our count
-      score -= myCount * 3;
-      _bd.countPenalty = -(myCount * 3);
+      // Don't give opponents our count (but if bid is doomed, dump count to minimize loss)
+      if(bidIsDoomed && isBidderTeam){
+        // Bid is lost — dump high count to get rid of it before opponents grab tricks
+        score += myCount * 2;
+        _bd.countDump = myCount * 2;
+      } else {
+        score -= myCount * 3;
+        _bd.countPenalty = -(myCount * 3);
+      }
 
       // Strategic void: prefer voiding suits with remaining count tiles
       // so we can trump in later to steal count
