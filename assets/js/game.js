@@ -1539,6 +1539,18 @@ function evaluateHandForBid(hand) {
     if (trumpCount >= 3 && hasDoubleTrump && hasSecondTrump && doubles.length >= 1) {
       return { action: "bid", bid: minBid, marks: 1 };
     }
+
+    // NEW: 3 top trumps (double + 2nd + 3rd) even without other doubles → min bid
+    // Having the top 3 trumps gives strong control even without side doubles
+    if (trumpCount >= 3 && hasDoubleTrump && hasSecondTrump && hasThirdTrump) {
+      return { action: "bid", bid: minBid, marks: 1 };
+    }
+
+    // NEW: 4+ trumps with double but no 2nd → still worth a min bid
+    // Having 4 in a suit with the double gives enough trump mass
+    if (trumpCount >= 4 && hasDoubleTrump && ntUncoveredOffs <= 1) {
+      return { action: "bid", bid: minBid, marks: 1 };
+    }
   }
 
   return { action: "pass" };
@@ -1573,19 +1585,86 @@ function aiChooseTrump(hand, bidAmount) {
   }
 
   let bestSuit = null;
-  let bestScore = 0;
+  let bestScore = -Infinity;
   const maxPip = GAME_MODE === 'MOON' ? 6 : 7;
+
+  // Count tiles per suit for void detection
+  const suitCounts = {};
+  for (let pip = 0; pip <= maxPip; pip++) suitCounts[pip] = 0;
+  for (const tile of hand) {
+    const [a, b] = tile;
+    if (a !== b) { // non-doubles belong to both suits
+      suitCounts[a]++;
+      suitCounts[b]++;
+    }
+    // doubles belong to their own suit
+    if (a === b) suitCounts[a]++;
+  }
+
   for (let pip = maxPip; pip >= 0; pip--) {
     const trumpTiles = hand.filter(t => t[0] === pip || t[1] === pip);
+    if (trumpTiles.length === 0) continue;
+
     const hasDouble = trumpTiles.some(t => t[0] === pip && t[1] === pip);
-    const score = trumpTiles.length * 10 + (hasDouble ? 20 : 0);
+    const hasSecond = pip > 0 && trumpTiles.some(t =>
+      (t[0] === pip && t[1] === pip - 1) || (t[0] === pip - 1 && t[1] === pip));
+    const hasThird = pip > 1 && trumpTiles.some(t =>
+      (t[0] === pip && t[1] === pip - 2) || (t[0] === pip - 2 && t[1] === pip));
+
+    let score = 0;
+
+    // Base: count of trump tiles (each one is a potential trump play)
+    score += trumpTiles.length * 10;
+
+    // Having the double is critical — guaranteed trick winner
+    if (hasDouble) score += 25;
+
+    // Sequential strength: having the top 2 or 3 trumps is much stronger
+    // than scattered trumps (e.g., 7-7, 7-6, 7-5 >> 7-7, 7-3, 7-0)
+    if (hasDouble && hasSecond) score += 15;
+    if (hasDouble && hasSecond && hasThird) score += 10;
+
+    // Void suit bonus: if choosing this trump leaves us void in other suits,
+    // we can trump in when those suits are led
+    const nonTrumpTiles = hand.filter(t => t[0] !== pip && t[1] !== pip);
+    const nonTrumpSuits = new Set();
+    for (const t of nonTrumpTiles) {
+      if (t[0] !== t[1]) { nonTrumpSuits.add(t[0]); nonTrumpSuits.add(t[1]); }
+      else nonTrumpSuits.add(t[0]);
+    }
+    // Count suits we're void in (excluding the trump suit)
+    let voidSuits = 0;
+    for (let s = 0; s <= maxPip; s++) {
+      if (s === pip) continue;
+      // Check if we have any tiles in suit s that aren't trump
+      const hasSuit = nonTrumpTiles.some(t =>
+        (t[0] === s || t[1] === s) && !(t[0] === t[1]));
+      const hasDoubleSuit = hand.some(t => t[0] === s && t[1] === s);
+      if (!hasSuit && !hasDoubleSuit) voidSuits++;
+    }
+    score += voidSuits * 5; // each void suit = opportunity to trump in
+
+    // Count tile awareness: penalty if our trump tiles are count tiles
+    // (10-count: pip sum = 10; 5-count: pip sum = 5)
+    // These are valuable points we'd rather capture, not risk losing
+    let countExposure = 0;
+    for (const t of trumpTiles) {
+      const sum = t[0] + t[1];
+      if (sum === 10) countExposure += 3;
+      else if (sum === 5) countExposure += 2;
+    }
+    score -= countExposure;
+
+    // Slight preference for higher pip suits (more points available in tricks)
+    score += pip;
+
     if (score > bestScore) {
       bestScore = score;
       bestSuit = pip;
     }
   }
 
-  return bestSuit !== null ? bestSuit : 7;
+  return bestSuit !== null ? bestSuit : maxPip;
 }
 
 // AI Tile Selection — v3: full strategy (void tracking, trump control, bid safety, partner play)
@@ -3082,37 +3161,80 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   }
 
   // ═══════════════════════════════════════════════════════════════════
-  //  NEL-O LOGIC (unchanged from v2)
+  //  NEL-O LOGIC (v4: opponent-aware strategy)
   // ═══════════════════════════════════════════════════════════════════
   if(isNello){
-    // Nello Doubles Only: doubles are their own suit, treat them as normal tiles for AI strategy
     const _nelloDbls = gameState.nello_doubles_suit;
+    const bidderSeat = typeof session !== 'undefined' ? session.bid_winner_seat : undefined;
+    const iAmBidder = bidderSeat !== undefined && bidderSeat === p;
+    const iAmOpponent = bidderSeat !== undefined && !isSameTeam(bidderSeat);
+
     if(isLead){
+      if(iAmBidder){
+        // BIDDER leading: play lowest non-double to minimize chance of winning
+        let lowNDIdx = -1, lowNDVal = Infinity, lowIdx = legal[0], lowVal = Infinity;
+        for(const idx of legal){
+          const tile = hand[idx], val = tile[0]+tile[1], dbl = tile[0]===tile[1];
+          if(val < lowVal){ lowVal = val; lowIdx = idx; }
+          if((!dbl || _nelloDbls) && val < lowNDVal){ lowNDVal = val; lowNDIdx = idx; }
+        }
+        return lowNDIdx >= 0
+          ? makeResult(lowNDIdx, "Nel-O bidder: lead lowest")
+          : makeResult(lowIdx, "Nel-O bidder: lead lowest");
+      }
+
+      if(iAmOpponent){
+        // OPPONENT leading against Nello bidder: strategic lead
+        // Lead HIGH tiles in suits where the bidder must follow
+        // Doubles are great — they control the suit and force bidder to follow
+        let bestIdx = legal[0], bestScore = -Infinity;
+        for(const idx of legal){
+          const tile = hand[idx], val = tile[0]+tile[1], dbl = tile[0]===tile[1];
+          let score = 0;
+
+          // Doubles are strong leads — bidder must follow in that suit
+          if(dbl && !_nelloDbls) score += 20;
+
+          // Prefer high-value tiles (more likely to force bidder to win)
+          score += val * 2;
+
+          // If bidder is void in this suit, don't lead it
+          const suitPip = Math.max(tile[0], tile[1]);
+          if(bidderSeat !== undefined && voidIn[bidderSeat] && voidIn[bidderSeat].has(suitPip)){
+            score -= 50;
+          }
+
+          if(score > bestScore){ bestScore = score; bestIdx = idx; }
+        }
+        return makeResult(bestIdx, "Nel-O opp: lead high to trap bidder");
+      }
+
+      // Partner of bidder: lead low to help bidder avoid winning
       let lowNDIdx = -1, lowNDVal = Infinity, lowIdx = legal[0], lowVal = Infinity;
       for(const idx of legal){
         const tile = hand[idx], val = tile[0]+tile[1], dbl = tile[0]===tile[1];
         if(val < lowVal){ lowVal = val; lowIdx = idx; }
-        // In doubles-only mode, doubles are valid low plays (they're their own suit)
         if((!dbl || _nelloDbls) && val < lowNDVal){ lowNDVal = val; lowNDIdx = idx; }
       }
       return lowNDIdx >= 0
-        ? makeResult(lowNDIdx, "Nel-O: lead low (force bidder high)")
-        : makeResult(lowIdx, "Nel-O: lead low");
+        ? makeResult(lowNDIdx, "Nel-O partner: lead low to help bidder")
+        : makeResult(lowIdx, "Nel-O partner: lead low");
     }
+
+    // Following in Nello
     if(bidderWinning){
       let highIdx = legal[0], highVal = 0;
       for(const idx of legal){
         const val = hand[idx][0]+hand[idx][1];
         if(val > highVal){ highVal = val; highIdx = idx; }
       }
-      return makeResult(highIdx, "Nel-O: bidder winning, play high");
+      return makeResult(highIdx, "Nel-O: bidder winning, play high to rescue");
     }
     {
       let lowNDIdx = -1, lowNDVal = Infinity, lowIdx = legal[0], lowVal = Infinity;
       for(const idx of legal){
         const tile = hand[idx], val = tile[0]+tile[1], dbl = tile[0]===tile[1];
         if(val < lowVal){ lowVal = val; lowIdx = idx; }
-        // In doubles-only mode, doubles are valid low plays
         if((!dbl || _nelloDbls) && val < lowNDVal){ lowNDVal = val; lowNDIdx = idx; }
       }
       const reason = partnerWinning
