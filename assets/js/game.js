@@ -5287,7 +5287,10 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       }
 
       // Don't give opponents our count (but if bid is doomed, dump count to minimize loss)
-      if(bidIsDoomed && isBidderTeam){
+      if(partnerWinning && isLastInTrick){
+        // Partner winning + last in trick = count goes to OUR team — no penalty needed
+        // (bonus already applied above at line 5284)
+      } else if(bidIsDoomed && isBidderTeam){
         // Bid is lost — dump high count to get rid of it before opponents grab tricks
         score += myCount * 2;
         _bd.countDump = myCount * 2;
