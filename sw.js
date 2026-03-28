@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.9.0 — TN51 3-team fixes, trump selection, void detection, off-tracker
+// Version: v17.10.0 — exact card counting, DFM lead/trump, DOUBLES count hunt
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.9.0';
+const CACHE_NAME = 'tx-dom-v17.10.0';
 const urlsToCache = [
   './index.html',
   // CSS

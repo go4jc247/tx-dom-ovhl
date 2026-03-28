@@ -1911,6 +1911,11 @@ function aiChooseTrump(hand, bidAmount) {
       if (!ndSuits.has(s)) doublesVoids++;
     }
     doublesScore += doublesVoids * 5;
+    // DFM bonus: when Doubles Follow Me is active, leading a trump double forces
+    // opponents to play their doubles — this strips their suit control massively
+    if (typeof doublesFollowMe !== 'undefined' && doublesFollowMe !== 'off') {
+      doublesScore += 8; // DFM makes DOUBLES significantly stronger
+    }
     // Compare DOUBLES vs best pip suit (+2 bias: DOUBLES is non-standard, needs clear advantage)
     if (doublesScore > bestScore + 2) {
       return "DOUBLES";
