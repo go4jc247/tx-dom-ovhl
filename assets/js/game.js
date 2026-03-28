@@ -3985,6 +3985,41 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       };
     }
 
+    // ── MOON OPPONENT LEAD: maximize trick wins to deny the bidder ──
+    // In Moon, there are no partners — every non-bidder must win tricks independently.
+    // When the bidder is on pace for all tricks, lead suits where bidder is likely void
+    // to force bidder to waste trump or play off-suit.
+    if(isMoon && !iAmBidder){
+      const bidderTricksWon = gameState.team_points[bidderTeamIdx] || 0;
+      const isShootMoon = session && session.moon_shoot;
+      const bidderOnPace = bidderTricksWon >= trickNum;
+      if(bidderOnPace || isShootMoon){
+        // Bidder winning everything — lead our guaranteed winners first
+        // Priority: doubles (guaranteed), then highest non-trump tiles
+        if(nonTrumpDoubles.length > 0){
+          // Lead doubles — they win unless trumped
+          let bestDblIdx = nonTrumpDoubles[0], bestDblPip = -1;
+          for(const idx of nonTrumpDoubles){
+            if(hand[idx][0] > bestDblPip){ bestDblPip = hand[idx][0]; bestDblIdx = idx; }
+          }
+          return makeResult(bestDblIdx, "Moon opp lead: double to deny bidder");
+        }
+        if(trumpDoubles.length > 0){
+          // Lead trump double if no non-trump doubles
+          return makeResult(trumpDoubles[0], "Moon opp lead: trump double to deny bidder");
+        }
+        // Lead highest trump to assert dominance
+        if(pullableTrumps.length > 0){
+          let highIdx = pullableTrumps[0], highRank = -Infinity;
+          for(const idx of pullableTrumps){
+            const r = getTrumpRankNum(hand[idx]);
+            if(r > highRank){ highRank = r; highIdx = idx; }
+          }
+          return makeResult(highIdx, "Moon opp lead: high trump to win trick");
+        }
+      }
+    }
+
     // ── FINAL TRICK EXACT CARD COUNTING ──
     // When it's the last trick and we're leading, each opponent has exactly 1 tile.
     // We can determine the optimal lead by checking if our tile beats all opponents' tiles.

@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.18.0 — fix opp signal tracking, Moon count/bid fixes, widow swap threshold
+// Version: v17.19.0 — Moon opponent lead strategy, opp signal tracking fix
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.18.0';
+const CACHE_NAME = 'tx-dom-v17.19.0';
 const urlsToCache = [
   './index.html',
   // CSS
