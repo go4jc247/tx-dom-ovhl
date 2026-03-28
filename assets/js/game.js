@@ -4006,14 +4006,15 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       // BUT respect last-trump protection
       // AND don't waste high trumps pulling partner's trumps
       // PICK safest trump: avoid count tiles (pipSum=5 or 10), then prefer low value
-      if(otherTrumps.length > 0 && iHaveHighestTrump && !shouldSaveLastTrump && !partnersHoldRemainingTrumps){
+      if(otherTrumps.length > 0 && iHaveHighestTrump && !shouldSaveLastTrump && !partnersHoldRemainingTrumps
+        && (trumpTilesRemaining.length > 0 || !opponentsVoidInTrump)){
         let bestIdx = otherTrumps[0], bestScore = -Infinity;
         for(const idx of otherTrumps){
           const tile = hand[idx];
           const pipSum = tile[0] + tile[1];
           const isCount = (pipSum === 5 || pipSum === 10);
-          // Prefer non-count trumps, then lowest pipSum
-          let score = -pipSum + (isCount ? -50 : 0);
+          // Prefer non-count trumps; 10-count much worse than 5-count to lead
+          let score = -pipSum + (isCount ? (pipSum === 10 ? -100 : -50) : 0);
           if(score > bestScore){ bestScore = score; bestIdx = idx; }
         }
         return makeResult(bestIdx, "Lead: safe trump (pulling remaining trumps)");
@@ -4025,14 +4026,15 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       // Skip if remaining trumps are only held by partners (don't pull partner trumps)
       // PICK safest trump: avoid count tiles, then prefer low value
       const p3EarlyWindow = trickNum <= 1;
-      const p3MidWindow = trickNum <= 3 && trumpsInHand.length >= 4; // stricter in mid-game
-      if(otherTrumps.length >= 2 && trumpsInHand.length >= 3 && (p3EarlyWindow || p3MidWindow || mustWin) && !bidIsSafe && !partnersHoldRemainingTrumps){
+      const p3MidWindow = trickNum === 2 && trumpsInHand.length >= 4;
+      const p3LateWindow = trickNum === 3 && trumpsInHand.length >= 5; // stricter late
+      if(otherTrumps.length >= 2 && trumpsInHand.length >= 3 && (p3EarlyWindow || p3MidWindow || p3LateWindow || mustWin) && !bidIsSafe && !partnersHoldRemainingTrumps){
         let bestIdx = otherTrumps[0], bestScore = -Infinity;
         for(const idx of otherTrumps){
           const tile = hand[idx];
           const pipSum = tile[0] + tile[1];
           const isCount = (pipSum === 5 || pipSum === 10);
-          let score = -pipSum + (isCount ? -50 : 0);
+          let score = -pipSum + (isCount ? (pipSum === 10 ? -100 : -50) : 0);
           if(score > bestScore){ bestScore = score; bestIdx = idx; }
         }
         return makeResult(bestIdx, "Lead: early trump (forcing opponent trumps)");
@@ -4045,7 +4047,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       // CRITICAL: Only do this if a partner's trump can actually BEAT our lowest trump.
       // If our lowest trump outranks all remaining trumps, we'd win our own trick (pointless).
       // Don't do this with only 1 trump (save it as get-back-in card).
-      if(partnersHoldRemainingTrumps && nonTrumpDoubles.length === 0 && otherTrumps.length >= 2){
+      if(partnersHoldRemainingTrumps && nonTrumpDoubles.length === 0 && otherTrumps.length >= 2
+        && (opponentsVoidInTrump || trumpTilesRemaining.length <= 2)){
         // Find lowest non-double trump, preferring non-count tiles
         let lowIdx = otherTrumps[0], lowR = Infinity, lowIsCount = true;
         for(const idx of otherTrumps){
