@@ -1952,13 +1952,20 @@ function aiChooseTrump(hand, bidAmount) {
     doublesScore += doublesVoids * 5;
     // DFM bonus: when Doubles Follow Me is active, leading a trump double forces
     // opponents to play their doubles — this strips their suit control massively
-    // Scale with doubles count: more doubles = more DFM rounds = more stripping
+    // Scale with doubles count AND pip quality: high doubles ([6,6],[5,5]) are far more
+    // devastating under DFM than low doubles ([0,0],[1,1])
     if (typeof doublesFollowMe !== 'undefined' && doublesFollowMe !== 'off') {
-      const dfmBonus = doubles.length >= 5 ? 15 : doubles.length >= 4 ? 12 : 8;
+      const avgDoublePip = doubles.reduce((s,d) => s + d[0], 0) / doubles.length;
+      const highDoubleBonus = Math.floor(avgDoublePip * 1.5); // avg pip 5 = +7, avg pip 2 = +3
+      const dfmBonus = (doubles.length >= 5 ? 15 : doubles.length >= 4 ? 12 : 8) + highDoubleBonus;
       doublesScore += dfmBonus;
     }
-    // Compare DOUBLES vs best pip suit (+2 bias: DOUBLES is non-standard, needs clear advantage)
-    if (doublesScore > bestScore + 2) {
+    // Compare DOUBLES vs best pip suit — bias scales with risk (fewer doubles = more risk)
+    // 3 doubles in 7-tile hand = 4 unprotected tiles → need +8 advantage
+    // 4 doubles = 3 unprotected → need +4 advantage
+    // 5+ doubles = 2 or fewer unprotected → need only +2
+    const doublesBias = doubles.length >= 5 ? 2 : doubles.length >= 4 ? 4 : 8;
+    if (doublesScore > bestScore + doublesBias) {
       return "DOUBLES";
     }
   }
@@ -7450,7 +7457,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.50.0';  // v17.50.0: in-game TechSupport chat feature
+const MP_VERSION = 'v17.51.0';  // v17.51.0: widow swap void creation, DFM pip quality, doubles trump bias
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
@@ -15396,7 +15403,7 @@ function aiWidowSwap(seat){
       // Void bonuses: suits with 0 presence allow trump-in opportunities
       // Moon bidder: voids are extra valuable (plays alone, every trick counts)
       var maxPip = session.game.max_pip || 6;
-      var isMoonBidder = GAME_MODE === 'MOON' && session.bid_winner_seat === session.game.current_player;
+      var isMoonBidder = GAME_MODE === 'MOON' && session.bid_winner_seat === seat;
       for(var pip = 0; pip <= maxPip; pip++){
         if(tm === 'PIP' && pip === ts) continue; // trump suit can't be void bonus
         if(!voidPips[pip]){
@@ -15466,8 +15473,30 @@ function aiWidowSwap(seat){
     var newTrump = aiChooseTrump(postSwapHand, bid);
     var newScore = evalHand(postSwapHand, newTrump);
     var gain = newScore - origScore;
+    // VOID CREATION BONUS: if swapping this tile creates a new void that didn't exist before
+    var swappedPipA = tile[0], swappedPipB = tile[1];
+    for(var vp of [swappedPipA, swappedPipB]){
+      if(tile[0] === tile[1] && vp === swappedPipB) continue; // skip duplicate for doubles
+      // Count how many tiles in the ORIGINAL hand (excluding this tile) have this pip
+      var remainingInSuit = 0;
+      for(var ri = 0; ri < hand.length; ri++){
+        if(ri === i) continue;
+        if(hand[ri][0] === vp || hand[ri][1] === vp) remainingInSuit++;
+      }
+      // Also check if the widow tile adds this pip back
+      if(widow[0] === vp || widow[1] === vp) remainingInSuit++;
+      if(remainingInSuit === 0){
+        // This swap creates a new void! Extra bonus beyond evalHand's passive void scoring
+        var _moonBidder = GAME_MODE === 'MOON' && session.bid_winner_seat === seat;
+        gain += _moonBidder ? 6 : 3;
+      }
+    }
     // Penalty for changing trump strategy (risky to shift mid-hand)
-    if(newTrump !== origTrump) gain -= 8;
+    // Smarter: reduce penalty if new trump is clearly stronger (higher score gain)
+    if(newTrump !== origTrump){
+      var trumpChangePenalty = (newScore - origScore > 15) ? 3 : 8; // small penalty if big improvement
+      gain -= trumpChangePenalty;
+    }
     // Heavy penalty for swapping out trump tiles (trump double = -20, other trump = -12)
     if(isTrumpTile) gain -= (tile[0] === tile[1]) ? 20 : 12;
     if(gain > bestSwapGain){ bestSwapGain = gain; bestSwapIdx = i; }
