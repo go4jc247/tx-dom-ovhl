@@ -8093,7 +8093,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.94.0';  // v17.94.0: Fix tutorial early hand termination (play all 7 tricks)
+const MP_VERSION = 'v17.95.0';  // v17.95.0: Update tutorial terminology (suits, count dominoes, aces/deuces/treys)
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables

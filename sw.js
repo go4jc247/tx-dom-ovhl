@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.94.0 — Fix tutorial early hand termination (play all 7 tricks)
+// Version: v17.95.0 — Update tutorial terminology (suits, count dominoes, aces/deuces/treys)
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.94.0';
+const CACHE_NAME = 'tx-dom-v17.95.0';
 const urlsToCache = [
   './index.html',
   // CSS

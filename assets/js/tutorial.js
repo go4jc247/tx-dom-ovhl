@@ -424,9 +424,9 @@ const TUTORIAL_LESSONS = [
     title: 'The Dominoes',
     steps: [
       { type: 'text_dim', text: 'Welcome to Texas 42 Training!\n\nThis tutorial will teach you how to play one of the best card-style domino games ever invented.\n\nLet\'s start with the basics.' },
-      { type: 'text_dim', text: 'Texas 42 uses a standard Double-Six domino set \u2014 28 tiles total.\n\nEach tile has two ends, with 0 to 6 dots (called "pips") on each end.\n\nExamples: [6|6], [5|3], [2|0]' },
-      { type: 'text_dim', text: 'Four players sit around the table. All 28 tiles are dealt out \u2014 7 tiles each.\n\nYou (Player 1) sit at the bottom. Your partner (Player 4) sits across from you at the top.\n\nPlayers 2 and 3 are your opponents.' },
-      { type: 'deal', text: 'Here are your 7 tiles at the bottom of the screen.\n\nYour opponents\' and partner\'s tiles are face-down.\n\nTap any of your tiles to see how they sort!',
+      { type: 'text_dim', text: 'Texas 42 uses a standard Double-Six domino set \u2014 28 dominoes total.\n\nEach domino has two ends, with a number from 0 to 6 on each side.\n\nExamples: [6|6], [5|3], [2|0]' },
+      { type: 'text_dim', text: 'Four players sit around the table. All 28 dominoes are dealt out \u2014 7 each.\n\nYou (Player 1) sit at the bottom. Your partner (Player 4) sits across from you at the top.\n\nPlayers 2 and 3 are your opponents.' },
+      { type: 'deal', text: 'Here are your 7 dominoes at the bottom of the screen.\n\nYour opponents\' and partner\'s dominoes are face-down.\n\nTap any of your dominoes to see how they sort!',
         hands: [
           [[6,4],[5,5],[3,3],[6,2],[4,1],[5,0],[6,6]],
           [[5,4],[3,2],[6,1],[4,0],[2,2],[5,1],[6,3]],
@@ -439,17 +439,17 @@ const TUTORIAL_LESSONS = [
   {
     title: 'Suits & Doubles',
     steps: [
-      { type: 'text', text: 'SUITS\n\nDominoes are grouped into 7 suits: blanks (0s), ones (1s), twos (2s), threes (3s), fours (4s), fives (5s), and sixes (6s).\n\nA tile belongs to a suit if it contains that pip number.' },
-      { type: 'text', text: 'The "sixes" suit contains:\n[6|6] [6|5] [6|4] [6|3] [6|2] [6|1] [6|0]\n\nThat\'s 7 tiles in every suit.\n\nThe DOUBLE is the highest: [6|6] is king of sixes.' },
+      { type: 'text', text: 'SUITS\n\nDominoes are grouped into 7 suits: blanks (0s), aces (1s), deuces (2s), treys (3s), fours (4s), fives (5s), and sixes (6s).\n\nA domino belongs to a suit if it has that number on either end.' },
+      { type: 'text', text: 'The "sixes" suit contains:\n[6|6] [6|5] [6|4] [6|3] [6|2] [6|1] [6|0]\n\nThat\'s 7 dominoes in every suit.\n\nThe DOUBLE is the highest: [6|6] is king of sixes.' },
       { type: 'text', text: 'DOUBLES are special:\n\n[6|6] = highest six\n[5|5] = highest five\n[4|4] = highest four\n...down to...\n[0|0] = highest blank\n\nThe lowest in the sixes suit is [6|0].\nThe lowest in the fives suit is [5|0].' },
-      { type: 'text', text: 'Each tile appears in TWO suits. The [6|4] belongs to both sixes AND fours.\n\nWhen a suit is led in a trick, you must follow that specific suit. More on this during play!' }
+      { type: 'text', text: 'Each domino belongs to TWO suits. The [6|4] belongs to both sixes AND fours.\n\nWhen a suit is led in a trick, you must follow that specific suit. More on this during play!' }
     ]
   },
   // LESSON 3: COUNT DOMINOES
   {
     title: 'Count Dominoes',
     steps: [
-      { type: 'text', text: 'COUNT (HONOR) TILES\n\nSome tiles are worth extra points:\n\n5-COUNT tiles (5 pts each):\n  [5|0]  [4|1]  [3|2]\n\n10-COUNT tiles (10 pts each):\n  [5|5]  [6|4]' },
+      { type: 'text', text: 'COUNT DOMINOES\n\nSome dominoes are worth extra points:\n\n5-COUNT (5 pts each):\n  [5|0]  [4|1]  [3|2]\n\n10-COUNT (10 pts each):\n  [5|5]  [6|4]' },
       { type: 'text', text: 'Total count: 3 x 5 pts = 15\n             2 x 10 pts = 20\nCount total = 35 points\n\nPlus 7 tricks x 1 pt each = 7\n\n35 + 7 = 42 total points\n\nThat\'s where the name "42" comes from!' },
       { type: 'text', text: 'In your hand, look for count:\n\n  [6|4] = 10 points\n  [5|5] = 10 points\n  [5|0] = 5 points\n  [4|1] = 5 points\n\nThat\'s 30 points of count! Very strong.' }
     ]
@@ -458,9 +458,9 @@ const TUTORIAL_LESSONS = [
   {
     title: 'Bidding & Trump',
     steps: [
-      { type: 'text', text: 'THE BIDDING PHASE\n\nAfter dealing, players bid clockwise starting left of the dealer.\n\nYou bid how many of 42 points your team can win.\n\nMinimum bid: 30\nMaximum bid: 42\n\nYou can pass if your hand is weak.' },
-      { type: 'text', text: 'The highest bidder wins the bid and chooses the trump suit.\n\nIf everyone passes, the tiles are reshuffled.\n\nBidding 30 means your team needs 30 of 42 points to earn a mark.' },
-      { type: 'text', text: 'WHEN TO BID 30 (rule of thumb):\n\nYou need at least:\n\u2022 3 tiles in your best suit, including the double\n\u2022 Plus 2 other doubles\n\nExample: [6|6] [6|4] [6|2] + [3|3] [5|5]\n= 3 sixes with double + 2 side doubles = bid 30!' },
+      { type: 'text', text: 'THE BIDDING PHASE\n\nAfter dealing, players bid clockwise starting left of the shuffler.\n\nYou bid how many of 42 points your team can win.\n\nMinimum bid: 30\nMaximum bid: 42\n\nYou can pass if your hand is weak.' },
+      { type: 'text', text: 'The highest bidder wins the bid and chooses the trump suit.\n\nIf everyone passes, the dominoes are reshuffled.\n\nBidding 30 means your team needs 30 of 42 points to earn a mark.' },
+      { type: 'text', text: 'WHEN TO BID 30 (rule of thumb):\n\nYou need at least:\n\u2022 3 dominoes in your best suit, including the double\n\u2022 Plus 2 other doubles\n\nExample: [6|6] [6|4] [6|2] + [3|3] [5|5]\n= 3 sixes with double + 2 side doubles = bid 30!' },
       { type: 'text', text: 'Your hand: [6|6] [6|4] [6|2] [5|5] [5|0] [4|1] [3|3]\n\n3 sixes with double [6|6] + doubles [5|5] and [3|3].\n\nSolid 30-bid hand! Let\'s bid.', nextLabel: 'Start Bidding \u25B6' },
       { type: 'bid', text: 'Use the slider to set 30, then tap "Bid".\n\nThe other players will pass.', aiPass: true },
       { type: 'trump', text: 'You won the bid! Pick trump.\n\nYou have 3 sixes with [6|6]. Slide to 6, then tap "Confirm Trump".' }
@@ -481,7 +481,7 @@ const TUTORIAL_LESSONS = [
   {
     title: 'Scoring',
     steps: [
-      { type: 'text_dim', text: 'SCORING\n\nAfter 7 tricks:\n\u2022 Count your team\'s points (tricks + count tiles won)\n\u2022 Bidding team got >= bid? Earn 1 MARK\n\u2022 Bidding team fell short ("set")? Opponents get 1 MARK\n\nFirst team to 7 marks wins the game!' },
+      { type: 'text_dim', text: 'SCORING\n\nAfter 7 tricks:\n\u2022 Count your team\'s points (tricks + count dominoes won)\n\u2022 Bidding team got >= bid? Earn 1 MARK\n\u2022 Bidding team fell short ("set")? Opponents get 1 MARK\n\nFirst team to 7 marks wins the game!' },
       { type: 'text_dim', text: 'EXAMPLE:\n\nYou bid 30 with sixes trump.\nYour team won 5 tricks (5) + [5|5] (10) + [6|4] (10) + [4|1] (5)\n\nTotal: 5+10+10+5 = 30. Made it!\nYour team earns 1 mark.\n\nIf you only got 28 \u2192 opponents get the mark (set!)' },
       { type: 'text_dim', text: 'KEY FACTS:\n\n\u2022 Each trick = 1 point\n\u2022 [5|0] [4|1] [3|2] = 5 pts each\n\u2022 [5|5] [6|4] = 10 pts each\n\u2022 42 total points available\n\u2022 1 mark per hand won\n\u2022 7 marks to win the game\n\nBoth teammates\' tricks count together!' }
     ]
@@ -490,7 +490,7 @@ const TUTORIAL_LESSONS = [
   {
     title: 'Following Suit',
     steps: [
-      { type: 'text_dim', text: 'FOLLOWING SUIT\n\nWhen someone leads a tile, its suit is the higher pip.\n\nIf P2 leads [5|3] \u2192 fives suit.\nYou MUST play a five if you have one.\n\nNo fives? Play anything \u2014 trump to steal the trick!' },
+      { type: 'text_dim', text: 'FOLLOWING SUIT\n\nWhen someone leads a domino, its suit is the higher number.\n\nIf P2 leads [5|3] \u2192 fives suit.\nYou MUST play a five if you have one.\n\nNo fives? Play anything \u2014 trump to steal the trick!' },
       { type: 'text_dim', text: 'TRUMPING A TRICK\n\nWhen you can\'t follow suit, playing trump wins.\n\nBut if multiple players trump, highest trump wins.\n\nExample: P2 leads [5|3]. You have no fives but [6|2] is trump.\nPlay [6|2] \u2192 you\'ve trumped it!' },
       { type: 'text_dim', text: 'WHEN TRUMP IS LED\n\nIf someone leads a trump, everyone must play trump if they have one.\n\nNo trump left? Play anything, but you can\'t win.\n\nThis is why leading trumps early is powerful \u2014 it drains opponents\' trumps!' }
     ]
@@ -500,14 +500,14 @@ const TUTORIAL_LESSONS = [
     title: 'Practice Hand',
     steps: [
       { type: 'text_dim', text: 'PRACTICE TIME!\n\nFull hand: deal \u2192 bid \u2192 trump \u2192 play 7 tricks \u2192 score.\n\nReady?', nextLabel: 'Deal Me In! \u25B6' },
-      { type: 'deal', text: 'Study your hand. Look for trump candidates, doubles, and count tiles.\n\nBid when ready!',
+      { type: 'deal', text: 'Study your hand. Look for trump candidates, doubles, and count dominoes.\n\nBid when ready!',
         hands: [
           [[5,5],[5,3],[5,1],[4,4],[6,4],[3,2],[5,0]],
           [[6,6],[6,3],[2,2],[4,0],[1,0],[3,1],[6,1]],
           [[4,3],[2,1],[6,5],[0,0],[4,2],[3,0],[6,2]],
           [[1,1],[3,3],[2,0],[6,0],[4,1],[5,2],[5,4]]
         ], dealer: 3, nextLabel: 'Start Bidding \u25B6' },
-      { type: 'bid', text: '4 fives with [5|5]! Plus [4|4] and count tiles.\n\nBid 30 with fives as trump.', aiPass: true },
+      { type: 'bid', text: '4 fives with [5|5]! Plus [4|4] and count dominoes.\n\nBid 30 with fives as trump.', aiPass: true },
       { type: 'trump', text: 'Pick fives as trump \u2014 you have four including the double!' },
       { type: 'play', text: 'Play all 7 tricks! Lead strong trumps first.\n\n[5|5] is unbeatable. [6|4] is 10-count trump. [5|0] and [3|2] are 5-count.',
         resultText: 'Great practice! You\'re getting the hang of it.' }
@@ -518,15 +518,15 @@ const TUTORIAL_LESSONS = [
     title: 'Nello',
     steps: [
       { type: 'text_dim', text: 'SPECIAL BID: NEL-O (Nello)\n\n"I will win ZERO tricks!"\n\nAvailable when you bid the maximum (42).\n\nSucceed (0 tricks) \u2192 your team earns 1 mark\nWin even 1 trick \u2192 opponents get the mark' },
-      { type: 'text_dim', text: 'NELLO RULES:\n\n\u2022 Your partner sits out\n\u2022 You vs. both opponents (3 players)\n\u2022 No trump suit\n\u2022 You lead first\n\u2022 Avoid winning ANY trick\n\nNello hands need lots of LOW tiles.' },
-      { type: 'text_dim', text: 'GOOD NELLO HANDS:\n\n\u2022 Many blanks (low pips)\n\u2022 No doubles (doubles are highest in suit)\n\u2022 Low off-tiles\n\nExample: [0|0] [1|0] [2|0] [3|0] [4|0] [2|1] [3|1]\nAll very low \u2014 hard to win any trick!' }
+      { type: 'text_dim', text: 'NELLO RULES:\n\n\u2022 Your partner sits out\n\u2022 You vs. both opponents (3 players)\n\u2022 No trump suit\n\u2022 You lead first\n\u2022 Avoid winning ANY trick\n\nNello hands need lots of LOW dominoes.' },
+      { type: 'text_dim', text: 'GOOD NELLO HANDS:\n\n\u2022 Many blanks (low numbers)\n\u2022 No doubles (doubles are highest in suit)\n\u2022 Low offs\n\nExample: [0|0] [1|0] [2|0] [3|0] [4|0] [2|1] [3|1]\nAll very low \u2014 hard to win any trick!' }
     ]
   },
   // LESSON 11: DOUBLES AS TRUMP
   {
     title: 'Doubles as Trump',
     steps: [
-      { type: 'text_dim', text: 'SPECIAL TRUMP: DOUBLES\n\nInstead of a pip suit, declare ALL doubles as trump!\n\n[6|6] = highest trump\n[5|5] [4|4] [3|3] [2|2] [1|1] [0|0]\n\n7 trump tiles \u2014 one in every suit.' },
+      { type: 'text_dim', text: 'SPECIAL TRUMP: DOUBLES\n\nInstead of a regular suit, declare ALL doubles as trump!\n\n[6|6] = highest trump\n[5|5] [4|4] [3|3] [2|2] [1|1] [0|0]\n\n7 trump dominoes \u2014 one in every suit.' },
       { type: 'text_dim', text: 'WHEN TO BID DOUBLES:\n\nNeed 4+ doubles, ideally 5+.\n\nExample: [6|6] [4|4] [3|3] [2|2] [1|1] [5|0] [6|3]\n5 doubles! Bid 30 with Doubles trump.\n\n[6|6] pulls doubles from opponents. Very powerful.' },
       { type: 'text_dim', text: 'DOUBLES FOLLOW ME:\n\nWhen doubles are trump and you lead a double, opponents must play a double if they have one.\n\nThis house rule (ON by default) makes doubles-as-trump very strong!' }
     ]
@@ -535,8 +535,8 @@ const TUTORIAL_LESSONS = [
   {
     title: 'Final Challenge',
     steps: [
-      { type: 'text_dim', text: 'YOU\'VE LEARNED THE BASICS!\n\nReview:\n\u2022 28 tiles, 7 each, 4 players, 2 teams\n\u2022 Bid 30-42 on points your team can win\n\u2022 Pick trump (your strongest suit)\n\u2022 Follow suit, use trumps strategically\n\u2022 35 count + 7 tricks = 42 points\n\u2022 First to 7 marks wins!' },
-      { type: 'text_dim', text: 'QUICK REFERENCE:\n\n5-count: [5|0] [4|1] [3|2]\n10-count: [5|5] [6|4]\n\nBid 30: 3 trumps + double + 2 side doubles\nLead strong trumps early!\nProtect your count tiles!', nextLabel: 'Play Final Hand \u25B6' },
+      { type: 'text_dim', text: 'YOU\'VE LEARNED THE BASICS!\n\nReview:\n\u2022 28 dominoes, 7 each, 4 players, 2 teams\n\u2022 Bid 30-42 on points your team can win\n\u2022 Pick trump (your strongest suit)\n\u2022 Follow suit, use trumps strategically\n\u2022 35 count + 7 tricks = 42 points\n\u2022 First to 7 marks wins!' },
+      { type: 'text_dim', text: 'QUICK REFERENCE:\n\n5-count: [5|0] [4|1] [3|2]\n10-count: [5|5] [6|4]\n\nBid 30: 3 trumps + double + 2 side doubles\nLead strong trumps early!\nProtect your count dominoes!', nextLabel: 'Play Final Hand \u25B6' },
       { type: 'deal', text: 'Final challenge! Study, bid smart, play to win.\n\nGood luck!',
         hands: [
           [[4,4],[4,3],[4,1],[4,0],[6,6],[3,2],[5,0]],
