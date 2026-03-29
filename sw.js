@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.95.0 — Update tutorial terminology (suits, count dominoes, aces/deuces/treys)
+// Version: v17.96.0 — Add tutorial narration audio (Lesson 1)
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.95.0';
+const CACHE_NAME = 'tx-dom-v17.96.0';
 const urlsToCache = [
   './index.html',
   // CSS
@@ -35,6 +35,11 @@ const urlsToCache = [
   './assets/audio/bgm3.mp3',
   './assets/audio/win-song.mp3',
   './assets/audio/lose-song.mp3',
+  // Tutorial narration
+  './assets/audio/tutorial/L1_S1_welcome.mp3',
+  './assets/audio/tutorial/L1_S2_domino_set.mp3',
+  './assets/audio/tutorial/L1_S3_four_players.mp3',
+  './assets/audio/tutorial/L1_S4_deal.mp3',
 ];
 
 self.addEventListener('install', e => {

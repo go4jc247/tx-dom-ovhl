@@ -19,6 +19,8 @@ let TUT_ON_HAND_END = null;
 let TUT_ON_TRICK_END = null;
 let TUT_ON_BID_DONE = null;
 let TUT_ON_TRUMP_DONE = null;
+let TUT_AUDIO = null; // current narration Audio object
+let TUT_AUDIO_MUTED = false;
 
 // ── DOM references ──────────────────────────────────────────────────────────
 const tutOverlay = document.getElementById('tutorialOverlay');
@@ -71,6 +73,17 @@ function tutSkipTyping() {
   return true;
 }
 
+// ── Audio narration ─────────────────────────────────────────────────────────
+function tutStopAudio() {
+  if (TUT_AUDIO) { TUT_AUDIO.pause(); TUT_AUDIO.currentTime = 0; TUT_AUDIO = null; }
+}
+function tutPlayAudio(file) {
+  tutStopAudio();
+  if (TUT_AUDIO_MUTED || !file) return;
+  TUT_AUDIO = new Audio('./assets/audio/tutorial/' + file);
+  TUT_AUDIO.play().catch(() => {}); // ignore autoplay blocks
+}
+
 // ── Show/Hide overlay ───────────────────────────────────────────────────────
 function tutShow() { tutOverlay.style.display = 'flex'; }
 function tutHide() { tutOverlay.style.display = 'none'; }
@@ -113,6 +126,10 @@ function tutRunStep() {
   tutUpdateCounter();
   tutShow();
   tutPrev.style.display = (TUT_LESSON > 0 || TUT_STEP > 0) ? '' : 'none';
+
+  // Play narration audio if available
+  if (step.audio) tutPlayAudio(step.audio);
+  else tutStopAudio();
 
   switch (step.type) {
     case 'text':
@@ -334,6 +351,7 @@ function tutEnd() {
   TUT_ON_BID_DONE = null;
   TUT_ON_TRUMP_DONE = null;
   if (TUT_TYPE_TIMER) { clearInterval(TUT_TYPE_TIMER); TUT_TYPE_TIMER = null; }
+  tutStopAudio();
 
   tutHide();
   document.body.classList.remove('tutDimGame', 'tutShowGame');
@@ -423,10 +441,10 @@ const TUTORIAL_LESSONS = [
   {
     title: 'The Dominoes',
     steps: [
-      { type: 'text_dim', text: 'Welcome to Texas 42 Training!\n\nThis tutorial will teach you how to play one of the best card-style domino games ever invented.\n\nLet\'s start with the basics.' },
-      { type: 'text_dim', text: 'Texas 42 uses a standard Double-Six domino set \u2014 28 dominoes total.\n\nEach domino has two ends, with a number from 0 to 6 on each side.\n\nExamples: [6|6], [5|3], [2|0]' },
-      { type: 'text_dim', text: 'Four players sit around the table. All 28 dominoes are dealt out \u2014 7 each.\n\nYou (Player 1) sit at the bottom. Your partner (Player 4) sits across from you at the top.\n\nPlayers 2 and 3 are your opponents.' },
-      { type: 'deal', text: 'Here are your 7 dominoes at the bottom of the screen.\n\nYour opponents\' and partner\'s dominoes are face-down.\n\nTap any of your dominoes to see how they sort!',
+      { type: 'text_dim', audio: 'L1_S1_welcome.mp3', text: 'Welcome to Texas 42 Training!\n\nThis tutorial will teach you how to play one of the best card-style domino games ever invented.\n\nLet\'s start with the basics.' },
+      { type: 'text_dim', audio: 'L1_S2_domino_set.mp3', text: 'Texas 42 uses a standard Double-Six domino set \u2014 28 dominoes total.\n\nEach domino has two ends, with a number from 0 to 6 on each side.\n\nExamples: [6|6], [5|3], [2|0]' },
+      { type: 'text_dim', audio: 'L1_S3_four_players.mp3', text: 'Four players sit around the table. All 28 dominoes are dealt out \u2014 7 each.\n\nYou (Player 1) sit at the bottom. Your partner (Player 4) sits across from you at the top.\n\nPlayers 2 and 3 are your opponents.' },
+      { type: 'deal', audio: 'L1_S4_deal.mp3', text: 'Here are your 7 dominoes at the bottom of the screen.\n\nYour opponents\' and partner\'s dominoes are face-down.\n\nTap any of your dominoes to see how they sort!',
         hands: [
           [[6,4],[5,5],[3,3],[6,2],[4,1],[5,0],[6,6]],
           [[5,4],[3,2],[6,1],[4,0],[2,2],[5,1],[6,3]],
