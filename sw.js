@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.93.0 — Tutorial/Training mode (11 lessons, terminal UI)
+// Version: v17.94.0 — Fix tutorial early hand termination (play all 7 tricks)
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.93.0';
+const CACHE_NAME = 'tx-dom-v17.94.0';
 const urlsToCache = [
   './index.html',
   // CSS

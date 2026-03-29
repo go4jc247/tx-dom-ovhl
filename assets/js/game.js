@@ -1329,7 +1329,9 @@ class SessionV6_4g{
       const isNelloCaught=this._nello_caught_point();
 
       // End early if: set, bid already made, Nel-O bidder caught point, or all tricks played
-      if(!isSet && !isBidMade && !isNelloCaught && !handComplete) return false;
+      // Tutorial: always play all 7 tricks (no early termination)
+      if(window.TUT_ACTIVE){ if(!handComplete) return false; }
+      else if(!isSet && !isBidMade && !isNelloCaught && !handComplete) return false;
 
       const marksAtStake=this.bid_marks;
       const bidderSeat = this.bid_winner_seat !== undefined ? this.bid_winner_seat : 0;
@@ -8091,7 +8093,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.93.0';  // v17.93.0: Tutorial/Training mode (11 lessons, terminal UI)
+const MP_VERSION = 'v17.94.0';  // v17.94.0: Fix tutorial early hand termination (play all 7 tricks)
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
@@ -19023,7 +19025,7 @@ async function handlePlayer1Click(spriteSlotIndexOrElement){
     }
 
     // Check for lay down opportunity (shows button, but doesn't block play)
-    checkLayDown();
+    if(!window.TUT_ACTIVE) checkLayDown();
   }
 
   // AI/Human players take their turns
@@ -20806,7 +20808,7 @@ function resumeAfterNelloDoublesChoice(){
 function confirmTrumpSelection(){
   const trump = selectedTrump;
   if(trump === null || trump === undefined){
-    alert("Please select a trump first!");
+    if(!window.TUT_ACTIVE) alert("Please select a trump first!");
     return;
   }
 
@@ -21012,7 +21014,7 @@ function confirmTrumpSelection(){
   } else if(currentPlayer === 0){
     console.log("Setting up for player 0 to play");
     // Check for lay down on first trick (human bidder selected trump and leads)
-    checkLayDown();
+    if(!window.TUT_ACTIVE) checkLayDown();
     waitingForPlayer1 = true;
     enablePlayer1Clicks();
     updatePlayer1ValidStates();
@@ -21034,7 +21036,7 @@ async function aiPlayTurn(){
 
   try {
   // Check for lay down at start of AI turn (e.g., AI bidder's first lead)
-  if(session.game.current_trick.length === 0) {
+  if(session.game.current_trick.length === 0 && !window.TUT_ACTIVE) {
     checkLayDown();
     // Only block if AI laid down (human gets button + can still play)
     if(layDownState && session.game.current_player !== 0) { isAnimating = false; return; }
@@ -21154,7 +21156,7 @@ async function aiPlayTurn(){
       }
 
       // Check for lay down opportunity (shows button for human, AI auto-lays down)
-      checkLayDown();
+      if(!window.TUT_ACTIVE) checkLayDown();
       if(layDownState && session.game.current_player !== 0) return; // AI laid down
     }
 
@@ -21166,7 +21168,7 @@ async function aiPlayTurn(){
 
   if(session.phase === PHASE_PLAYING && session.game.current_player === 0){
     // Check for lay down for human player
-    checkLayDown();
+    if(!window.TUT_ACTIVE) checkLayDown();
 
     waitingForPlayer1 = true;
     enablePlayer1Clicks();

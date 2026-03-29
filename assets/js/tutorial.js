@@ -379,9 +379,16 @@ finalizeBidding = _wrappedFinalize;
 // ── Hook: confirmTrumpSelection → tutorial callback ─────────────────────────
 const _origConfirmTrumpRef = confirmTrumpSelection;
 const _wrappedConfirmTrump = function() {
+  const phaseBefore = session ? session.phase : null;
+  if (TUT_ACTIVE) console.log('[Tutorial] confirmTrumpSelection called, selectedTrump:', selectedTrump, 'phase:', phaseBefore);
   const result = _origConfirmTrumpRef.apply(this, arguments);
-  if (TUT_ACTIVE && TUT_ON_TRUMP_DONE) {
+  const phaseAfter = session ? session.phase : null;
+  // Only fire callback if trump was actually set (phase changed from NEED_TRUMP)
+  if (TUT_ACTIVE && TUT_ON_TRUMP_DONE && session && phaseAfter !== phaseBefore) {
+    console.log('[Tutorial] Trump confirmed! Phase changed:', phaseBefore, '->', phaseAfter);
     setTimeout(() => { if (TUT_ON_TRUMP_DONE) TUT_ON_TRUMP_DONE(); }, 500);
+  } else if (TUT_ACTIVE && TUT_ON_TRUMP_DONE) {
+    console.log('[Tutorial] confirmTrumpSelection called but phase unchanged:', phaseBefore, '- NOT firing callback');
   }
   return result;
 };
