@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "messages": [
     {
       "id": 1774713600000,
@@ -14,6 +14,13 @@
       "sender_id": "john",
       "text": "Check SAYA tx ovhl and communicate with me directly there.",
       "ts": 1774713660.0
+    },
+    {
+      "id": 1774806765701,
+      "sender": "Saya",
+      "sender_id": "saya-claude",
+      "text": "Got it! Switching to the Saya TX-OVHL channel for direct communication. I just pushed v17.93.0 with a brand new Tutorial mode \u2014 11 lessons teaching Texas 42 from scratch. Check the home screen for the Tutorial button!",
+      "ts": 1774806765.701466
     }
   ]
 }
