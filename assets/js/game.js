@@ -8093,7 +8093,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.96.0';  // v17.96.0: Add tutorial narration audio (Lesson 1)
+const MP_VERSION = 'v17.97.0';  // v17.97.0: Unified free-click domino exploration (deal through trump)
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
@@ -14309,13 +14309,10 @@ function showBidOverlay(show) {
     // Clear bid hint
     const hintEl = document.getElementById('bidHintDisplay');
     if(hintEl) hintEl.textContent = '';
-    // Save the previewed trump before disabling (for trump selection phase)
+    // Save the previewed trump (for trump selection pre-select)
     biddingPreviewedTrump = previewedTrump;
-    // Disable bidding preview but DON'T restore hand order if we're going to trump selection
-    // (the hand will stay sorted by the previewed trump)
-    disableBiddingPreview();
-    // Only restore original hand order if NOT going to trump selection
-    // (trump selection will keep the sorted order)
+    // Keep bidding preview active — unified free-click mode persists through trump selection
+    // Only restore hand order if not going to trump selection
     if(session.phase !== PHASE_NEED_TRUMP && session.phase !== PHASE_NEED_BID) {
       restoreOriginalHandOrder();
     }
@@ -14547,7 +14544,8 @@ function disableBiddingPreview(force){
   }
 }
 
-// Handle domino click during bidding for trump preview
+// Handle domino click for free exploration — works in ALL pre-play phases
+// (pre-deal, bidding, trump selection, widow swap)
 function handleBiddingDominoClick(tile){
   if(!biddingPreviewActive || session.phase === PHASE_PLAYING) return;
 
@@ -14556,7 +14554,7 @@ function handleBiddingDominoClick(tile){
   const highPip = Math.max(tile[0], tile[1]);
   const lowPip = Math.min(tile[0], tile[1]);
 
-  // Same click cycling logic as trump selection
+  // Click cycling logic: high pip → doubles/low pip → clear → repeat
   if(trumpClickState.lastClickedTile === tileKey){
     trumpClickState.clickCount++;
   } else {
@@ -14590,6 +14588,14 @@ function handleBiddingDominoClick(tile){
 
   // Preview sort the hand (highlights are applied at the END of this function)
   previewSortHandByTrump(newTrump);
+
+  // If we're in trump selection phase, also update the trump UI
+  if(session.phase === PHASE_NEED_TRUMP){
+    selectedTrump = newTrump;
+    document.getElementById('btnTrumpConfirm').disabled = false;
+    updateTrumpGridSelection(newTrump);
+    highlightTrumpDominoes(newTrump);
+  }
 }
 
 // Preview sort the hand by a potential trump (temporary visual only)
@@ -14787,10 +14793,21 @@ function disableTrumpDominoClicks(){
 }
 
 function buildTrumpOptions() {
-  selectedTrump = null;
   trumpClickState = { lastClickedTile: null, clickCount: 0 };
-  biddingPreviewActive = false;  // V10_105: Fix #8 — prevent bidding preview from intercepting trump clicks
-  document.getElementById('btnTrumpConfirm').disabled = true;
+  // Keep biddingPreviewActive ON — unified free-click mode handles both bidding and trump selection
+  // Pre-select from whatever was previewed during bidding
+  if(biddingPreviewedTrump !== null && biddingPreviewedTrump !== undefined){
+    selectedTrump = biddingPreviewedTrump;
+    document.getElementById('btnTrumpConfirm').disabled = false;
+    // Sync the trump UI to show the pre-selected value
+    setTimeout(() => {
+      updateTrumpGridSelection(biddingPreviewedTrump);
+      highlightTrumpDominoes(biddingPreviewedTrump);
+    }, 50);
+  } else {
+    selectedTrump = null;
+    document.getElementById('btnTrumpConfirm').disabled = true;
+  }
 
   // Check if Nello is available at trump selection
   // V10_111: Use _nelloAllowedAtTrump (computed at end of bidding) to gate by restriction rules
@@ -18759,25 +18776,8 @@ async function handlePlayer1Click(spriteSlotIndexOrElement){
     return;
   }
 
-  // If in trump selection mode, route to trump selection instead
-  // Also do preview shuffle so hand re-sorts when clicking during trump selection
-  if(trumpSelectionActive && session.phase === PHASE_NEED_TRUMP){
-    const trumpSeat = getLocalSeat();
-    const spriteData = sprites[trumpSeat][spriteSlotIndex];
-    if(spriteData && spriteData.tile){
-      handleTrumpDominoClick(spriteData.tile);
-      // Preview sort using the currently selected trump (don't call handleBiddingDominoClick
-      // which shares trumpClickState and would double-count the click)
-      if(selectedTrump !== undefined && typeof previewSortHandByTrump === 'function'){
-        previewSortHandByTrump(selectedTrump);
-        SFX.playShuffle();
-      }
-    }
-    return;
-  }
-
-  // If in bidding preview mode, route to bidding preview handler
-  // Works during ALL pre-play phases: bidding, waiting, trump selection, widow swap
+  // Unified free-click mode: route to bidding preview handler during ALL pre-play phases
+  // (bidding, trump selection, widow swap, post-deal)
   if(biddingPreviewActive && session.phase !== PHASE_PLAYING){
     const bidSeat = getLocalSeat();
     const spriteData = sprites[bidSeat][spriteSlotIndex];

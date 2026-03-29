@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.96.0 — Add tutorial narration audio (Lesson 1)
+// Version: v17.97.0 — Unified free-click domino exploration (deal through trump)
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.96.0';
+const CACHE_NAME = 'tx-dom-v17.97.0';
 const urlsToCache = [
   './index.html',
   // CSS
