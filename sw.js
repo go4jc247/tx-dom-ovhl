@@ -1,16 +1,17 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.92.0 — DOUBLES lay-down fix, strategic context improvements
+// Version: v17.93.0 — Tutorial/Training mode (11 lessons, terminal UI)
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.92.0';
+const CACHE_NAME = 'tx-dom-v17.93.0';
 const urlsToCache = [
   './index.html',
   // CSS
   './assets/css/styles.css',
   // JS
   './assets/js/game.js',
+  './assets/js/tutorial.js',
   // Images
   './assets/images/icon-180.png',
   './assets/images/icon-512.png',

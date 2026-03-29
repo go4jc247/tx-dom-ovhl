@@ -8091,7 +8091,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v17.92.0';  // v17.92.0: DOUBLES lay-down fix, strategic context improvements
+const MP_VERSION = 'v17.93.0';  // v17.93.0: Tutorial/Training mode (11 lessons, terminal UI)
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
@@ -31316,5 +31316,4 @@ document.addEventListener('keydown', function(e) {
     checkVisibility();
   }
 })();
-
 

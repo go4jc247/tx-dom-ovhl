@@ -1766,3 +1766,164 @@
 #devTabsBar button:hover { background:rgba(0,0,0,0.8); }
 #exportAllBtn { color:#0f0 !important; border-color:rgba(0,255,0,0.3) !important; }
 #shuffleSettingsBtn { color:#ff0 !important; border-color:rgba(255,255,0,0.3) !important; }
+
+/* ===== TUTORIAL OVERLAY ===== */
+#tutorialOverlay {
+  position: fixed;
+  left: 0; top: 0; right: 0;
+  z-index: 1050;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: calc(6px + env(safe-area-inset-top));
+}
+#tutorialOverlay > * { pointer-events: auto; }
+
+#tutorialTerminal {
+  width: 92%;
+  max-width: 400px;
+  background: rgba(0, 12, 0, 0.92);
+  border: 1px solid rgba(0, 255, 65, 0.3);
+  border-radius: 10px;
+  box-shadow: 0 0 20px rgba(0, 255, 65, 0.15), inset 0 0 60px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  font-family: 'Courier New', 'Consolas', monospace;
+}
+
+#tutorialTermHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  background: rgba(0, 255, 65, 0.08);
+  border-bottom: 1px solid rgba(0, 255, 65, 0.2);
+}
+#tutorialTermTitle {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(0, 255, 65, 0.7);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+#tutorialLessonNum {
+  font-size: 11px;
+  color: rgba(0, 255, 65, 0.5);
+}
+
+#tutorialTermBody {
+  padding: 12px 14px;
+  min-height: 60px;
+  max-height: 200px;
+  overflow-y: auto;
+  line-height: 1.5;
+}
+#tutorialTermBody::-webkit-scrollbar { width: 4px; }
+#tutorialTermBody::-webkit-scrollbar-thumb { background: rgba(0,255,65,0.3); border-radius: 2px; }
+#tutorialTermBody::-webkit-scrollbar-track { background: transparent; }
+
+#tutorialText {
+  color: rgba(0, 255, 65, 0.9);
+  font-size: 13px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  text-shadow: 0 0 8px rgba(0, 255, 65, 0.4);
+}
+
+#tutorialCursor {
+  color: rgba(0, 255, 65, 0.9);
+  animation: tutCursorBlink 0.8s step-end infinite;
+  font-size: 13px;
+}
+@keyframes tutCursorBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* Scanline effect */
+#tutorialTerminal::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.08) 2px,
+    rgba(0, 0, 0, 0.08) 4px
+  );
+  pointer-events: none;
+  border-radius: 10px;
+}
+#tutorialTerminal { position: relative; }
+
+#tutorialControls {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  width: 92%;
+  max-width: 400px;
+  justify-content: center;
+}
+#tutorialControls button {
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 700;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #fff;
+  transition: opacity 0.2s;
+}
+#tutorialControls button:active { opacity: 0.7; }
+#tutorialNext {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  flex: 1;
+}
+#tutorialPrev {
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.3) !important;
+}
+#tutorialSkip {
+  background: rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.6);
+  font-size: 11px;
+  padding: 8px 12px;
+}
+
+#tutorialHighlight {
+  position: fixed;
+  border: 2px solid rgba(0, 255, 65, 0.7);
+  border-radius: 8px;
+  box-shadow: 0 0 15px rgba(0, 255, 65, 0.3);
+  z-index: 1049;
+  pointer-events: none;
+  transition: all 0.3s ease;
+}
+
+#tutorialDominoDisplay {
+  width: 92%;
+  max-width: 400px;
+  margin-top: 8px;
+  background: rgba(0, 40, 10, 0.85);
+  border: 1px solid rgba(0, 255, 65, 0.2);
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  justify-content: center;
+}
+
+/* Tutorial action prompt — pulsing hint */
+.tutActionHint {
+  color: #f59e0b;
+  font-weight: 700;
+  animation: tutActionPulse 1.5s ease-in-out infinite;
+}
+@keyframes tutActionPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Dim game elements during tutorial explanation steps */
+.tutDimGame #tableMain { opacity: 0.3; transition: opacity 0.3s; }
+.tutShowGame #tableMain { opacity: 1; transition: opacity 0.3s; }

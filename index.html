@@ -991,6 +991,7 @@
         <button class="glossBtn glossBlue startScreenBtn" id="btnStartResumeGame" style="display:none;width:100%;padding:14px 32px;font-size:18px;">Resume Game</button>
         <button class="glossBtn startScreenBtn" id="btnStartMultiplayer" style="background:linear-gradient(to bottom, #a78bfa, #7c3aed);width:100%;padding:14px 32px;font-size:18px;">Multiplayer</button>
         <button class="glossBtn startScreenBtn" id="btnResumeMP" style="display:none; background:linear-gradient(to bottom, #f59e0b, #d97706); color:#fff;width:100%;padding:14px 32px;font-size:18px;">Resume MP Game</button>
+        <button class="glossBtn startScreenBtn" id="btnStartTutorial" style="background:linear-gradient(to bottom, #f59e0b, #d97706);width:100%;padding:14px 32px;font-size:18px;">Tutorial</button>
       </div>
     </div>
   </div>
@@ -1102,7 +1103,33 @@
   </div>
 </div>
 
+<!-- Tutorial Overlay — terminal-style instructional display -->
+<div id="tutorialOverlay" style="display:none;">
+  <div id="tutorialTerminal">
+    <div id="tutorialTermHeader">
+      <span id="tutorialTermTitle">TEXAS 42 TRAINING</span>
+      <span id="tutorialLessonNum">1/12</span>
+    </div>
+    <div id="tutorialTermBody">
+      <div id="tutorialText"></div>
+      <span id="tutorialCursor">&#9608;</span>
+    </div>
+  </div>
+  <div id="tutorialControls">
+    <button id="tutorialPrev" style="display:none;">&#9664; Back</button>
+    <button id="tutorialNext">Continue &#9654;</button>
+    <button id="tutorialSkip">Skip Tutorial</button>
+  </div>
+  <!-- Highlight box for pointing at specific UI areas -->
+  <div id="tutorialHighlight" style="display:none;"></div>
+  <!-- Domino display area for showing example tiles -->
+  <div id="tutorialDominoDisplay" style="display:none;">
+    <canvas id="tutorialDominoCanvas" width="400" height="120"></canvas>
+  </div>
+</div>
+
 <script src="./assets/js/game.js" defer></script>
+<script src="./assets/js/tutorial.js" defer></script>
 
 <!-- TN51 Layout Settings Popup -->
 <div id="tn51SettingsBackdrop" class="modalBackdrop" style="display:none;z-index:2000;">
