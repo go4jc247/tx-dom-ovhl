@@ -223,6 +223,7 @@ function tutRunStep() {
         TUT_ON_TRICK_END = null;
         TUT_ON_HAND_END = null;
         if (step.resultText) {
+          if (step.resultAudio) tutPlayAudio(step.resultAudio);
           tutType(step.resultText, () => {
             tutNext.textContent = 'Continue \u25B6';
             tutNext.style.display = '';
@@ -457,41 +458,41 @@ const TUTORIAL_LESSONS = [
   {
     title: 'Suits & Doubles',
     steps: [
-      { type: 'text', text: 'SUITS\n\nDominoes are grouped into 7 suits: blanks (0s), aces (1s), deuces (2s), treys (3s), fours (4s), fives (5s), and sixes (6s).\n\nA domino belongs to a suit if it has that number on either end.' },
-      { type: 'text', text: 'The "sixes" suit contains:\n[6|6] [6|5] [6|4] [6|3] [6|2] [6|1] [6|0]\n\nThat\'s 7 dominoes in every suit.\n\nThe DOUBLE is the highest: [6|6] is king of sixes.' },
-      { type: 'text', text: 'DOUBLES are special:\n\n[6|6] = highest six\n[5|5] = highest five\n[4|4] = highest four\n...down to...\n[0|0] = highest blank\n\nThe lowest in the sixes suit is [6|0].\nThe lowest in the fives suit is [5|0].' },
-      { type: 'text', text: 'Each domino belongs to TWO suits. The [6|4] belongs to both sixes AND fours.\n\nWhen a suit is led in a trick, you must follow that specific suit. More on this during play!' }
+      { type: 'text', audio: 'L2_S1_suits.mp3', text: 'SUITS\n\nDominoes are grouped into 7 suits: blanks (0s), aces (1s), deuces (2s), treys (3s), fours (4s), fives (5s), and sixes (6s).\n\nA domino belongs to a suit if it has that number on either end.' },
+      { type: 'text', audio: 'L2_S2_sixes_suit.mp3', text: 'The "sixes" suit contains:\n[6|6] [6|5] [6|4] [6|3] [6|2] [6|1] [6|0]\n\nThat\'s 7 dominoes in every suit.\n\nThe DOUBLE is the highest: [6|6] is king of sixes.' },
+      { type: 'text', audio: 'L2_S3_doubles.mp3', text: 'DOUBLES are special:\n\n[6|6] = highest six\n[5|5] = highest five\n[4|4] = highest four\n...down to...\n[0|0] = highest blank\n\nThe lowest in the sixes suit is [6|0].\nThe lowest in the fives suit is [5|0].' },
+      { type: 'text', audio: 'L2_S4_two_suits.mp3', text: 'Each domino belongs to TWO suits. The [6|4] belongs to both sixes AND fours.\n\nWhen a suit is led in a trick, you must follow that specific suit. More on this during play!' }
     ]
   },
   // LESSON 3: COUNT DOMINOES
   {
     title: 'Count Dominoes',
     steps: [
-      { type: 'text', text: 'COUNT DOMINOES\n\nSome dominoes are worth extra points:\n\n5-COUNT (5 pts each):\n  [5|0]  [4|1]  [3|2]\n\n10-COUNT (10 pts each):\n  [5|5]  [6|4]' },
-      { type: 'text', text: 'Total count: 3 x 5 pts = 15\n             2 x 10 pts = 20\nCount total = 35 points\n\nPlus 7 tricks x 1 pt each = 7\n\n35 + 7 = 42 total points\n\nThat\'s where the name "42" comes from!' },
-      { type: 'text', text: 'In your hand, look for count:\n\n  [6|4] = 10 points\n  [5|5] = 10 points\n  [5|0] = 5 points\n  [4|1] = 5 points\n\nThat\'s 30 points of count! Very strong.' }
+      { type: 'text', audio: 'L3_S1_count_tiles.mp3', text: 'COUNT DOMINOES\n\nSome dominoes are worth extra points:\n\n5-COUNT (5 pts each):\n  [5|0]  [4|1]  [3|2]\n\n10-COUNT (10 pts each):\n  [5|5]  [6|4]' },
+      { type: 'text', audio: 'L3_S2_total_count.mp3', text: 'Total count: 3 x 5 pts = 15\n             2 x 10 pts = 20\nCount total = 35 points\n\nPlus 7 tricks x 1 pt each = 7\n\n35 + 7 = 42 total points\n\nThat\'s where the name "42" comes from!' },
+      { type: 'text', audio: 'L3_S3_your_count.mp3', text: 'In your hand, look for count:\n\n  [6|4] = 10 points\n  [5|5] = 10 points\n  [5|0] = 5 points\n  [4|1] = 5 points\n\nThat\'s 30 points of count! Very strong.' }
     ]
   },
   // LESSON 4: BIDDING & TRUMP
   {
     title: 'Bidding & Trump',
     steps: [
-      { type: 'text', text: 'THE BIDDING PHASE\n\nAfter dealing, players bid clockwise starting left of the shuffler.\n\nYou bid how many of 42 points your team can win.\n\nMinimum bid: 30\nMaximum bid: 42\n\nYou can pass if your hand is weak.' },
-      { type: 'text', text: 'The highest bidder wins the bid and chooses the trump suit.\n\nIf everyone passes, the dominoes are reshuffled.\n\nBidding 30 means your team needs 30 of 42 points to earn a mark.' },
-      { type: 'text', text: 'WHEN TO BID 30 (rule of thumb):\n\nYou need at least:\n\u2022 3 dominoes in your best suit, including the double\n\u2022 Plus 2 other doubles\n\nExample: [6|6] [6|4] [6|2] + [3|3] [5|5]\n= 3 sixes with double + 2 side doubles = bid 30!' },
-      { type: 'text', text: 'Your hand: [6|6] [6|4] [6|2] [5|5] [5|0] [4|1] [3|3]\n\n3 sixes with double [6|6] + doubles [5|5] and [3|3].\n\nSolid 30-bid hand! Let\'s bid.', nextLabel: 'Start Bidding \u25B6' },
-      { type: 'bid', text: 'Use the slider to set 30, then tap "Bid".\n\nThe other players will pass.', aiPass: true },
-      { type: 'trump', text: 'You won the bid! Pick trump.\n\nYou have 3 sixes with [6|6]. Slide to 6, then tap "Confirm Trump".' }
+      { type: 'text', audio: 'L4_S1_bidding.mp3', text: 'THE BIDDING PHASE\n\nAfter dealing, players bid clockwise starting left of the shuffler.\n\nYou bid how many of 42 points your team can win.\n\nMinimum bid: 30\nMaximum bid: 42\n\nYou can pass if your hand is weak.' },
+      { type: 'text', audio: 'L4_S2_highest_bid.mp3', text: 'The highest bidder wins the bid and chooses the trump suit.\n\nIf everyone passes, the dominoes are reshuffled.\n\nBidding 30 means your team needs 30 of 42 points to earn a mark.' },
+      { type: 'text', audio: 'L4_S3_when_to_bid.mp3', text: 'WHEN TO BID 30 (rule of thumb):\n\nYou need at least:\n\u2022 3 dominoes in your best suit, including the double\n\u2022 Plus 2 other doubles\n\nExample: [6|6] [6|4] [6|2] + [3|3] [5|5]\n= 3 sixes with double + 2 side doubles = bid 30!' },
+      { type: 'text', audio: 'L4_S4_your_hand.mp3', text: 'Your hand: [6|6] [6|4] [6|2] [5|5] [5|0] [4|1] [3|3]\n\n3 sixes with double [6|6] + doubles [5|5] and [3|3].\n\nSolid 30-bid hand! Let\'s bid.', nextLabel: 'Start Bidding \u25B6' },
+      { type: 'bid', audio: 'L4_S5_bid.mp3', text: 'Use the slider to set 30, then tap "Bid".\n\nThe other players will pass.', aiPass: true },
+      { type: 'trump', audio: 'L4_S6_trump.mp3', text: 'You won the bid! Pick trump.\n\nYou have 3 sixes with [6|6]. Slide to 6, then tap "Confirm Trump".' }
     ]
   },
   // LESSON 6: PLAYING TRICKS
   {
     title: 'Playing Tricks',
     steps: [
-      { type: 'text', text: 'HOW TRICKS WORK\n\nBid winner leads the first trick.\n\nEach player follows clockwise.\nYou MUST follow the led suit if you can.\n\nCan\'t follow? Play anything \u2014 including trump!' },
-      { type: 'text', text: 'WHO WINS THE TRICK:\n\n1. If trump was played \u2192 highest trump wins\n2. Otherwise \u2192 highest of the led suit wins\n\nWinner leads the next trick.\nAfter 7 tricks, count points.' },
-      { type: 'text', text: 'STRATEGY TIP:\n\nLead strong trumps first! [6|6] can\'t be beaten.\n\nThis pulls trumps from opponents AND wins the trick.\n\nLet\'s play!', nextLabel: 'Start Playing \u25B6' },
-      { type: 'play', text: 'You lead first. Click a domino to play it.\n\nTry leading with your strongest trump!',
+      { type: 'text', audio: 'L5_S1_tricks.mp3', text: 'HOW TRICKS WORK\n\nBid winner leads the first trick.\n\nEach player follows clockwise.\nYou MUST follow the led suit if you can.\n\nCan\'t follow? Play anything \u2014 including trump!' },
+      { type: 'text', audio: 'L5_S2_who_wins.mp3', text: 'WHO WINS THE TRICK:\n\n1. If trump was played \u2192 highest trump wins\n2. Otherwise \u2192 highest of the led suit wins\n\nWinner leads the next trick.\nAfter 7 tricks, count points.' },
+      { type: 'text', audio: 'L5_S3_strategy.mp3', text: 'STRATEGY TIP:\n\nLead strong trumps first! [6|6] can\'t be beaten.\n\nThis pulls trumps from opponents AND wins the trick.\n\nLet\'s play!', nextLabel: 'Start Playing \u25B6' },
+      { type: 'play', audio: 'L5_S4_play.mp3', text: 'You lead first. Click a domino to play it.\n\nTry leading with your strongest trump!',
         resultText: 'Hand complete! Check the score \u2014 did your team make the bid?' }
     ]
   },
@@ -499,35 +500,35 @@ const TUTORIAL_LESSONS = [
   {
     title: 'Scoring',
     steps: [
-      { type: 'text_dim', text: 'SCORING\n\nAfter 7 tricks:\n\u2022 Count your team\'s points (tricks + count dominoes won)\n\u2022 Bidding team got >= bid? Earn 1 MARK\n\u2022 Bidding team fell short ("set")? Opponents get 1 MARK\n\nFirst team to 7 marks wins the game!' },
-      { type: 'text_dim', text: 'EXAMPLE:\n\nYou bid 30 with sixes trump.\nYour team won 5 tricks (5) + [5|5] (10) + [6|4] (10) + [4|1] (5)\n\nTotal: 5+10+10+5 = 30. Made it!\nYour team earns 1 mark.\n\nIf you only got 28 \u2192 opponents get the mark (set!)' },
-      { type: 'text_dim', text: 'KEY FACTS:\n\n\u2022 Each trick = 1 point\n\u2022 [5|0] [4|1] [3|2] = 5 pts each\n\u2022 [5|5] [6|4] = 10 pts each\n\u2022 42 total points available\n\u2022 1 mark per hand won\n\u2022 7 marks to win the game\n\nBoth teammates\' tricks count together!' }
+      { type: 'text_dim', audio: 'L6_S1_scoring.mp3', text: 'SCORING\n\nAfter 7 tricks:\n\u2022 Count your team\'s points (tricks + count dominoes won)\n\u2022 Bidding team got >= bid? Earn 1 MARK\n\u2022 Bidding team fell short ("set")? Opponents get 1 MARK\n\nFirst team to 7 marks wins the game!' },
+      { type: 'text_dim', audio: 'L6_S2_example.mp3', text: 'EXAMPLE:\n\nYou bid 30 with sixes trump.\nYour team won 5 tricks (5) + [5|5] (10) + [6|4] (10) + [4|1] (5)\n\nTotal: 5+10+10+5 = 30. Made it!\nYour team earns 1 mark.\n\nIf you only got 28 \u2192 opponents get the mark (set!)' },
+      { type: 'text_dim', audio: 'L6_S3_key_facts.mp3', text: 'KEY FACTS:\n\n\u2022 Each trick = 1 point\n\u2022 [5|0] [4|1] [3|2] = 5 pts each\n\u2022 [5|5] [6|4] = 10 pts each\n\u2022 42 total points available\n\u2022 1 mark per hand won\n\u2022 7 marks to win the game\n\nBoth teammates\' tricks count together!' }
     ]
   },
   // LESSON 8: FOLLOWING SUIT
   {
     title: 'Following Suit',
     steps: [
-      { type: 'text_dim', text: 'FOLLOWING SUIT\n\nWhen someone leads a domino, its suit is the higher number.\n\nIf P2 leads [5|3] \u2192 fives suit.\nYou MUST play a five if you have one.\n\nNo fives? Play anything \u2014 trump to steal the trick!' },
-      { type: 'text_dim', text: 'TRUMPING A TRICK\n\nWhen you can\'t follow suit, playing trump wins.\n\nBut if multiple players trump, highest trump wins.\n\nExample: P2 leads [5|3]. You have no fives but [6|2] is trump.\nPlay [6|2] \u2192 you\'ve trumped it!' },
-      { type: 'text_dim', text: 'WHEN TRUMP IS LED\n\nIf someone leads a trump, everyone must play trump if they have one.\n\nNo trump left? Play anything, but you can\'t win.\n\nThis is why leading trumps early is powerful \u2014 it drains opponents\' trumps!' }
+      { type: 'text_dim', audio: 'L7_S1_following.mp3', text: 'FOLLOWING SUIT\n\nWhen someone leads a domino, its suit is the higher number.\n\nIf P2 leads [5|3] \u2192 fives suit.\nYou MUST play a five if you have one.\n\nNo fives? Play anything \u2014 trump to steal the trick!' },
+      { type: 'text_dim', audio: 'L7_S2_trumping.mp3', text: 'TRUMPING A TRICK\n\nWhen you can\'t follow suit, playing trump wins.\n\nBut if multiple players trump, highest trump wins.\n\nExample: P2 leads [5|3]. You have no fives but [6|2] is trump.\nPlay [6|2] \u2192 you\'ve trumped it!' },
+      { type: 'text_dim', audio: 'L7_S3_trump_led.mp3', text: 'WHEN TRUMP IS LED\n\nIf someone leads a trump, everyone must play trump if they have one.\n\nNo trump left? Play anything, but you can\'t win.\n\nThis is why leading trumps early is powerful \u2014 it drains opponents\' trumps!' }
     ]
   },
   // LESSON 9: PRACTICE HAND
   {
     title: 'Practice Hand',
     steps: [
-      { type: 'text_dim', text: 'PRACTICE TIME!\n\nFull hand: deal \u2192 bid \u2192 trump \u2192 play 7 tricks \u2192 score.\n\nReady?', nextLabel: 'Deal Me In! \u25B6' },
-      { type: 'deal', text: 'Study your hand. Look for trump candidates, doubles, and count dominoes.\n\nBid when ready!',
+      { type: 'text_dim', audio: 'L8_S1_practice.mp3', text: 'PRACTICE TIME!\n\nFull hand: deal \u2192 bid \u2192 trump \u2192 play 7 tricks \u2192 score.\n\nReady?', nextLabel: 'Deal Me In! \u25B6' },
+      { type: 'deal', audio: 'L8_S2_deal.mp3', text: 'Study your hand. Look for trump candidates, doubles, and count dominoes.\n\nBid when ready!',
         hands: [
           [[5,5],[5,3],[5,1],[4,4],[6,4],[3,2],[5,0]],
           [[6,6],[6,3],[2,2],[4,0],[1,0],[3,1],[6,1]],
           [[4,3],[2,1],[6,5],[0,0],[4,2],[3,0],[6,2]],
           [[1,1],[3,3],[2,0],[6,0],[4,1],[5,2],[5,4]]
         ], dealer: 3, nextLabel: 'Start Bidding \u25B6' },
-      { type: 'bid', text: '4 fives with [5|5]! Plus [4|4] and count dominoes.\n\nBid 30 with fives as trump.', aiPass: true },
-      { type: 'trump', text: 'Pick fives as trump \u2014 you have four including the double!' },
-      { type: 'play', text: 'Play all 7 tricks! Lead strong trumps first.\n\n[5|5] is unbeatable. [6|4] is 10-count trump. [5|0] and [3|2] are 5-count.',
+      { type: 'bid', audio: 'L8_S3_bid.mp3', text: '4 fives with [5|5]! Plus [4|4] and count dominoes.\n\nBid 30 with fives as trump.', aiPass: true },
+      { type: 'trump', audio: 'L8_S4_trump.mp3', text: 'Pick fives as trump \u2014 you have four including the double!' },
+      { type: 'play', audio: 'L8_S5_play.mp3', text: 'Play all 7 tricks! Lead strong trumps first.\n\n[5|5] is unbeatable. [6|4] is 10-count trump. [5|0] and [3|2] are 5-count.',
         resultText: 'Great practice! You\'re getting the hang of it.' }
     ]
   },
@@ -535,37 +536,38 @@ const TUTORIAL_LESSONS = [
   {
     title: 'Nello',
     steps: [
-      { type: 'text_dim', text: 'SPECIAL BID: NEL-O (Nello)\n\n"I will win ZERO tricks!"\n\nAvailable when you bid the maximum (42).\n\nSucceed (0 tricks) \u2192 your team earns 1 mark\nWin even 1 trick \u2192 opponents get the mark' },
-      { type: 'text_dim', text: 'NELLO RULES:\n\n\u2022 Your partner sits out\n\u2022 You vs. both opponents (3 players)\n\u2022 No trump suit\n\u2022 You lead first\n\u2022 Avoid winning ANY trick\n\nNello hands need lots of LOW dominoes.' },
-      { type: 'text_dim', text: 'GOOD NELLO HANDS:\n\n\u2022 Many blanks (low numbers)\n\u2022 No doubles (doubles are highest in suit)\n\u2022 Low offs\n\nExample: [0|0] [1|0] [2|0] [3|0] [4|0] [2|1] [3|1]\nAll very low \u2014 hard to win any trick!' }
+      { type: 'text_dim', audio: 'L9_S1_nello.mp3', text: 'SPECIAL BID: NEL-O (Nello)\n\n"I will win ZERO tricks!"\n\nAvailable when you bid the maximum (42).\n\nSucceed (0 tricks) \u2192 your team earns 1 mark\nWin even 1 trick \u2192 opponents get the mark' },
+      { type: 'text_dim', audio: 'L9_S2_nello_rules.mp3', text: 'NELLO RULES:\n\n\u2022 Your partner sits out\n\u2022 You vs. both opponents (3 players)\n\u2022 No trump suit\n\u2022 You lead first\n\u2022 Avoid winning ANY trick\n\nNello hands need lots of LOW dominoes.' },
+      { type: 'text_dim', audio: 'L9_S3_good_nello.mp3', text: 'GOOD NELLO HANDS:\n\n\u2022 Many blanks (low numbers)\n\u2022 No doubles (doubles are highest in suit)\n\u2022 Low offs\n\nExample: [0|0] [1|0] [2|0] [3|0] [4|0] [2|1] [3|1]\nAll very low \u2014 hard to win any trick!' }
     ]
   },
   // LESSON 11: DOUBLES AS TRUMP
   {
     title: 'Doubles as Trump',
     steps: [
-      { type: 'text_dim', text: 'SPECIAL TRUMP: DOUBLES\n\nInstead of a regular suit, declare ALL doubles as trump!\n\n[6|6] = highest trump\n[5|5] [4|4] [3|3] [2|2] [1|1] [0|0]\n\n7 trump dominoes \u2014 one in every suit.' },
-      { type: 'text_dim', text: 'WHEN TO BID DOUBLES:\n\nNeed 4+ doubles, ideally 5+.\n\nExample: [6|6] [4|4] [3|3] [2|2] [1|1] [5|0] [6|3]\n5 doubles! Bid 30 with Doubles trump.\n\n[6|6] pulls doubles from opponents. Very powerful.' },
-      { type: 'text_dim', text: 'DOUBLES FOLLOW ME:\n\nWhen doubles are trump and you lead a double, opponents must play a double if they have one.\n\nThis house rule (ON by default) makes doubles-as-trump very strong!' }
+      { type: 'text_dim', audio: 'L10_S1_doubles_trump.mp3', text: 'SPECIAL TRUMP: DOUBLES\n\nInstead of a regular suit, declare ALL doubles as trump!\n\n[6|6] = highest trump\n[5|5] [4|4] [3|3] [2|2] [1|1] [0|0]\n\n7 trump dominoes \u2014 one in every suit.' },
+      { type: 'text_dim', audio: 'L10_S2_when_doubles.mp3', text: 'WHEN TO BID DOUBLES:\n\nNeed 4+ doubles, ideally 5+.\n\nExample: [6|6] [4|4] [3|3] [2|2] [1|1] [5|0] [6|3]\n5 doubles! Bid 30 with Doubles trump.\n\n[6|6] pulls doubles from opponents. Very powerful.' },
+      { type: 'text_dim', audio: 'L10_S3_follow_me.mp3', text: 'DOUBLES FOLLOW ME:\n\nWhen doubles are trump and you lead a double, opponents must play a double if they have one.\n\nThis house rule (ON by default) makes doubles-as-trump very strong!' }
     ]
   },
   // LESSON 12: FINAL CHALLENGE
   {
     title: 'Final Challenge',
     steps: [
-      { type: 'text_dim', text: 'YOU\'VE LEARNED THE BASICS!\n\nReview:\n\u2022 28 dominoes, 7 each, 4 players, 2 teams\n\u2022 Bid 30-42 on points your team can win\n\u2022 Pick trump (your strongest suit)\n\u2022 Follow suit, use trumps strategically\n\u2022 35 count + 7 tricks = 42 points\n\u2022 First to 7 marks wins!' },
-      { type: 'text_dim', text: 'QUICK REFERENCE:\n\n5-count: [5|0] [4|1] [3|2]\n10-count: [5|5] [6|4]\n\nBid 30: 3 trumps + double + 2 side doubles\nLead strong trumps early!\nProtect your count dominoes!', nextLabel: 'Play Final Hand \u25B6' },
-      { type: 'deal', text: 'Final challenge! Study, bid smart, play to win.\n\nGood luck!',
+      { type: 'text_dim', audio: 'L11_S1_review.mp3', text: 'YOU\'VE LEARNED THE BASICS!\n\nReview:\n\u2022 28 dominoes, 7 each, 4 players, 2 teams\n\u2022 Bid 30-42 on points your team can win\n\u2022 Pick trump (your strongest suit)\n\u2022 Follow suit, use trumps strategically\n\u2022 35 count + 7 tricks = 42 points\n\u2022 First to 7 marks wins!' },
+      { type: 'text_dim', audio: 'L11_S2_reference.mp3', text: 'QUICK REFERENCE:\n\n5-count: [5|0] [4|1] [3|2]\n10-count: [5|5] [6|4]\n\nBid 30: 3 trumps + double + 2 side doubles\nLead strong trumps early!\nProtect your count dominoes!', nextLabel: 'Play Final Hand \u25B6' },
+      { type: 'deal', audio: 'L11_S3_deal.mp3', text: 'Final challenge! Study, bid smart, play to win.\n\nGood luck!',
         hands: [
           [[4,4],[4,3],[4,1],[4,0],[6,6],[3,2],[5,0]],
           [[5,5],[6,5],[5,2],[3,3],[2,1],[1,0],[6,3]],
           [[6,4],[6,2],[6,1],[2,2],[3,0],[5,1],[0,0]],
           [[1,1],[5,4],[5,3],[2,0],[4,2],[6,0],[3,1]]
         ], dealer: 3, nextLabel: 'Start Bidding \u25B6' },
-      { type: 'bid', text: '4 fours with the double! Plus [6|6], [3|2] (5-count), [5|0] (5-count).\n\nBid 30 with confidence!', aiPass: true },
-      { type: 'trump', text: 'Pick fours as trump \u2014 4 of them + the double!\n\n[4|4] unbeatable, [6|6] dominant off-suit.' },
-      { type: 'play', text: 'Lead trumps, play [6|6] for off-suit tricks.\n\nProtect [5|0] and [3|2] \u2014 5 pts each!',
-        resultText: 'Congratulations! You\'ve completed the Texas 42 Tutorial!\n\nYou\'re ready to play for real. Hit "New Game" and choose Texas 42!' }
+      { type: 'bid', audio: 'L11_S4_bid.mp3', text: '4 fours with the double! Plus [6|6], [3|2] (5-count), [5|0] (5-count).\n\nBid 30 with confidence!', aiPass: true },
+      { type: 'trump', audio: 'L11_S5_trump.mp3', text: 'Pick fours as trump \u2014 4 of them + the double!\n\n[4|4] unbeatable, [6|6] dominant off-suit.' },
+      { type: 'play', audio: 'L11_S6_play.mp3', text: 'Lead trumps, play [6|6] for off-suit tricks.\n\nProtect [5|0] and [3|2] \u2014 5 pts each!',
+        resultText: 'Congratulations! You\'ve completed the Texas 42 Tutorial!\n\nYou\'re ready to play for real. Hit "New Game" and choose Texas 42!',
+        resultAudio: 'L11_S7_congrats.mp3' }
     ]
   }
 ];
