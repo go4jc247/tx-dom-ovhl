@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v17.98.0 — All 45 tutorial narration clips wired up
+// Version: v17.99.0 — Tutorial deal visual alignment + click-to-sort fix
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v17.98.0';
+const CACHE_NAME = 'tx-dom-v17.99.0';
 const urlsToCache = [
   './index.html',
   // CSS

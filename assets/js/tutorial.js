@@ -160,7 +160,25 @@ function tutRunStep() {
       document.body.classList.remove('tutDimGame');
       document.body.classList.add('tutShowGame');
       if (step.text) tutType(step.text);
-      if (step.hands) tutDealHand(step.hands, step.dealer || 0);
+      if (step.hands) {
+        tutDealHand._allFaceDown = !!step.faceDown;
+        tutDealHand(step.hands, step.dealer || 0);
+      }
+      // Enable click-to-sort so user can tap dominoes to preview trump sorting
+      if (!step.faceDown && typeof enableBiddingPreview === 'function') enableBiddingPreview();
+      break;
+
+    case 'reveal':
+      // Flip player 1's tiles face-up (used after a faceDown deal step)
+      tutNext.textContent = step.nextLabel || 'Continue \u25B6';
+      tutNext.style.display = '';
+      document.body.classList.remove('tutDimGame');
+      document.body.classList.add('tutShowGame');
+      if (step.text) tutType(step.text);
+      for (const data of (sprites[0] || [])) {
+        if (data && data.sprite) data.sprite.setFaceUp(true);
+      }
+      if (typeof enableBiddingPreview === 'function') enableBiddingPreview();
       break;
 
     case 'bid':
@@ -311,9 +329,11 @@ function tutDealHand(hands, dealer) {
     }
   }
 
-  // Flip player 1 tiles face-up
-  for (const data of (sprites[0] || [])) {
-    if (data && data.sprite) data.sprite.setFaceUp(true);
+  // If allFaceDown, force player 1 tiles face-down (layout defaults them face-up)
+  if (tutDealHand._allFaceDown) {
+    for (const data of (sprites[0] || [])) {
+      if (data && data.sprite) data.sprite.setFaceUp(false);
+    }
   }
 
   team1Score = 0; team2Score = 0;
@@ -444,14 +464,14 @@ const TUTORIAL_LESSONS = [
     steps: [
       { type: 'text_dim', audio: 'L1_S1_welcome.mp3', text: 'Welcome to Texas 42 Training!\n\nThis tutorial will teach you how to play one of the best card-style domino games ever invented.\n\nLet\'s start with the basics.' },
       { type: 'text_dim', audio: 'L1_S2_domino_set.mp3', text: 'Texas 42 uses a standard Double-Six domino set \u2014 28 dominoes total.\n\nEach domino has two ends, with a number from 0 to 6 on each side.\n\nExamples: [6|6], [5|3], [2|0]' },
-      { type: 'text_dim', audio: 'L1_S3_four_players.mp3', text: 'Four players sit around the table. All 28 dominoes are dealt out \u2014 7 each.\n\nYou (Player 1) sit at the bottom. Your partner (Player 4) sits across from you at the top.\n\nPlayers 2 and 3 are your opponents.' },
-      { type: 'deal', audio: 'L1_S4_deal.mp3', text: 'Here are your 7 dominoes at the bottom of the screen.\n\nYour opponents\' and partner\'s dominoes are face-down.\n\nTap any of your dominoes to see how they sort!',
+      { type: 'deal', audio: 'L1_S3_four_players.mp3', text: 'Four players sit around the table. All 28 dominoes are dealt out \u2014 7 each.\n\nYou (Player 1) sit at the bottom. Your partner (Player 4) sits across from you at the top.\n\nPlayers 2 and 3 are your opponents.', faceDown: true,
         hands: [
           [[6,4],[5,5],[3,3],[6,2],[4,1],[5,0],[6,6]],
           [[5,4],[3,2],[6,1],[4,0],[2,2],[5,1],[6,3]],
           [[4,4],[6,5],[3,1],[2,0],[5,2],[1,0],[4,3]],
           [[1,1],[0,0],[6,0],[5,3],[4,2],[3,0],[2,1]]
-        ], dealer: 3 }
+        ], dealer: 3 },
+      { type: 'reveal', audio: 'L1_S4_deal.mp3', text: 'Here are your 7 dominoes at the bottom of the screen.\n\nYour opponents\' and partner\'s dominoes are face-down.\n\nTap any of your dominoes to see how they sort!' }
     ]
   },
   // LESSON 2: SUITS & DOUBLES
