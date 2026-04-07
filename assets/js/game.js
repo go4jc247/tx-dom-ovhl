@@ -708,8 +708,8 @@ class GameStateV6_4g{
     this.leader=0;
     this.current_player=0;
     this.current_trick=[];
-    this.tricks_team = GAME_MODE === 'MOON' ? [[],[],[]] : [[],[]];
-    this.team_points = GAME_MODE === 'MOON' ? [0,0,0] : [0,0];
+    this.tricks_team = (GAME_MODE === 'MOON' || GAME_MODE === 'TN51') ? [[],[],[]] : [[],[]];
+    this.team_points = (GAME_MODE === 'MOON' || GAME_MODE === 'TN51') ? [0,0,0] : [0,0];
     this.trick_number=0;
     this.nello_doubles_suit=false;
     this.force_double_trump=false;
@@ -729,8 +729,8 @@ class GameStateV6_4g{
     this.current_player=this.leader;
     if(typeof _trackCpChange==='function') _trackCpChange('reset_hand');
     this.current_trick=[];
-    this.tricks_team = GAME_MODE === 'MOON' ? [[],[],[]] : [[],[]];
-    this.team_points = GAME_MODE === 'MOON' ? [0,0,0] : [0,0];
+    this.tricks_team = (GAME_MODE === 'MOON' || GAME_MODE === 'TN51') ? [[],[],[]] : [[],[]];
+    this.team_points = (GAME_MODE === 'MOON' || GAME_MODE === 'TN51') ? [0,0,0] : [0,0];
     this.trick_number=0;
     this.active_players=Array.from({length:this.player_count},(_,i)=>i);
     this.nello_doubles_suit=false;
@@ -743,8 +743,8 @@ class GameStateV6_4g{
     this.current_player=this.leader;
     if(typeof _trackCpChange==='function') _trackCpChange('set_hands');
     this.current_trick=[];
-    this.tricks_team = GAME_MODE === 'MOON' ? [[],[],[]] : [[],[]];
-    this.team_points = GAME_MODE === 'MOON' ? [0,0,0] : [0,0];
+    this.tricks_team = (GAME_MODE === 'MOON' || GAME_MODE === 'TN51') ? [[],[],[]] : [[],[]];
+    this.team_points = (GAME_MODE === 'MOON' || GAME_MODE === 'TN51') ? [0,0,0] : [0,0];
     this.trick_number=0;
   }
 
@@ -763,7 +763,7 @@ class GameStateV6_4g{
     this.active_players = valid.length ? valid : Array.from({length:this.player_count},(_,i)=>i);
   }
 
-  team_of(p){ if(GAME_MODE === 'MOON') return Number(p); return Number(p)%2; }
+  team_of(p){ if(GAME_MODE === 'MOON') return Number(p); if(GAME_MODE === 'TN51') return Number(p)%3; return Number(p)%2; }
 
   _is_trump_tile(tile){
     const a=tile[0], b=tile[1];
@@ -1014,7 +1014,7 @@ class SessionV6_4g{
   constructor(playerCount=6,maxPip=7,handSize=6,marksToWin=7){
     this.game=new GameStateV6_4g(playerCount,maxPip,handSize);
     this.marks_to_win=Number(marksToWin);
-    this.team_marks = GAME_MODE === 'MOON' ? [0,0,0] : [0,0];
+    this.team_marks = (GAME_MODE === 'MOON' || GAME_MODE === 'TN51') ? [0,0,0] : [0,0];
     this.phase=PHASE_SPLASH;
     this.status="";
     this.contract="NORMAL";
@@ -1027,7 +1027,7 @@ class SessionV6_4g{
   _notify(){ if(typeof this.on_change==="function"){ try{ this.on_change(); }catch(_e){} } }
 
   start_new_game(){
-    this.team_marks = GAME_MODE === 'MOON' ? [0,0,0] : [0,0];
+    this.team_marks = (GAME_MODE === 'MOON' || GAME_MODE === 'TN51') ? [0,0,0] : [0,0];
     this.new_hand_random();
   }
 
@@ -1158,10 +1158,10 @@ class SessionV6_4g{
           this.game.hands[partnerSeat] = [];
         } else {
           // TN51 (6-player): bidder's 2 partners sit out, bidder vs 3 opponents
-          const bidderTeamIdx = bidderSeat % 2;
+          const bidderTeamIdx = bidderSeat % 3;
           const partners = [];
           for (let s = 0; s < 6; s++) {
-            if (s !== bidderSeat && (s % 2) === bidderTeamIdx) partners.push(s);
+            if (s !== bidderSeat && (s % 3) === bidderTeamIdx) partners.push(s);
           }
           const activePlayers = [0,1,2,3,4,5].filter(s => !partners.includes(s));
           this.game.set_active_players(activePlayers);
@@ -1336,7 +1336,10 @@ class SessionV6_4g{
       const marksAtStake=this.bid_marks;
       const bidderSeat = this.bid_winner_seat !== undefined ? this.bid_winner_seat : 0;
       const bidderTeamIndex = this.game.team_of(bidderSeat);
-      const defenderTeamIndex = (1 - bidderTeamIndex);
+      // For TN51 (3 teams), defenders share marks — award to highest-scoring non-bidder team
+      const defenderTeamIndex = GAME_MODE === 'TN51'
+        ? [0,1,2].filter(t => t !== bidderTeamIndex).reduce((best, t) => this.game.team_points[t] > this.game.team_points[best] ? t : best)
+        : (1 - bidderTeamIndex);
       const bidderTeamNum = bidderTeamIndex + 1;
       const defenderTeamNum = defenderTeamIndex + 1;
       const bidderPoints = this.game.team_points[bidderTeamIndex];
@@ -1363,8 +1366,9 @@ class SessionV6_4g{
         }
       }
 
-      if (GAME_MODE === 'MOON') {
-        const marks = this.team_marks.slice(0, 3);
+      if (GAME_MODE === 'MOON' || GAME_MODE === 'TN51') {
+        const teamCount = GAME_MODE === 'MOON' ? 3 : 3;
+        const marks = this.team_marks.slice(0, teamCount);
         const maxMark = Math.max(...marks);
         if (maxMark >= this.marks_to_win) {
           const winner = marks.indexOf(maxMark);
@@ -2442,7 +2446,7 @@ function initOffTracker() {
   if (session.contract === 'NELLO') return;
 
   const bidderSeat = session.bid_winner_seat;
-  const bidderTeam = GAME_MODE === 'MOON' ? bidderSeat : (bidderSeat % 2); // Moon: individual, T42/TN51: 2 teams
+  const bidderTeam = GAME_MODE === 'MOON' ? bidderSeat : (GAME_MODE === 'TN51' ? (bidderSeat % 3) : (bidderSeat % 2)); // Moon: individual, TN51: 3 teams
   const trumpSuit = session.game.trump_suit;
   const trumpMode = session.game.trump_mode;
   const maxPip = session.game.max_pip;
@@ -2482,7 +2486,7 @@ function updateOffTracker() {
   const maxPip = gs.max_pip;
 
   // Analyze all completed tricks
-  const _otTeamCount = GAME_MODE === 'MOON' ? 3 : 2;
+  const _otTeamCount = (GAME_MODE === 'MOON' || GAME_MODE === 'TN51') ? 3 : 2;
   const allTricks = [];
   for (let team = 0; team < _otTeamCount; team++) {
     for (let ti = 0; ti < (gs.tricks_team[team] || []).length; ti++) {
@@ -2692,7 +2696,7 @@ function detectLayDownHand(gameState, seat) {
 
   // Build played set
   const playedSet = new Set();
-  const teamCount = GAME_MODE === 'MOON' ? 3 : 2;
+  const teamCount = (GAME_MODE === 'MOON' || GAME_MODE === 'TN51') ? 3 : 2;
   for (let team = 0; team < teamCount; team++) {
     for (const record of (gameState.tricks_team[team] || [])) {
       for (let s = 0; s < gameState.player_count; s++) {
@@ -2906,7 +2910,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   if(_dbg.enabled){
     const _earlyLed = !isLead ? gameState._led_suit_for_trick() : null;
     _dbg.seat = p;
-    _dbg.myTeam = GAME_MODE === 'MOON' ? p : (p % 2);
+    _dbg.myTeam = GAME_MODE === 'MOON' ? p : (GAME_MODE === 'TN51' ? (p % 3) : (p % 2));
     _dbg.trickNum = gameState.trick_number;
     _dbg.isLead = isLead;
     _dbg.ledPip = _earlyLed === -1 ? 'TRUMP' : (_earlyLed !== null ? _earlyLed : null);
@@ -2943,8 +2947,8 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   const maxPip = gameState.max_pip;
   const isMoon = GAME_MODE === 'MOON';
   const isTN51 = GAME_MODE === 'TN51';
-  const myTeam = isMoon ? p : (p % 2);
-  const isSameTeam = (seat) => isMoon ? seat === p : (seat % 2) === myTeam;
+  const myTeam = isMoon ? p : (isTN51 ? (p % 3) : (p % 2));
+  const isSameTeam = (seat) => isMoon ? seat === p : (isTN51 ? (seat % 3) === myTeam : (seat % 2) === myTeam);
   const isOpponent = (seat) => seat !== p && !isSameTeam(seat);
   const trickNum = gameState.trick_number; // 0-indexed: how many tricks completed so far
   const totalTricks = gameState.hand_size || 6;
@@ -3789,7 +3793,7 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   //  BID SAFETY — how many points do we still need?
   // ═══════════════════════════════════════════════════════════════════
   const bidderSeat = gameState.bid_winner_seat !== undefined ? gameState.bid_winner_seat : 0;
-  const bidderTeamIdx = isMoon ? bidderSeat : (bidderSeat % 2);
+  const bidderTeamIdx = isMoon ? bidderSeat : (isTN51 ? (bidderSeat % 3) : (bidderSeat % 2));
   const isBidderTeam = isMoon ? (p === bidderSeat) : (myTeam === bidderTeamIdx);
   const iAmBidder = p === bidderSeat;
   const iAmBidderPartner = isBidderTeam && !iAmBidder; // on bidder's team but not the bidder
@@ -5784,7 +5788,33 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
           }
         }
 
-        // (Removed: TN51 3-team defender cooperation lead — TN51 is 2 teams)
+        // TN51 DEFENDER COOPERATION: In TN51, oppSuitSignal includes both the bidder team
+        // AND the other defender team. Leading into the other defender's strong suit is GOOD
+        // (they can win and deny the bidder). Compensate for the oppSuitSignal penalty.
+        if(isTN51 && !isBidderTeam && oppSuitSignal[ledSuit]){
+          // Build a signal for just the OTHER defender team (not bidder team, not our team)
+          let otherDefSignal = 0;
+          for(let team = 0; team < (gameState.tricks_team || []).length; team++){
+            for(const record of (gameState.tricks_team[team] || [])){
+              for(let seat = 0; seat < record.length; seat++){
+                if(seat === p || isSameTeam(seat)) continue; // skip self and partners
+                if((seat % 3) === bidderTeamIdx) continue; // skip bidder team
+                const t = record[seat];
+                if(!t || gameState._is_trump_tile(t)) continue;
+                const hp = Math.max(t[0], t[1]);
+                if(hp === ledSuit){
+                  otherDefSignal += (t[0] === t[1]) ? 20 : 5;
+                }
+              }
+            }
+          }
+          if(otherDefSignal > 0){
+            // Reverse the penalty from oppSuitSignal for this defender team's signal
+            const coopBonus = Math.min(otherDefSignal, 20);
+            score += coopBonus;
+            _breakdown.tn51DefCoopLead = coopBonus;
+          }
+        }
 
         // PARTNER SUIT RETURN: prefer suits where partner showed strength
         if(!isMoon && partnerSuitSignal[ledSuit]){
@@ -5896,8 +5926,11 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
   //  NORMAL GAME — FOLLOW LOGIC
   // ═══════════════════════════════════════════════════════════════════
 
-  // ── Partner winning: throw count (but NEVER dump trumps if non-trump options exist) ──
-  if(partnerWinning){
+  // ── Partner/teammate winning: throw count (but NEVER dump trumps if non-trump options exist) ──
+  // TN51: another defender team winning is also favorable — treat as "friendly win"
+  const friendlyDefenderWinning = isTN51 && !isBidderTeam && !partnerWinning
+    && currentWinner !== null && gameState.team_of(currentWinner) !== bidderTeamIdx && currentWinner !== p;
+  if(partnerWinning || friendlyDefenderWinning){
     // Separate legal tiles into trump and non-trump
     const pwNonTrumps = [];
     const pwTrumps = [];
@@ -5932,7 +5965,11 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       if(pipSum < lowVal){ lowVal = pipSum; lowIdx = idx; }
     }
     if(countIdx >= 0 && safeToThrowCount){
-      return makeResult(countIdx, "Partner winning (safe), throw count (" + countVal + "pts)");
+      // TN51 friendly defender: only throw 5-count (10 helps their team too much)
+      if(friendlyDefenderWinning && countVal === 10){
+        return makeResult(lowIdx, "TN51: friendly defender winning, keep 10-count");
+      }
+      return makeResult(countIdx, (friendlyDefenderWinning ? "TN51 friendly" : "Partner") + " winning (safe), throw count (" + countVal + "pts)");
     }
     if(countIdx >= 0 && !safeToThrowCount){
       // Opponents still to play — throw count more aggressively if bidder team needs points
@@ -6404,9 +6441,15 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
 
     // Can we beat the current winner?
     if(winTrumpF >= 0){
-      // Check if partner is already winning — no need to overtake
-      if(partnerWinning && !isBidderTeam){
-        if(lowTrumpF >= 0) return makeResult(lowTrumpF, "Trump led: partner winning" + (trickCountF > 0 ? " (" + trickCountF + "pts)" : "") + ", save trump");
+      // Check if current winner is already a defender (not on bidder's team)
+      // In TN51 (3 teams), another defender winning = bidder losing, no need to overtake
+      const winnerIsDefender = trickWinnerSeatF >= 0 && !isSameTeam(trickWinnerSeatF)
+        && (isMoon || (bidderTeamIdx !== undefined && (isTN51 ? (trickWinnerSeatF % 3) !== bidderTeamIdx : (trickWinnerSeatF % 2) !== bidderTeamIdx)));
+      if(winnerIsDefender && !isBidderTeam){
+        // Another defender already winning — bidder is losing either way
+        // In TN51 (3 teams): defender teams should cooperate to set the bidder
+        // Save our trump regardless of count in trick (count goes to defender, not bidder)
+        if(lowTrumpF >= 0) return makeResult(lowTrumpF, "Trump led: defender winning" + (trickCountF > 0 ? " (" + trickCountF + "pts)" : "") + ", save trump");
       }
       // On defense trying to set bid: overtake (unless defender already winning above)
       if(canSetBid && !isBidderTeam){
@@ -6519,9 +6562,13 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       };
     }
 
-    // If partner already trumped and is winning, DON'T over-trump
-    // BUT: check if opponents can still over-trump
-    if(partnerHasTrumpInTrick && !opponentHasTrumpInTrick){
+    // If partner (or TN51 friendly defender) already trumped and is winning, DON'T over-trump
+    // BUT: check if opponents (bidder's team) can still over-trump
+    const friendlyTrumpWinning = partnerHasTrumpInTrick
+      || (isTN51 && !isBidderTeam && currentWinner !== null && currentWinner !== p
+          && gameState.team_of(currentWinner) !== bidderTeamIdx
+          && trick.some(play => Array.isArray(play) && play[0] === currentWinner && gameState._is_trump_tile(play[1])));
+    if(friendlyTrumpWinning && !opponentHasTrumpInTrick){
       // Check: can opponents still over-trump?
       let oppsYetToPlay = 0;
       for(let s = 0; s < gameState.player_count; s++){
@@ -6582,7 +6629,21 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
       }
     }
 
-    // If partner already trumped and winning, don't waste our trump (handled above by partnerHasTrumpInTrick)
+    // TN51 3-TEAM: if another defender already trumped and is winning, save our trump
+    // Both defender teams want to set the bidder — no need to fight each other
+    if(winTrumpIdx >= 0 && !isBidderTeam && trickTrumpWinnerSeat >= 0 && !isSameTeam(trickTrumpWinnerSeat)){
+      const winnerOnBidderTeam = isMoon ? (trickTrumpWinnerSeat === bidderSeat)
+        : (isTN51 ? (trickTrumpWinnerSeat % 3) === bidderTeamIdx : (trickTrumpWinnerSeat % 2) === bidderTeamIdx);
+      if(!winnerOnBidderTeam){
+        // Another defender is winning with trump — don't waste ours
+        let _defLowIdx = legal[0], _defLowVal = Infinity;
+        for(const idx of legal){
+          const v = hand[idx][0] + hand[idx][1];
+          if(v < _defLowVal){ _defLowVal = v; _defLowIdx = idx; }
+        }
+        return makeResult(_defLowIdx, "Defender already winning — save trump, dump low");
+      }
+    }
 
     // MOON OPPONENT: always trump in when bidder is on pace for all tricks
     // Shoot-the-moon: always trump in to deny even a single trick
@@ -7039,7 +7100,19 @@ function choose_tile_ai(gameState, playerIndex, contract="NORMAL", returnRec=fal
         }
       }
 
-      // (Removed: TN51 3-team dump cooperation — TN51 is 2 teams, handled by partnerWinning)
+      // TN51 3-TEAM DUMP: in TN51, two defender teams cooperate against bidder
+      // When another defender is already winning the trick, throw count more freely
+      if(isTN51 && !isBidderTeam && !partnerWinning && trick.length > 0){
+        const trickWinner = gameState._determine_trick_winner();
+        const winnerOnBidTeam = trickWinner >= 0 && (trickWinner % 3) === bidderTeamIdx;
+        if(!winnerOnBidTeam && trickWinner >= 0 && (trickWinner % 3) !== myTeam){
+          // Other defender team is winning — safe to throw count (it goes to fellow defender)
+          if(myCount > 0){
+            score += myCount * 2;
+            _bd.tn51DefCoopCount = myCount * 2;
+          }
+        }
+      }
 
       // OPPONENT STRENGTH: prefer dumping tiles in suits opponents are strong in
       // (we'll lose those suits anyway; save tiles in suits we can win)
@@ -8020,7 +8093,7 @@ let mpMarksToWin = 7;            // Marks to win for MP game (host sets)
 let mpPreferredSeat = -1;         // Guest's preferred seat (-1 = auto)
 let mpHelloNonce = null;           // Unique nonce sent with hello, used to match seat_assign
 const MP_WS_URL = 'wss://tn51-tx42-relay.onrender.com';  // V10_122: PRODUCTION
-const MP_VERSION = 'v18.0.0';  // v18.0.0: Fix TN51 team structure — restore 2 teams of 3 (was wrongly 3 teams of 2)
+const MP_VERSION = 'v17.99.0';  // v17.99.0: Tutorial deal visual alignment + click-to-sort fix
 
 // ═══════════════════════════════════════════════════════════════
 // V10_FIX: Multiplayer Sync Fix Variables
@@ -10400,8 +10473,8 @@ async function mpHandlePlayConfirmed(move) {
 
     // Handle hand completion
     if (move.handComplete && move.handResult) {
-      session.game.team_points = move.handResult.teamPoints || (GAME_MODE === 'MOON' ? [0,0,0] : [0,0]);
-      session.team_marks = move.handResult.teamMarks || (GAME_MODE === 'MOON' ? [0,0,0] : [0,0]);
+      session.game.team_points = move.handResult.teamPoints || (GAME_MODE === 'MOON' ? [0,0,0] : (GAME_MODE === 'TN51' ? [0,0,0] : [0,0]));
+      session.team_marks = move.handResult.teamMarks || (GAME_MODE === 'MOON' ? [0,0,0] : (GAME_MODE === 'TN51' ? [0,0,0] : [0,0]));
       // V10_121g: Ensure status is properly set from host's handResult
       session.status = move.handResult.status || 'Hand over';
       setStatus(session.status);
@@ -13009,8 +13082,8 @@ function mpResumeFromSavedState(savedState) {
   // Restore engine state
   session.game.hands = snap.hands;
   session.game.current_trick = snap.current_trick || [];
-  session.game.tricks_team = snap.tricks_team || (GAME_MODE === 'MOON' ? [[],[],[]] : [[],[]]);
-  session.game.team_points = snap.team_points || (GAME_MODE === 'MOON' ? [0,0,0] : [0,0]);
+  session.game.tricks_team = snap.tricks_team || ((GAME_MODE === 'MOON' || GAME_MODE === 'TN51') ? [[],[],[]] : [[],[]]);
+  session.game.team_points = snap.team_points || ((GAME_MODE === 'MOON' || GAME_MODE === 'TN51') ? [0,0,0] : [0,0]);
   session.game.trump_suit = snap.trump_suit;
   session.game.trump_mode = snap.trump_mode;
   session.game.trick_number = snap.trick_number || 0;
@@ -13022,7 +13095,7 @@ function mpResumeFromSavedState(savedState) {
   session.game.force_double_trump = snap.force_double_trump || false;
 
   session.phase = snap.phase || PHASE_PLAYING;
-  session.team_marks = snap.team_marks || (GAME_MODE === 'MOON' ? [0,0,0] : [0,0]);
+  session.team_marks = snap.team_marks || ((GAME_MODE === 'MOON' || GAME_MODE === 'TN51') ? [0,0,0] : [0,0]);
   session.marks_to_win = snap.marks_to_win || savedState.marksToWin || 7;
   session.contract = snap.contract || 'NORMAL';
   session.current_bid = snap.current_bid || 0;
@@ -13576,7 +13649,7 @@ function ppRotateBoard(viewingSeat) {
       el.textContent = 'P' + (seat + 1);  // Show real player number
       // Update team color
       el.classList.remove('team1', 'team2', 'team3');
-      const teamNum = (seat % 2 === 0) ? 1 : 2;
+      const teamNum = GAME_MODE === 'TN51' ? (seat % 3) + 1 : (seat % 2 === 0 ? 1 : 2);
       el.classList.add('team' + teamNum);
     }
   }
@@ -13716,7 +13789,12 @@ function ppResetRotation() {
     if (el) {
       el.textContent = 'P' + p;
       el.classList.remove('team1', 'team2', 'team3');
-      el.classList.add((p - 1) % 2 === 0 ? 'team1' : 'team2');
+      if (GAME_MODE === 'TN51') {
+        const teamIdx = (p - 1) % 3;
+        el.classList.add(teamIdx === 0 ? 'team1' : teamIdx === 1 ? 'team2' : 'team3');
+      } else {
+        el.classList.add((p - 1) % 2 === 0 ? 'team1' : 'team2');
+      }
     }
   }
 
@@ -15713,7 +15791,59 @@ function updateScoreDisplay(){
     if(mp) mp.style.display = 'none';
     return;
   }
-  // TN51 uses 2-team scoring like T42 (falls through to standard team UI below)
+  if(GAME_MODE === 'TN51'){
+    // TN51: Use moonScoreBar repurposed for 3 teams
+    var tn51Bar = document.getElementById('moonScoreBar');
+    if(tn51Bar){
+      tn51Bar.style.display = 'flex';
+      // Update labels for TN51 (Team 1/2/3 instead of P1/P2/P3, Marks instead of Bid)
+      // Only rewrite innerHTML on first call to avoid DOM churn
+      if(!tn51Bar._tn51Initialized){
+        var cols = tn51Bar.children;
+        var tn51Labels = ['Team 1','Team 2','Team 3'];
+        for(var ci=0;ci<3;ci++){
+          if(!cols[ci]) continue;
+          var lbl=cols[ci].querySelector('div');
+          if(lbl) lbl.textContent=tn51Labels[ci];
+          var infoDiv=cols[ci].querySelectorAll('div')[2];
+          if(infoDiv){
+            var bidSpan=infoDiv.querySelector('[id^="moonP"][id$="Bid"]');
+            var trkSpan=infoDiv.querySelector('[id^="moonP"][id$="Tricks"]');
+            if(bidSpan && trkSpan) infoDiv.innerHTML='Marks: <span id="'+bidSpan.id+'">0</span> | Tricks: <span id="'+trkSpan.id+'">0</span>';
+          }
+        }
+        tn51Bar._tn51Initialized = true;
+      }
+      // Score (points this hand)
+      var t1s = document.getElementById('moonP1Score');
+      if(t1s) t1s.textContent = team1Score;
+      var t2s = document.getElementById('moonP2Score');
+      if(t2s) t2s.textContent = team2Score;
+      var t3s = document.getElementById('moonP3Score');
+      if(t3s) t3s.textContent = team3Score;
+      // Marks (game-level score)
+      var t1b = document.getElementById('moonP1Bid');
+      var t2b = document.getElementById('moonP2Bid');
+      var t3b = document.getElementById('moonP3Bid');
+      if(t1b) t1b.textContent = team1Marks;
+      if(t2b) t2b.textContent = team2Marks;
+      if(t3b) t3b.textContent = team3Marks;
+      // Tricks won this hand
+      var t1t = document.getElementById('moonP1Tricks');
+      var t2t = document.getElementById('moonP2Tricks');
+      var t3t = document.getElementById('moonP3Tricks');
+      if(t1t) t1t.textContent = team1TricksWon;
+      if(t2t) t2t.textContent = team2TricksWon;
+      if(t3t) t3t.textContent = team3TricksWon;
+    }
+    var t1p = document.getElementById('team1Pill');
+    var t2p = document.getElementById('team2Pill');
+    var mp = document.getElementById('marksPill');
+    if(t1p) t1p.style.display = 'none';
+    if(t2p) t2p.style.display = 'none';
+    if(mp) mp.style.display = 'none';
+    return;
+  }
   // Show team UI, hide Moon UI
   var t1p2 = document.getElementById('team1Pill');
   var t2p2 = document.getElementById('team2Pill');
@@ -17323,7 +17453,7 @@ let _pickClickHandlers = new Map(); // For cleanup
 
 // Build pick order based on game mode and dealer seat
 function _getPickOrder(dealer, playerCount) {
-  const dealerTeam = dealer % 2;
+  const dealerTeam = GAME_MODE === 'TN51' ? (dealer % 3) : (dealer % 2);
   if (GAME_MODE === 'MOON') {
     // Moon (3 players): non-dealer pick simultaneously, dealer gets rest
     const opponents = [];
@@ -17340,7 +17470,7 @@ function _getPickOrder(dealer, playerCount) {
   const partners = [];
   for (let i = 1; i < playerCount; i++) {
     const seat = (dealer + i) % playerCount;
-    const seatTeam = seat % 2;
+    const seatTeam = GAME_MODE === 'TN51' ? (seat % 3) : (seat % 2);
     if (seatTeam !== dealerTeam) {
       opponents.push(seat);
     } else if (seat !== dealer) {
@@ -18198,6 +18328,9 @@ function positionPlayerIndicators(){
         if (GAME_MODE === 'MOON') {
           // Moon: 3 individual colors — P1 blue, P2 red, P3 neon green
           el.classList.add(seat === 0 ? 'team1' : seat === 1 ? 'team2' : 'team3');
+        } else if (GAME_MODE === 'TN51') {
+          const teamIdx = seat % 3;
+          el.classList.add(teamIdx === 0 ? 'team1' : teamIdx === 1 ? 'team2' : 'team3');
         } else {
           el.classList.add(seat % 2 === 0 ? 'team1' : 'team2');
         }
@@ -20118,6 +20251,12 @@ function showHandEndPopup(){
       const winnerIdx = marks.indexOf(maxM);
       const _localSeat = MULTIPLAYER_MODE ? mpSeat : 0;
       localWon = (_localSeat === winnerIdx);
+    } else if (GAME_MODE === 'TN51') {
+      const marks = [session.team_marks[0], session.team_marks[1], session.team_marks[2] || 0];
+      const maxM = Math.max(...marks);
+      const winnerIdx = marks.indexOf(maxM);
+      const localTeamIdx = MULTIPLAYER_MODE ? (mpSeat % 3) : 0;
+      localWon = (localTeamIdx === winnerIdx);
     } else {
       const localTeam = MULTIPLAYER_MODE ? ((mpSeat % 2 === 0) ? 1 : 2) : 1;
       const t1m = session.team_marks[0];
@@ -21589,6 +21728,15 @@ function showGameEndSummary(){
     _youWon = (_localSeat === winnerIdx);
     _endTitle = _youWon ? 'You Win!' : 'Player ' + (winnerIdx + 1) + ' Wins!';
     _endBg = _youWon ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
+  } else if (GAME_MODE === 'TN51') {
+    const t3m = session.team_marks[2] || 0;
+    const marks = [t1m, t2m, t3m];
+    const maxM = Math.max(...marks);
+    const winnerIdx = marks.indexOf(maxM);
+    const localTeamIdx = MULTIPLAYER_MODE ? (mpSeat % 3) : 0;
+    _youWon = (localTeamIdx === winnerIdx);
+    _endTitle = _youWon ? 'Your Team Wins! \u{1F389}' : 'Team ' + (winnerIdx + 1) + ' Wins!';
+    _endBg = _youWon ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
   } else {
     const winner = t1m > t2m ? 1 : 2;
     const _localTeam = MULTIPLAYER_MODE ? ((mpSeat % 2 === 0) ? 1 : 2) : 1;
@@ -22152,9 +22300,24 @@ function showRoundEndSummary(){
     resultText = 'Round Over';
   }
 
-  // Build round-end score columns — Moon shows 3 players, T42/TN51 show 2 teams
+  // Build round-end score columns — Moon/TN51 shows 3 players/teams, others show 2 teams
   let _roundPointsCols, _roundMarksCols;
-  if (GAME_MODE === 'MOON') {
+  if (GAME_MODE === 'TN51') {
+    const t3p = session.game.team_points[2] || 0;
+    const t3m = session.team_marks[2] || 0;
+    _roundPointsCols = `
+          <div style="text-align:center;"><div style="font-size:10px;opacity:0.8;">Team 1</div><div style="font-size:20px;font-weight:bold;color:#fff;">${t1p}</div></div>
+          <div style="width:1px;background:rgba(255,255,255,0.2);"></div>
+          <div style="text-align:center;"><div style="font-size:10px;opacity:0.8;">Team 2</div><div style="font-size:20px;font-weight:bold;color:#fff;">${t2p}</div></div>
+          <div style="width:1px;background:rgba(255,255,255,0.2);"></div>
+          <div style="text-align:center;"><div style="font-size:10px;opacity:0.8;">Team 3</div><div style="font-size:20px;font-weight:bold;color:#fff;">${t3p}</div></div>`;
+    _roundMarksCols = `
+            <div style="font-size:16px;font-weight:bold;color:#93c5fd;">${t1m}</div>
+            <div style="font-size:12px;opacity:0.5;align-self:center;">-</div>
+            <div style="font-size:16px;font-weight:bold;color:#fca5a5;">${t2m}</div>
+            <div style="font-size:12px;opacity:0.5;align-self:center;">-</div>
+            <div style="font-size:16px;font-weight:bold;color:#fbbf24;">${t3m}</div>`;
+  } else if (GAME_MODE === 'MOON') {
     const t3p = session.game.team_points[2] || 0;
     const t3m = session.team_marks[2] || 0;
     _roundPointsCols = `
@@ -22379,7 +22542,7 @@ function renderBoneyard2(){
   // Determine played tiles and trump state
   const playedTiles = new Set();
   if(session && session.game){
-    const _teamCount = GAME_MODE === 'MOON' ? 3 : 2;
+    const _teamCount = (GAME_MODE === 'MOON' || GAME_MODE === 'TN51') ? 3 : 2;
     for(let team = 0; team < _teamCount; team++){
       for(const record of (session.game.tricks_team[team] || [])){
         for(let seat = 0; seat < record.length; seat++){
@@ -23035,8 +23198,8 @@ function resumeGameFromSave(){
     const snap = saved.session;
     session.game.hands = snap.hands;
     session.game.current_trick = snap.current_trick || [];
-    session.game.tricks_team = snap.tricks_team || (GAME_MODE === 'MOON' ? [[],[],[]] : [[],[]]);
-    session.game.team_points = snap.team_points || (GAME_MODE === 'MOON' ? [0,0,0] : [0,0]);
+    session.game.tricks_team = snap.tricks_team || ((GAME_MODE === 'MOON' || GAME_MODE === 'TN51') ? [[],[],[]] : [[],[]]);
+    session.game.team_points = snap.team_points || ((GAME_MODE === 'MOON' || GAME_MODE === 'TN51') ? [0,0,0] : [0,0]);
     session.game.trump_suit = snap.trump_suit;
     session.game.trump_mode = snap.trump_mode;
     session.game.trick_number = snap.trick_number || 0;
@@ -23045,7 +23208,7 @@ function resumeGameFromSave(){
     session.game.active_players = snap.active_players || Array.from({length: session.game.player_count}, (_, i) => i);
 
     session.phase = snap.phase || PHASE_PLAYING;
-    session.team_marks = snap.team_marks || (GAME_MODE === 'MOON' ? [saved.team1Marks || 0, saved.team2Marks || 0, saved.team3Marks || 0] : [saved.team1Marks || 0, saved.team2Marks || 0]);
+    session.team_marks = snap.team_marks || ((GAME_MODE === 'MOON' || GAME_MODE === 'TN51') ? [saved.team1Marks || 0, saved.team2Marks || 0, saved.team3Marks || 0] : [saved.team1Marks || 0, saved.team2Marks || 0]);
     session.marks_to_win = snap.marks_to_win || 7;
     session.contract = snap.contract || "NORMAL";
     session.current_bid = snap.current_bid || 34;
@@ -23266,7 +23429,7 @@ function saveHandForReplay(name){
     hands: handsToSave,
     dealerSeat: dealerToSave,
     contract: contractToSave,
-    marks: GAME_MODE === 'MOON' ? [session.team_marks[0], session.team_marks[1], session.team_marks[2] || 0] : [session.team_marks[0], session.team_marks[1]],
+    marks: (GAME_MODE === 'MOON' || GAME_MODE === 'TN51') ? [session.team_marks[0], session.team_marks[1], session.team_marks[2] || 0] : [session.team_marks[0], session.team_marks[1]],
     marksToWin: session.marks_to_win,
     moon_widow: widowToSave
   };
@@ -24251,8 +24414,8 @@ function _tilesStr(arr){ return (arr||[]).map(t => _tileStr(t)); }
 function _partnerSeats(seat){
   if(GAME_MODE === 'MOON') return []; // Moon: individual play, no partners
   if(GAME_MODE === 'TN51'){
-    const team = seat % 2;
-    return [0,1,2,3,4,5].filter(s => s !== seat && (s % 2) === team);
+    const team = seat % 3;
+    return [0,1,2,3,4,5].filter(s => s !== seat && (s % 3) === team);
   }
   // T42: 4 players, teams are 0,2 and 1,3
   if(seat % 2 === 0) return [0,2].filter(s => s !== seat);

@@ -1,10 +1,10 @@
 // ============================================================
 // TX-Dom-Dev Service Worker
-// Version: v18.0.0 — Fix TN51 team structure: restore 2 teams of 3
+// Version: v17.99.0 — Tutorial deal visual alignment + click-to-sort fix
 // UPDATE CACHE_NAME every release to bust old caches
 // ============================================================
 
-const CACHE_NAME = 'tx-dom-v18.0.0';
+const CACHE_NAME = 'tx-dom-v17.99.0';
 const urlsToCache = [
   './index.html',
   // CSS
