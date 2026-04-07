@@ -1419,12 +1419,11 @@ class SessionV6_4g{
 
 // AI Bidding Logic
 function evaluateHandForBid(hand) {
-  const isMoon = GAME_MODE === 'MOON';
   const doubles = [];
   const blanks = [];
-  const maxBid = isMoon ? 7 : (GAME_MODE === 'T42' ? 42 : 51);
-  const minBid = isMoon ? 4 : (GAME_MODE === 'T42' ? 30 : 34);
-  const midBid = isMoon ? 5 : (GAME_MODE === 'T42' ? 36 : 42);
+  const maxBid = GAME_MODE === 'MOON' ? 7 : (GAME_MODE === 'T42' ? 42 : 51);
+  const minBid = GAME_MODE === 'MOON' ? 4 : (GAME_MODE === 'T42' ? 30 : 34);
+  const midBid = GAME_MODE === 'MOON' ? 5 : (GAME_MODE === 'T42' ? 36 : 42);
   const maxPip = session.game.max_pip;
 
   for (const tile of hand) {

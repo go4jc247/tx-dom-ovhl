@@ -8,13 +8,13 @@ Format: Same as T42 tutorial — ellipses for pauses, spelled-out numbers, colon
 ## LESSON 1: The Dominoes (4 steps)
 
 **L1_S1_welcome**
-"Welcome to: Tennessee fifty-one Training! ... This tutorial will teach you a bigger, bolder domino game... six players, two teams, and fifty-one points on the line! So pull up a chair, partner... there's room for everyone."
+"Welcome to: Tennessee fifty-one Training! ... This tutorial will teach you a bigger, bolder domino game... six players, three teams, and fifty-one points on the line! So pull up a chair, partner... there's room for everyone."
 
 **L1_S2_domino_set**
 "Tennessee fifty-one uses a double-seven domino set... that's thirty-six dominoes total. Each domino has two ends, with a number from zero to seven on each side. For example... double-seven, six-five, three-blank."
 
 **L1_S3_six_players**
-"Six players sit around the table. All thirty-six dominoes get dealt out... six each. You sit at the bottom. Your two teammates sit across from you... seats two and four. The other three players? ... They're the opposing team."
+"Six players sit around the table. All thirty-six dominoes get dealt out... six each. You sit at the bottom. Your partner sits directly across from you at the top. And those four other players? ... They're on two other teams."
 
 **L1_S4_deal**
 "Here are your six dominoes at the bottom of the screen. Everyone else's dominoes are face-down. Go ahead... tap any of your dominoes to see how they sort!"
@@ -23,14 +23,14 @@ Format: Same as T42 tutorial — ellipses for pauses, spelled-out numbers, colon
 
 ## LESSON 2: Teams & Seating (3 steps)
 
-**L2_S1_two_teams**
-"Two teams! ... Tennessee fifty-one has two teams of three players each. You and the two players across from you... seats two and four... are Team one. The three players on your left and right... that's Team two. Same team structure as forty-two... just with six players instead of four!"
+**L2_S1_three_teams**
+"Three teams! ... Tennessee fifty-one has three teams of two players each. You and your partner across the table are Team one. The players to your left and right... each paired with the player across from them... that's Teams two and three."
 
 **L2_S2_team_dynamics**
-"Here's where it gets interesting... three teammates working together means more firepower. When your team wins the bid, all three of you are trying to make it... and all three opponents are trying to stop you. Teamwork is everything!"
+"Here's where it gets interesting... when one team wins the bid, the other two teams become defenders. Those two defender teams work together to stop the bidder! It's always two against one... team-wise."
 
 **L2_S3_cooperation**
-"With three players per team, communication through your plays matters even more. Your two teammates can help pull trump, protect count, and set up tricks for you. But the other team has three players doing the same thing! ... Stay sharp, partner."
+"That means four players are trying to set the bidding team, and only two are trying to make it. The bidder and their partner have to play sharp... because the odds are stacked against them!"
 
 ---
 
@@ -94,7 +94,7 @@ Format: Same as T42 tutorial — ellipses for pauses, spelled-out numbers, colon
 "Who wins the trick? ... If any trump was played, the highest trump takes it. Otherwise... the highest domino in the led suit wins. The winner leads the next trick. After six tricks, we count up the points."
 
 **L6_S3_strategy**
-"Strategy tip! ... Lead with your strong trumps first to pull trump from all three opponents! Double-seven can't be beaten by anyone. This gets their trumps out of the way... and wins you the trick at the same time. Now let's play!"
+"Strategy tip! ... Lead with your strong trumps first to pull trump from all four opponents! Double-seven can't be beaten by anyone. This gets their trumps out of the way... and wins you the trick at the same time. Now let's play!"
 
 **L6_S4_play**
 "You lead first! Click a domino to play it. Try leading with your strongest trump!"
@@ -104,13 +104,13 @@ Format: Same as T42 tutorial — ellipses for pauses, spelled-out numbers, colon
 ## LESSON 7: Scoring (3 steps)
 
 **L7_S1_scoring**
-"Scoring! ... After six tricks, count up your team's points... that's tricks won plus any count dominoes you captured. Did the bidding team make their bid? ... They earn one mark. Fall short? ... That's called getting set... and the other team gets one mark! First team to seven marks wins the whole game!"
+"Scoring! ... After six tricks, count up your team's points... that's tricks won plus any count dominoes you captured. Did the bidding team make their bid? ... They earn one mark. Fall short? ... That's called getting set... and the other two teams each get one mark! First team to seven marks wins the whole game!"
 
 **L7_S2_example**
-"Here's an example... you bid thirty-four with sevens trump. Your team won four tricks... that's four points. Plus you captured double-five for ten, seven-trey for ten, and four-ace for five. Four plus ten plus ten plus five equals... twenty-nine. Uh oh... that's a set, partner! The other team gets a mark."
+"Here's an example... you bid thirty-four with sevens trump. Your team won four tricks... that's four points. Plus you captured double-five for ten, seven-trey for ten, and four-ace for five. Four plus ten plus ten plus five equals... twenty-nine. Uh oh... that's a set, partner! Both opponent teams get a mark."
 
 **L7_S3_key_facts**
-"Key facts to remember... each trick is worth one point. Five-blank, four-ace, and trey-deuce are five count each. Double-five, six-four, and seven-trey are ten count each. Fifty-one total points available every hand. One mark per hand won... seven marks to win the game. All three teammates' tricks count together!"
+"Key facts to remember... each trick is worth one point. Five-blank, four-ace, and trey-deuce are five count each. Double-five, six-four, and seven-trey are ten count each. Fifty-one total points available every hand. One mark per hand won... seven marks to win the game. Both you and your partner's tricks count together!"
 
 ---
 
@@ -123,7 +123,7 @@ Format: Same as T42 tutorial — ellipses for pauses, spelled-out numbers, colon
 "Trumping a trick! ... When you can't follow suit, playing a trump wins. But be careful... if multiple players trump, the highest trump wins. And with six players in the mix... there's a better chance someone else has trump too!"
 
 **L8_S3_trump_led**
-"When trump is led... everyone must play trump if they've got one. No trump left? Play whatever you like... but you can't win that trick. This is exactly why leading trumps early is so powerful... it gets all three opponents' trumps and drains them dry!"
+"When trump is led... everyone must play trump if they've got one. No trump left? Play whatever you like... but you can't win that trick. This is exactly why leading trumps early is so powerful... it gets all four opponents' trumps and drains them dry!"
 
 ---
 
@@ -149,10 +149,10 @@ Format: Same as T42 tutorial — ellipses for pauses, spelled-out numbers, colon
 ## LESSON 10: Nello (3 steps)
 
 **L10_S1_nello**
-"Special bid: Nello! ... This one's a gamble, partner. You're telling the table: I will win zero tricks! It's available when you bid the maximum... fifty-one. Pull it off with zero tricks won... your team earns a mark. But win even one trick? ... The other team gets the mark."
+"Special bid: Nello! ... This one's a gamble, partner. You're telling the table: I will win zero tricks! It's available when you bid the maximum... fifty-one. Pull it off with zero tricks won... your team earns a mark. But win even one trick? ... The other teams get the mark."
 
 **L10_S2_nello_rules**
-"Nello rules! Your two partners sit out... it's you against the three opponents. No trump suit. You lead first. And you must avoid winning any trick. Nello hands need lots of low dominoes."
+"Nello rules! Your partner sits out... it's you against the other five players. No trump suit. You lead first. And you must avoid winning any trick. Nello hands need lots of low dominoes."
 
 **L10_S3_good_nello**
 "A good Nello hand has lots of blanks and low numbers... no doubles, because doubles are the highest in their suit. Something like: ace-blank, deuce-blank, trey-blank, four-blank, deuce-ace, trey-ace. All very low... real hard to win any trick with those!"
@@ -175,7 +175,7 @@ Format: Same as T42 tutorial — ellipses for pauses, spelled-out numbers, colon
 ## LESSON 12: Final Challenge (7 steps)
 
 **L12_S1_review**
-"You've learned the basics! ... Let's review: thirty-six dominoes, six each, six players, two teams of three. Bid thirty-four to fifty-one on the points your team can win. Pick trump... your strongest suit. Follow suit, use trumps strategically. Forty-five count plus six tricks equals fifty-one. First team to seven marks wins!"
+"You've learned the basics! ... Let's review: thirty-six dominoes, six each, six players, three teams. Bid thirty-four to fifty-one on the points your team can win. Pick trump... your strongest suit. Follow suit, use trumps strategically. Forty-five count plus six tricks equals fifty-one. First team to seven marks wins!"
 
 **L12_S2_reference**
 "Quick reference! ... Five-count dominoes: five-blank, four-ace, trey-deuce. Ten-count dominoes: double-five, six-four, and seven-trey. To bid thirty-four: three trumps with the double, plus two side doubles. Lead strong trumps early! And always... protect your count dominoes!"
@@ -219,11 +219,11 @@ Format: Same as T42 tutorial — ellipses for pauses, spelled-out numbers, colon
 ### Key Differences from T42 Tutorial:
 - Double-7 set (36 tiles) vs Double-6 (28 tiles)
 - 6 players vs 4 players
-- 2 teams of 3 vs 2 teams of 2
+- 3 teams vs 2 teams
 - 8 suits vs 7 suits
 - 6 tricks vs 7 tricks
 - Min bid 34 vs 30, Max bid 51 vs 42
 - 3 ten-count tiles (includes [7|3]) vs 2 ten-count tiles
 - 45 count + 6 tricks = 51 vs 35 count + 7 tricks = 42
-- New Lesson 2 (Teams & Seating) explains 2-team-of-3 dynamics
-- Nello is 1 vs 3 (2 partners sit out) vs 1 vs 2 in T42
+- New Lesson 2 (Teams & Seating) explains 3-team dynamics
+- Nello is 1 vs 5 (partner sits out) vs 1 vs 2 in T42
